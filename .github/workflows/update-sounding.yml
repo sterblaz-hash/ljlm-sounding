@@ -1,39 +1,65 @@
 name: Update LJLM sounding
 
 on:
-  # Omogoči ročni zagon iz zavihka Actions
+  # Omogoča tudi ročni zagon iz zavihka Actions
   workflow_dispatch:
+
+  # Samodejni zagoni po terminih 00 in 12 UTC.
+  # Več poskusov, ker se BUFR pri DWD lahko pojavi z zamikom.
+  schedule:
+    - cron: "10,30,50 0 * * *"
+    - cron: "10,30,50 12 * * *"
 
 jobs:
   update-sounding:
     runs-on: ubuntu-latest
 
+    # Workflow potrebuje dovoljenje za zapis JSON datotek
+    # nazaj v repozitorij.
     permissions:
       contents: write
 
     steps:
+      # --------------------------------------------------------
+      # 1. Prenos vsebine našega repozitorija
+      # --------------------------------------------------------
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
+      # --------------------------------------------------------
+      # 2. Python
+      # --------------------------------------------------------
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.10"
 
+      # --------------------------------------------------------
+      # 3. Namestitev ecCodes
+      # --------------------------------------------------------
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # --------------------------------------------------------
+      # 4. Prenos in dekodiranje LJLM / WMO 14015
+      # --------------------------------------------------------
       - name: Retrieve Ljubljana sounding
         run: |
           python extract_ljlm.py
 
+      # --------------------------------------------------------
+      # 5. Kontrolni izpis rezultata v Actions log
+      # --------------------------------------------------------
       - name: Show result
         run: |
           echo "Contents of data/latest.json:"
           cat data/latest.json
 
+      # --------------------------------------------------------
+      # 6. Shranjevanje nove sondaže v GitHub
+      # --------------------------------------------------------
       - name: Save sounding to repository
         run: |
           git config user.name "github-actions[bot]"
