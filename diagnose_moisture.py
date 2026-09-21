@@ -9,12 +9,7 @@ from eccodes import (
     codes_get_array,
     codes_release,
     codes_set,
-    codes_keys_iterator_new,
-    codes_keys_iterator_next,
-    codes_keys_iterator_get_name,
-    codes_keys_iterator_delete,
 )
-
 
 DWD_URL = (
     "https://opendata.dwd.de/weather/"
@@ -23,7 +18,6 @@ DWD_URL = (
 
 WMO_BLOCK = 14
 WMO_STATION = 15
-
 MAX_FILES = 250
 
 
@@ -32,7 +26,6 @@ def download(url):
         url,
         headers={"User-Agent": "ljlm-sounding/1.0"}
     )
-
     with urlopen(req, timeout=60) as response:
         return response.read()
 
@@ -69,162 +62,196 @@ def get_candidate_files():
         if "latest" not in f.lower()
     ]
 
-    files = sorted(
+    return sorted(
         set(files),
         reverse=True
+    )[:MAX_FILES]
+
+
+def celsius(value):
+    try:
+        if value > 1e10:
+            return None
+        return value - 273.15
+    except Exception:
+        return None
+
+
+def print_row(i, p, t, td):
+
+    p_value = (
+        p[i] / 100.0
+        if i < len(p)
+        else None
     )
 
-    return files[:MAX_FILES]
+    t_value = (
+        celsius(t[i])
+        if i < len(t)
+        else None
+    )
+
+    td_value = (
+        celsius(td[i])
+        if i < len(td)
+        else None
+    )
+
+    print(
+        f"{i:5d} | "
+        f"p={str(round(p_value, 2) if p_value is not None else None):>9} hPa | "
+        f"T={str(round(t_value, 2) if t_value is not None else None):>8} C | "
+        f"Td={str(round(td_value, 2) if td_value is not None else None):>8} C"
+    )
 
 
-def print_array(handle, key):
+def diagnose(handle):
 
-    values = safe_array(handle, key)
+    pressure = safe_array(
+        handle,
+        "pressure"
+    )
+
+    temperature = safe_array(
+        handle,
+        "airTemperature"
+    )
+
+    dewpoint = safe_array(
+        handle,
+        "dewpointTemperature"
+    )
+
+    height = safe_array(
+        handle,
+        "nonCoordinateGeopotentialHeight"
+    )
+
+    wind_speed = safe_array(
+        handle,
+        "windSpeed"
+    )
+
+    wind_direction = safe_array(
+        handle,
+        "windDirection"
+    )
 
     print()
-    print("=" * 60)
-    print(key)
-    print("=" * 60)
-
-    print("Number of values:", len(values))
-
-    if values:
-        print("First 30 values:")
-
-        for i, value in enumerate(values[:30]):
-            print(
-                f"{i:3d}: {value}"
-            )
-
-
-def diagnose_handle(handle):
-
-    print()
-    print("#" * 70)
-    print("LJUBLJANA WMO 14015 FOUND")
-    print("#" * 70)
-
-    year = safe_get(handle, "year")
-    month = safe_get(handle, "month")
-    day = safe_get(handle, "day")
-    hour = safe_get(handle, "hour")
-    minute = safe_get(handle, "minute")
+    print("=" * 80)
+    print("LJUBLJANA 14015")
+    print("=" * 80)
 
     print(
         "Launch:",
-        year,
-        month,
-        day,
-        hour,
-        minute
+        safe_get(handle, "year"),
+        safe_get(handle, "month"),
+        safe_get(handle, "day"),
+        safe_get(handle, "hour"),
+        safe_get(handle, "minute")
     )
-
-    # --------------------------------------------------------
-    # 1. Poskusimo najpogostejša imena spremenljivk
-    # --------------------------------------------------------
-
-    candidate_keys = [
-        "relativeHumidity",
-        "dewpointTemperature",
-        "dewpointTemperatureAt2M",
-        "specificHumidity",
-        "mixingRatio",
-        "waterVapourMixingRatio",
-        "humidityMixingRatio",
-        "airTemperature",
-        "pressure",
-    ]
 
     print()
-    print(
-        "TESTING COMMON MOISTURE KEYS"
-    )
+    print("ARRAY LENGTHS")
+    print("-" * 80)
 
-    for key in candidate_keys:
-        print_array(handle, key)
-
-    # --------------------------------------------------------
-    # 2. Pregled vseh BUFR ključev
-    # --------------------------------------------------------
+    print("pressure             :", len(pressure))
+    print("airTemperature       :", len(temperature))
+    print("dewpointTemperature  :", len(dewpoint))
+    print("height               :", len(height))
+    print("windSpeed            :", len(wind_speed))
+    print("windDirection        :", len(wind_direction))
 
     print()
-    print("#" * 70)
-    print(
-        "ALL KEYS CONTAINING HUMID / DEW / VAPOUR / MIX / MOIST"
-    )
-    print("#" * 70)
+    print("=" * 80)
+    print("FIRST 40 VALUES")
+    print("=" * 80)
 
-    iterator = None
-
-    found_keys = set()
-
-    try:
-
-        iterator = codes_keys_iterator_new(
-            handle
+    for i in range(
+        min(
+            40,
+            max(
+                len(pressure),
+                len(temperature),
+                len(dewpoint)
+            )
+        )
+    ):
+        print_row(
+            i,
+            pressure,
+            temperature,
+            dewpoint
         )
 
-        while codes_keys_iterator_next(
-            iterator
-        ):
+    print()
+    print("=" * 80)
+    print("VALUES AROUND 850 hPa")
+    print("=" * 80)
 
-            key = codes_keys_iterator_get_name(
-                iterator
+    for i, value in enumerate(pressure):
+
+        try:
+            p_hpa = value / 100.0
+        except Exception:
+            continue
+
+        if 800 <= p_hpa <= 900:
+
+            start = max(
+                0,
+                i - 5
             )
 
-            key_lower = key.lower()
+            end = min(
+                len(pressure),
+                i + 6
+            )
 
-            if (
-                "humid" in key_lower
-                or "dew" in key_lower
-                or "vapour" in key_lower
-                or "vapor" in key_lower
-                or "mix" in key_lower
-                or "moist" in key_lower
+            for j in range(
+                start,
+                end
             ):
-
-                if key in found_keys:
-                    continue
-
-                found_keys.add(key)
-
-                print()
-                print("KEY:", key)
-
-                values = safe_array(
-                    handle,
-                    key
+                print_row(
+                    j,
+                    pressure,
+                    temperature,
+                    dewpoint
                 )
 
-                print(
-                    "Number of values:",
-                    len(values)
-                )
-
-                if values:
-                    print(
-                        "First 20:",
-                        values[:20]
-                    )
-
-    except Exception as exc:
-
-        print(
-            "Key iterator error:",
-            exc
-        )
-
-    finally:
-
-        if iterator is not None:
-            codes_keys_iterator_delete(
-                iterator
-            )
+            print("-" * 80)
 
     print()
-    print("#" * 70)
-    print("DIAGNOSTICS FINISHED")
-    print("#" * 70)
+    print("=" * 80)
+    print("LAST 40 VALUES")
+    print("=" * 80)
+
+    maximum = max(
+        len(pressure),
+        len(temperature),
+        len(dewpoint)
+    )
+
+    start = max(
+        0,
+        maximum - 40
+    )
+
+    for i in range(
+        start,
+        maximum
+    ):
+        print_row(
+            i,
+            pressure,
+            temperature,
+            dewpoint
+        )
+
+    print()
+    print("=" * 80)
+    print("END OF DIAGNOSTICS")
+    print("=" * 80)
 
 
 def scan_bufr(path):
@@ -236,11 +263,9 @@ def scan_bufr(path):
             handle = None
 
             try:
-
                 handle = (
                     codes_bufr_new_from_file(f)
                 )
-
             except Exception:
                 break
 
@@ -270,8 +295,7 @@ def scan_bufr(path):
                     and station == WMO_STATION
                 ):
 
-                    diagnose_handle(handle)
-
+                    diagnose(handle)
                     return True
 
             except Exception as exc:
@@ -292,7 +316,7 @@ def scan_bufr(path):
 def main():
 
     print(
-        "Searching for latest Ljubljana sounding..."
+        "Searching latest Ljubljana sounding..."
     )
 
     files = get_candidate_files()
@@ -316,14 +340,11 @@ def main():
             content = download(
                 DWD_URL + filename
             )
-
         except Exception as exc:
-
             print(
                 "Download failed:",
                 exc
             )
-
             continue
 
         tmp_path = None
@@ -338,11 +359,7 @@ def main():
                 tmp.write(content)
                 tmp_path = tmp.name
 
-            found = scan_bufr(
-                tmp_path
-            )
-
-            if found:
+            if scan_bufr(tmp_path):
                 return
 
         finally:
@@ -353,10 +370,8 @@ def main():
             ):
                 os.remove(tmp_path)
 
-    print()
     print(
-        "Ljubljana WMO 14015 "
-        "was not found."
+        "Ljubljana 14015 not found."
     )
 
 
