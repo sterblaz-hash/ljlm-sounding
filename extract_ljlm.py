@@ -223,12 +223,6 @@ def read_ljlm_from_bufr(path):
                     "wind_direction": len(wind_direction),
                 }
 
-                # DWD BUFR ima pri tej sondaži eno dodatno
-                # tlačno vrednost na koncu.
-                #
-                # Dejanski profil zato omejimo na skupno
-                # dolžino profilnih meteoroloških spremenljivk.
-
                 profile_lengths = [
                     len(temperature),
                     len(dewpoint),
@@ -739,8 +733,7 @@ def prepare_metpy_profile(levels):
         reverse=True
     )
 
-    # Odstranimo morebitne zaporedne
-    # podvojene tlačne nivoje.
+    # Odstranimo morebitne podvojene tlačne nivoje.
     unique_rows = []
     last_pressure = None
 
@@ -1260,7 +1253,7 @@ def calculate_metpy_parameters(
 
     # ========================================================
     # MLCAPE / MLCIN
-    # Standardna 100-hPa mešana plast
+    # 100-hPa mešana plast
     # ========================================================
 
     ml = safe_parameter(
@@ -1293,7 +1286,99 @@ def calculate_metpy_parameters(
         )
 
     # ========================================================
+    # MOST UNSTABLE PARCEL
+    # Iskanje v spodnjih 300 hPa profila
+    # ========================================================
+
+    mu_parcel = safe_parameter(
+        "Most Unstable Parcel",
+        lambda:
+            mpcalc.most_unstable_parcel(
+                p,
+                t,
+                td,
+                depth=300 * units.hPa
+            )
+    )
+
+    if mu_parcel is not None:
+
+        try:
+
+            (
+                mu_pressure,
+                mu_temperature,
+                mu_dewpoint,
+                mu_index
+            ) = mu_parcel
+
+            result[
+                "mu_parcel_pressure_hpa"
+            ] = quantity_value(
+                mu_pressure,
+                "hPa"
+            )
+
+            result[
+                "mu_parcel_temperature_c"
+            ] = quantity_value(
+                mu_temperature,
+                "degC"
+            )
+
+            result[
+                "mu_parcel_dewpoint_c"
+            ] = quantity_value(
+                mu_dewpoint,
+                "degC"
+            )
+
+            mu_height_msl = (
+                height_at_pressure(
+                    p,
+                    z,
+                    mu_pressure
+                )
+            )
+
+            if mu_height_msl is not None:
+
+                result[
+                    "mu_parcel_height_msl_m"
+                ] = round(
+                    mu_height_msl,
+                    0
+                )
+
+                result[
+                    "mu_parcel_height_agl_m"
+                ] = round(
+                    mu_height_msl
+                    - surface_height,
+                    0
+                )
+
+            else:
+
+                result[
+                    "mu_parcel_height_msl_m"
+                ] = None
+
+                result[
+                    "mu_parcel_height_agl_m"
+                ] = None
+
+        except Exception as exc:
+
+            print(
+                "MetPy warning "
+                "(MU parcel details):",
+                exc
+            )
+
+    # ========================================================
     # MUCAPE / MUCIN
+    # Enaka 300-hPa iskalna plast kot zgoraj
     # ========================================================
 
     mu = safe_parameter(
@@ -1302,7 +1387,8 @@ def calculate_metpy_parameters(
             mpcalc.most_unstable_cape_cin(
                 p,
                 t,
-                td
+                td,
+                depth=300 * units.hPa
             )
     )
 
@@ -1497,8 +1583,8 @@ def determine_term(
     launch_time
 ):
 
-    # Sondaža termina 00 UTC je lahko dejansko
-    # izpuščena okoli 23:30 UTC prejšnjega dne.
+    # 00 UTC sonda je lahko izpuščena okoli
+    # 23:30 UTC prejšnjega koledarskega dne.
 
     if launch_time.hour >= 18:
 
@@ -1831,6 +1917,30 @@ def print_results(
             "mucin_jkg"
         ),
         "J/kg"
+    )
+
+    print(
+        "MU parcel:",
+        metpy.get(
+            "mu_parcel_pressure_hpa"
+        ),
+        "hPa |",
+        metpy.get(
+            "mu_parcel_temperature_c"
+        ),
+        "C | Td",
+        metpy.get(
+            "mu_parcel_dewpoint_c"
+        ),
+        "C |",
+        metpy.get(
+            "mu_parcel_height_msl_m"
+        ),
+        "m MSL |",
+        metpy.get(
+            "mu_parcel_height_agl_m"
+        ),
+        "m AGL"
     )
 
     print()
