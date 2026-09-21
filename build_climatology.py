@@ -1042,8 +1042,7 @@ def smooth_climatology(
 
             output = dict(original)
 
-            for percentile
-            in percentile_names:
+            for percentile in percentile_names:
 
                 values = []
 
