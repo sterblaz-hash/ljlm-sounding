@@ -892,6 +892,14 @@ def percentile_statistics(
                 float(np.max(values)),
                 2
             ),
+
+        # Urejene zgodovinske vrednosti iz ±15-dnevnega okna.
+        # Omogočajo izračun dejanskega empiričnega percentila
+        # aktualne sondaže brez približevanja med P10/P50/P90.
+        "distribution": [
+            round(float(value), 4)
+            for value in np.sort(values)
+        ],
     }
 
 
@@ -1425,6 +1433,13 @@ def main():
                     "10-day moving mean "
                     "of percentile curves; "
                     "extremes are not smoothed"
+                ),
+
+            "distribution_description":
+                (
+                    "Sorted unsmoothed empirical values "
+                    "from the ±15-day climatological window; "
+                    "used for exact empirical percentile ranks."
                 ),
 
             "daily_deduplication":
