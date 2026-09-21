@@ -1,16 +1,37 @@
-name: Test LJLM MetPy
+name: Update LJLM sounding
 
 on:
   workflow_dispatch:
 
+  schedule:
+    # GitHub uporablja UTC.
+    #
+    # Več poskusov po vsakem terminu,
+    # ker čas prihoda BUFR v DWD ni vedno enak.
+    #
+    # 00 UTC
+    - cron: "20 0 * * *"
+    - cron: "50 0 * * *"
+    - cron: "20 1 * * *"
+    - cron: "50 1 * * *"
+
+    # 12 UTC
+    - cron: "20 12 * * *"
+    - cron: "50 12 * * *"
+    - cron: "20 13 * * *"
+    - cron: "50 13 * * *"
+
 jobs:
-  test-sounding:
+
+  update-sounding:
+
     runs-on: ubuntu-latest
 
     permissions:
       contents: write
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v7
 
@@ -24,13 +45,50 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Retrieve and analyse Ljubljana sounding
+      - name: Retrieve Ljubljana sounding
         run: |
           python extract_ljlm.py
 
-      - name: Show generated parameters
+      - name: Show latest sounding
+        if: always()
         run: |
-          echo "========================================"
-          echo "LATEST.JSON"
-          echo "========================================"
-          cat data/latest.json
+          if [ -f data/latest.json ]; then
+            echo "latest.json exists"
+            python - <<'PY'
+          import json
+
+          with open(
+              "data/latest.json",
+              "r",
+              encoding="utf-8"
+          ) as f:
+              d = json.load(f)
+
+          print(
+              "Nominal:",
+              d.get("nominal_date"),
+              d.get("term")
+          )
+
+          print(
+              "Launch:",
+              d.get("launch_time")
+          )
+          PY
+          else
+            echo "No latest.json yet."
+          fi
+
+      - name: Commit new sounding
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/
+
+          if git diff --cached --quiet; then
+            echo "No new sounding to commit."
+          else
+            git commit -m "Update LJLM sounding"
+            git push
+          fi
