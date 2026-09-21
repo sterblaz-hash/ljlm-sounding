@@ -1,6 +1,7 @@
 import io
 import json
 import math
+import os
 import zipfile
 from collections import defaultdict
 from datetime import date, datetime, timedelta
@@ -71,8 +72,6 @@ def download(url):
 def parse_header(line):
     """
     IGRA v2 profile header.
-
-    Returns only the fields that we need.
     """
 
     if not line.startswith("#"):
@@ -107,25 +106,17 @@ def parse_level(line):
     """
     Parse one IGRA level.
 
-    Relevant fixed-width fields:
-
     pressure:
-        columns 10-15
         Pa
 
     geopotential height:
-        columns 17-21
         metres
 
     temperature:
-        columns 23-27
         tenths degC
 
     dewpoint depression:
-        columns 35-39
         tenths degC
-
-    Missing values are normally -9999 / -8888.
     """
 
     try:
@@ -304,7 +295,6 @@ def interpolate_pressure(
     if not usable:
         return None
 
-    # Najprej neposredna meritev.
     exact = [
         x for x in usable
         if abs(
@@ -350,7 +340,7 @@ def interpolate_pressure(
     p1 = above["pressure_hpa"]
     p2 = below["pressure_hpa"]
 
-    # Ne interpoliramo čez ogromne luknje.
+    # Ne interpoliramo čez prevelike luknje.
     if abs(p1 - p2) > 100:
         return None
 
@@ -395,9 +385,7 @@ def freezing_level(levels):
     if len(rows) < 2:
         return None
 
-    # Iščemo prvi prehod iz pozitivne
-    # v negativno temperaturo nad postajo.
-
+    # Prvi prehod iz T >= 0 °C v T < 0 °C.
     for i in range(
         len(rows) - 1
     ):
@@ -438,14 +426,46 @@ def freezing_level(levels):
 # ============================================================
 
 def calculate_pwat(levels):
+    """
+    Izračun precipitable water (PWAT) iz profila rosišča.
+
+    QC:
+    - najmanj 10 veljavnih nivojev rosišča,
+    - profil rosišča se mora začeti dovolj blizu spodnjega
+      dela sondaže,
+    - profil rosišča mora segati vsaj do 300 hPa,
+    - odstranimo podvojene tlake.
+
+    S tem preprečimo, da bi delni profil vlage obravnavali
+    kot celotni PWAT.
+    """
+
+    # --------------------------------------------------------
+    # Celotni tlačni profil
+    # --------------------------------------------------------
+
+    all_pressure_rows = [
+        x for x in levels
+        if x.get("pressure_hpa") is not None
+    ]
+
+    if not all_pressure_rows:
+        return None
+
+    surface_pressure = max(
+        x["pressure_hpa"]
+        for x in all_pressure_rows
+    )
+
+    # --------------------------------------------------------
+    # Samo nivoji z rosiščem
+    # --------------------------------------------------------
 
     rows = [
         x for x in levels
         if (
-            x["pressure_hpa"]
-            is not None
-            and x["dewpoint_c"]
-            is not None
+            x.get("pressure_hpa") is not None
+            and x.get("dewpoint_c") is not None
         )
     ]
 
@@ -458,25 +478,65 @@ def calculate_pwat(levels):
         reverse=True
     )
 
-    # Odstranimo podvojene tlake.
+    # --------------------------------------------------------
+    # Odstranimo podvojene tlake
+    # --------------------------------------------------------
+
     unique = []
     seen = set()
 
     for row in rows:
 
-        p = round(
+        p_key = round(
             row["pressure_hpa"],
             2
         )
 
-        if p in seen:
+        if p_key in seen:
             continue
 
-        seen.add(p)
+        seen.add(p_key)
         unique.append(row)
 
     if len(unique) < 10:
         return None
+
+    highest_moisture_pressure = (
+        unique[0]["pressure_hpa"]
+    )
+
+    lowest_moisture_pressure = (
+        unique[-1]["pressure_hpa"]
+    )
+
+    # --------------------------------------------------------
+    # QC 1
+    #
+    # Profil vlage se mora začeti blizu spodnjega dela
+    # celotnega profila.
+    #
+    # Dovolimo največ 50 hPa razlike.
+    # --------------------------------------------------------
+
+    if (
+        surface_pressure
+        - highest_moisture_pressure
+        > 50
+    ):
+        return None
+
+    # --------------------------------------------------------
+    # QC 2
+    #
+    # Rosišče mora segati vsaj do 300 hPa.
+    # --------------------------------------------------------
+
+    if lowest_moisture_pressure > 300:
+        return None
+
+    # --------------------------------------------------------
+    # METPY
+    # --------------------------------------------------------
 
     p = np.array(
         [
@@ -508,6 +568,11 @@ def calculate_pwat(levels):
         )
 
         if not math.isfinite(value):
+            return None
+
+        # Zelo širok sanity check.
+        # Pravih meteoroloških ekstremov nočemo rezati.
+        if value <= 0 or value > 100:
             return None
 
         return value
@@ -643,15 +708,11 @@ def calculate_profile_parameters(
 
 def deduplicate_daily(records):
     """
-    V starejšem arhivu so lahko za isti
-    datum podvojeni ali skoraj podvojeni
-    profili.
+    Za klimatologijo uporabimo največ eno reprezentativno
+    vrednost posameznega parametra na koledarski dan.
 
-    Za klimatologijo želimo največ eno
-    reprezentativno vrednost na dan.
-
-    Če je več profilov istega dne,
-    vzamemo mediano posameznega parametra.
+    Če je istega dne več profilov, vzamemo mediano
+    posameznega parametra.
     """
 
     grouped = defaultdict(list)
@@ -717,7 +778,7 @@ def climatological_day(
 ):
     """
     Uporabimo prestopno referenčno leto,
-    da obstaja tudi 29. februar.
+    zato obstaja tudi 29. februar.
     """
 
     return date(
@@ -1017,8 +1078,7 @@ def smooth_climatology(
     smoothed = {}
 
     # 10-dnevno centrirano glajenje:
-    # pet dni nazaj + tekoči dan +
-    # štirje dnevi naprej = 10 dni.
+    # 5 dni nazaj + tekoči dan + 4 dni naprej.
 
     offsets = list(
         range(-5, 5)
@@ -1089,8 +1149,8 @@ def smooth_climatology(
                         2
                     )
 
-            # min/max in njuni datumi
-            # namenoma ostanejo NEGLAJENI.
+            # min, max in datumi ekstremov ostanejo
+            # namenoma NEGLAJENI.
 
             smoothed[key][
                 parameter
@@ -1137,6 +1197,7 @@ def print_qc(records):
 
         print()
         print(parameter)
+
         print(
             "  valid:",
             len(valid)
@@ -1174,6 +1235,56 @@ def print_qc(records):
                 maximum["date"]
             )
 
+    # ========================================================
+    # POSEBEN PWAT QC
+    # ========================================================
+
+    pwat_records = [
+        r
+        for r in records
+        if valid_number(
+            r.get("pwat_mm")
+        )
+    ]
+
+    pwat_records.sort(
+        key=lambda r:
+            r["pwat_mm"]
+    )
+
+    print()
+    print("=" * 60)
+    print("PWAT QC - 10 LOWEST VALUES")
+    print("=" * 60)
+
+    for record in pwat_records[:10]:
+
+        print(
+            record["date"],
+            round(
+                record["pwat_mm"],
+                2
+            ),
+            "mm"
+        )
+
+    print()
+    print("=" * 60)
+    print("PWAT QC - 10 HIGHEST VALUES")
+    print("=" * 60)
+
+    for record in pwat_records[-10:][::-1]:
+
+        print(
+            record["date"],
+            round(
+                record["pwat_mm"],
+                2
+            ),
+            "mm"
+        )
+
+    print()
     print("=" * 60)
 
 
@@ -1334,8 +1445,15 @@ def main():
             "pwat_method":
                 (
                     "MetPy precipitable_water "
-                    "from available dewpoint "
-                    "profile"
+                    "from available dewpoint profile"
+                ),
+
+            "pwat_qc":
+                (
+                    "Dewpoint profile must begin "
+                    "within 50 hPa of the bottom "
+                    "of the sounding and extend "
+                    "to at least 300 hPa."
                 ),
 
             "created_utc":
@@ -1347,8 +1465,6 @@ def main():
         "daily":
             climatology,
     }
-
-    import os
 
     os.makedirs(
         "climatology",
@@ -1370,13 +1486,18 @@ def main():
 
     print()
     print("=" * 60)
+
     print(
         "Saved:",
         OUTPUT_FILE
     )
+
     print("=" * 60)
 
-    # Primer 21. september
+    # ========================================================
+    # PRIMER: 21. SEPTEMBER
+    # ========================================================
+
     sample = (
         climatology
         .get(
@@ -1397,6 +1518,11 @@ def main():
 
         print()
         print(parameter)
+
+        print(
+            "  N:",
+            stats.get("n")
+        )
 
         print(
             "  P10:",
