@@ -2,7 +2,6 @@ import json
 import math
 import os
 import re
-import sys
 import tempfile
 from datetime import datetime, timezone, timedelta
 from urllib.request import urlopen, Request
@@ -233,18 +232,11 @@ def read_ljlm_from_bufr(path):
                     "wind_direction": len(wind_direction),
                 }
 
-                # ------------------------------------------------
-                # Pomembno:
+                # DWD BUFR ima v tem primeru eno dodatno
+                # osamljeno tlačno vrednost na koncu.
                 #
-                # V našem DWD BUFR ima pressure eno dodatno
-                # osamljeno vrednost na koncu.
-                #
-                # Vse druge profilne spremenljivke imajo enako
-                # število elementov.
-                #
-                # Zato profil omejimo na skupno dolžino dejanskih
-                # meteoroloških spremenljivk.
-                # ------------------------------------------------
+                # Profil omejimo na skupno dolžino dejanskih
+                # meteoroloških profilnih spremenljivk.
 
                 profile_lengths = [
                     len(temperature),
@@ -500,7 +492,7 @@ def value_at_pressure(
 
 
 # ============================================================
-# METPY PROFIL
+# METPY TERMO PROFIL
 # ============================================================
 
 def prepare_metpy_profile(levels):
@@ -521,6 +513,12 @@ def prepare_metpy_profile(levels):
 
     if len(rows) < 10:
         return None
+
+    # Profil mora biti od visokega proti nizkemu tlaku.
+    rows.sort(
+        key=lambda x: x["pressure_hpa"],
+        reverse=True
+    )
 
     pressure = np.array(
         [
@@ -585,6 +583,11 @@ def prepare_wind_profile(levels):
 
     if len(rows) < 2:
         return None
+
+    rows.sort(
+        key=lambda x: x["pressure_hpa"],
+        reverse=True
+    )
 
     pressure = np.array(
         [
@@ -817,7 +820,7 @@ def calculate_metpy_parameters(levels):
         )
 
     # --------------------------------------------------------
-    # Surface-based CAPE/CIN
+    # SURFACE-BASED CAPE / CIN
     # --------------------------------------------------------
 
     sb = safe_parameter(
@@ -849,7 +852,9 @@ def calculate_metpy_parameters(levels):
         )
 
     # --------------------------------------------------------
-    # Ničta izoterma
+    # NIČTA IZOTERMA
+    #
+    # Poiščemo prvo spremembo T iz >= 0 na < 0 pri vzpenjanju.
     # --------------------------------------------------------
 
     freezing_level = None
@@ -858,11 +863,29 @@ def calculate_metpy_parameters(levels):
         len(t) - 1
     ):
 
-        t1 = t[i].to("degC").magnitude
-        t2 = t[i + 1].to("degC").magnitude
+        t1 = (
+            t[i]
+            .to("degC")
+            .magnitude
+        )
 
-        z1 = z[i].to("meter").magnitude
-        z2 = z[i + 1].to("meter").magnitude
+        t2 = (
+            t[i + 1]
+            .to("degC")
+            .magnitude
+        )
+
+        z1 = (
+            z[i]
+            .to("meter")
+            .magnitude
+        )
+
+        z2 = (
+            z[i + 1]
+            .to("meter")
+            .magnitude
+        )
 
         if (
             t1 >= 0
@@ -876,7 +899,8 @@ def calculate_metpy_parameters(levels):
 
             freezing_level = (
                 z1
-                + fraction * (z2 - z1)
+                + fraction
+                * (z2 - z1)
             )
 
             break
@@ -891,7 +915,7 @@ def calculate_metpy_parameters(levels):
     )
 
     # --------------------------------------------------------
-    # SHEAR
+    # VETROVNI STRIG
     # --------------------------------------------------------
 
     wind = prepare_wind_profile(
@@ -918,8 +942,10 @@ def calculate_metpy_parameters(levels):
                         v,
                         height=wz,
                         bottom=surface_height,
-                        depth=depth_km
-                        * units.kilometer
+                        depth=(
+                            depth_km
+                            * units.kilometer
+                        )
                     )
             )
 
@@ -928,11 +954,9 @@ def calculate_metpy_parameters(levels):
 
             u_shear, v_shear = shear
 
-            magnitude = (
-                np.sqrt(
-                    u_shear ** 2
-                    + v_shear ** 2
-                )
+            magnitude = np.sqrt(
+                u_shear ** 2
+                + v_shear ** 2
             )
 
             result[
@@ -946,75 +970,34 @@ def calculate_metpy_parameters(levels):
 
 
 # ============================================================
-# PRIČAKOVANI TERMIN
+# TERMIN SONDAŽE
 # ============================================================
 
-def expected_sounding_time(now=None):
+def determine_term(launch_time):
 
-    if now is None:
-        now = datetime.now(
-            timezone.utc
-        )
+    # Ljubljana 00 UTC je lahko dejansko izpuščena
+    # že prejšnji koledarski dan okoli 23:30 UTC.
 
-    if now.hour < 6:
-
-        expected = now.replace(
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0
-        )
+    if launch_time.hour >= 18:
 
         term = "00"
 
-    elif now.hour < 18:
+        nominal_date = (
+            launch_time
+            + timedelta(days=1)
+        ).date()
 
-        expected = now.replace(
-            hour=12,
-            minute=0,
-            second=0,
-            microsecond=0
-        )
+    elif launch_time.hour < 6:
 
-        term = "12"
+        term = "00"
+        nominal_date = launch_time.date()
 
     else:
 
-        expected = (
-            now
-            + timedelta(days=1)
-        ).replace(
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0
-        )
+        term = "12"
+        nominal_date = launch_time.date()
 
-        term = "00"
-
-    return expected, term
-
-
-def sounding_matches_expected_term(
-    launch_time,
-    expected_time
-):
-
-    start = (
-        expected_time
-        - timedelta(minutes=90)
-    )
-
-    end = (
-        expected_time
-        + timedelta(hours=3)
-    )
-
-    return (
-        start
-        <= launch_time
-        <= end
-    )
+    return term, nominal_date
 
 
 # ============================================================
@@ -1023,9 +1006,19 @@ def sounding_matches_expected_term(
 
 def save_json(
     profile,
-    source_file,
-    term
+    source_file
 ):
+
+    launch = datetime.fromisoformat(
+        profile["launch_time"].replace(
+            "Z",
+            "+00:00"
+        )
+    )
+
+    term, nominal_date = (
+        determine_term(launch)
+    )
 
     # --------------------------------------------------------
     # Standardni nivoji
@@ -1081,6 +1074,10 @@ def save_json(
 
     profile["term"] = term
 
+    profile["nominal_date"] = (
+        nominal_date.isoformat()
+    )
+
     profile["parameters"] = {
         "standard_levels":
             standard_levels,
@@ -1117,31 +1114,10 @@ def save_json(
     # ARHIV
     # --------------------------------------------------------
 
-    launch = datetime.fromisoformat(
-        profile["launch_time"]
-        .replace(
-            "Z",
-            "+00:00"
-        )
-    )
-
-    if (
-        term == "00"
-        and launch.hour >= 18
-    ):
-
-        archive_date = (
-            launch
-            + timedelta(days=1)
-        )
-
-    else:
-        archive_date = launch
-
     archive_dir = os.path.join(
         "data",
-        f"{archive_date.year:04d}",
-        f"{archive_date.month:02d}"
+        f"{nominal_date.year:04d}",
+        f"{nominal_date.month:02d}"
     )
 
     os.makedirs(
@@ -1151,7 +1127,10 @@ def save_json(
 
     archive_file = os.path.join(
         archive_dir,
-        f"{archive_date:%Y%m%d}_{term}.json"
+        (
+            f"{nominal_date:%Y%m%d}"
+            f"_{term}.json"
+        )
     )
 
     with open(
@@ -1171,6 +1150,137 @@ def save_json(
 
 
 # ============================================================
+# IZPIS REZULTATOV
+# ============================================================
+
+def print_results(profile):
+
+    parameters = (
+        profile["parameters"]
+    )
+
+    standard = (
+        parameters[
+            "standard_levels"
+        ]
+    )
+
+    metpy = (
+        parameters["metpy"]
+    )
+
+    print()
+    print("=" * 60)
+    print(
+        "METEOROLOGICAL PARAMETERS"
+    )
+    print("=" * 60)
+
+    print(
+        "T850:",
+        standard.get("t850")
+    )
+
+    print(
+        "T700:",
+        standard.get("t700")
+    )
+
+    print(
+        "T500:",
+        standard.get("t500")
+    )
+
+    print(
+        "Td850:",
+        standard.get("td850")
+    )
+
+    print(
+        "RH850:",
+        standard.get("rh850")
+    )
+
+    print(
+        "PWAT:",
+        metpy.get("pwat_mm"),
+        "mm"
+    )
+
+    print(
+        "Freezing level:",
+        metpy.get(
+            "freezing_level_m"
+        ),
+        "m"
+    )
+
+    print(
+        "LCL:",
+        metpy.get(
+            "lcl_pressure_hpa"
+        ),
+        "hPa"
+    )
+
+    print(
+        "LFC:",
+        metpy.get(
+            "lfc_pressure_hpa"
+        ),
+        "hPa"
+    )
+
+    print(
+        "EL:",
+        metpy.get(
+            "el_pressure_hpa"
+        ),
+        "hPa"
+    )
+
+    print(
+        "SBCAPE:",
+        metpy.get(
+            "sbcape_jkg"
+        ),
+        "J/kg"
+    )
+
+    print(
+        "SBCIN:",
+        metpy.get(
+            "sbcin_jkg"
+        ),
+        "J/kg"
+    )
+
+    print(
+        "0-1 km shear:",
+        metpy.get(
+            "shear_0_1km_ms"
+        ),
+        "m/s"
+    )
+
+    print(
+        "0-3 km shear:",
+        metpy.get(
+            "shear_0_3km_ms"
+        ),
+        "m/s"
+    )
+
+    print(
+        "0-6 km shear:",
+        metpy.get(
+            "shear_0_6km_ms"
+        ),
+        "m/s"
+    )
+
+
+# ============================================================
 # GLAVNI PROGRAM
 # ============================================================
 
@@ -1180,19 +1290,19 @@ def main():
         timezone.utc
     )
 
-    expected_time, term = (
-        expected_sounding_time(now)
-    )
-
     print(
         "Current UTC time:",
         now.isoformat()
     )
 
+    print()
     print(
-        "Expected sounding term:",
-        expected_time.isoformat(),
-        f"({term} UTC)"
+        "TEST MODE:"
+    )
+
+    print(
+        "The newest available Ljubljana "
+        "sounding will be analysed."
     )
 
     print()
@@ -1257,17 +1367,6 @@ def main():
             if profile is None:
                 continue
 
-            launch = (
-                datetime.fromisoformat(
-                    profile[
-                        "launch_time"
-                    ].replace(
-                        "Z",
-                        "+00:00"
-                    )
-                )
-            )
-
             print()
             print(
                 "LJUBLJANA 14015 FOUND"
@@ -1290,162 +1389,30 @@ def main():
                 profile["qc"]
             )
 
-            if not (
-                sounding_matches_expected_term(
-                    launch,
-                    expected_time
-                )
-            ):
-
-                print()
-                print(
-                    "Sounding does not "
-                    "belong to expected term."
-                )
-
-                print(
-                    "latest.json will "
-                    "NOT be changed."
-                )
-
-                return
+            # --------------------------------------------
+            # TESTNA VERZIJA:
+            # ne preverjamo pričakovanega 00/12 termina.
+            # Analiziramo najnovejšo najdeno sondažo.
+            # --------------------------------------------
 
             archive_file = save_json(
                 profile,
-                filename,
-                term
+                filename
             )
 
-            parameters = (
-                profile["parameters"]
-            )
-
-            standard = (
-                parameters[
-                    "standard_levels"
-                ]
-            )
-
-            metpy = (
-                parameters["metpy"]
+            print_results(
+                profile
             )
 
             print()
             print(
-                "=" * 60
+                "Nominal date:",
+                profile["nominal_date"]
             )
 
             print(
-                "METEOROLOGICAL PARAMETERS"
-            )
-
-            print(
-                "=" * 60
-            )
-
-            print(
-                "T850:",
-                standard.get("t850")
-            )
-
-            print(
-                "T700:",
-                standard.get("t700")
-            )
-
-            print(
-                "T500:",
-                standard.get("t500")
-            )
-
-            print(
-                "Td850:",
-                standard.get("td850")
-            )
-
-            print(
-                "RH850:",
-                standard.get("rh850")
-            )
-
-            print(
-                "PWAT:",
-                metpy.get(
-                    "pwat_mm"
-                ),
-                "mm"
-            )
-
-            print(
-                "Freezing level:",
-                metpy.get(
-                    "freezing_level_m"
-                ),
-                "m"
-            )
-
-            print(
-                "LCL:",
-                metpy.get(
-                    "lcl_pressure_hpa"
-                ),
-                "hPa"
-            )
-
-            print(
-                "LFC:",
-                metpy.get(
-                    "lfc_pressure_hpa"
-                ),
-                "hPa"
-            )
-
-            print(
-                "EL:",
-                metpy.get(
-                    "el_pressure_hpa"
-                ),
-                "hPa"
-            )
-
-            print(
-                "SBCAPE:",
-                metpy.get(
-                    "sbcape_jkg"
-                ),
-                "J/kg"
-            )
-
-            print(
-                "SBCIN:",
-                metpy.get(
-                    "sbcin_jkg"
-                ),
-                "J/kg"
-            )
-
-            print(
-                "0-1 km shear:",
-                metpy.get(
-                    "shear_0_1km_ms"
-                ),
-                "m/s"
-            )
-
-            print(
-                "0-3 km shear:",
-                metpy.get(
-                    "shear_0_3km_ms"
-                ),
-                "m/s"
-            )
-
-            print(
-                "0-6 km shear:",
-                metpy.get(
-                    "shear_0_6km_ms"
-                ),
-                "m/s"
+                "Term:",
+                profile["term"]
             )
 
             print()
