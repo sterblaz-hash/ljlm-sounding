@@ -34,6 +34,7 @@ WMO_BLOCK = 14
 WMO_STATION = 15
 
 OUTPUT_LATEST = "data/latest.json"
+CLIMATOLOGY_FILE = "climatology/daily_climatology.json"
 
 MAX_CANDIDATE_FILES = 250
 
@@ -1509,6 +1510,284 @@ def sounding_already_saved(
 
 
 # ============================================================
+# KLIMATOLOŠKI PERCENTILI
+# ============================================================
+
+def empirical_percentile(value, distribution):
+    """
+    Empirični percentil glede na dejanske zgodovinske vrednosti.
+
+    Pri izenačenih vrednostih uporabimo srednji rang:
+    delež vrednosti pod aktualno vrednostjo + polovica deleža
+    vrednosti, ki so ji enake.
+    """
+
+    if not valid_number(value):
+        return None
+
+    values = np.asarray(
+        [
+            float(x)
+            for x in distribution
+            if valid_number(x)
+        ],
+        dtype=float
+    )
+
+    if len(values) == 0:
+        return None
+
+    value = float(value)
+
+    lower = np.sum(values < value)
+    equal = np.sum(
+        np.isclose(
+            values,
+            value,
+            rtol=0.0,
+            atol=1e-9
+        )
+    )
+
+    percentile = (
+        lower + 0.5 * equal
+    ) / len(values) * 100.0
+
+    return round(
+        float(percentile),
+        1
+    )
+
+
+def load_climatology_for_date(
+    nominal_date
+):
+    """
+    Prebere klimatologijo za koledarski dan nominalnega termina.
+    """
+
+    if not os.path.exists(
+        CLIMATOLOGY_FILE
+    ):
+        print(
+            "Climatology file not found:",
+            CLIMATOLOGY_FILE
+        )
+        return None
+
+    try:
+
+        with open(
+            CLIMATOLOGY_FILE,
+            "r",
+            encoding="utf-8"
+        ) as f:
+            climatology = json.load(f)
+
+        key = nominal_date.strftime(
+            "%m-%d"
+        )
+
+        return (
+            climatology
+            .get("daily", {})
+            .get(key)
+        )
+
+    except Exception as exc:
+
+        print(
+            "Climatology read warning:",
+            exc
+        )
+
+        return None
+
+
+def climatology_result(
+    value,
+    climatology_parameter
+):
+    """
+    Sestavi rezultat aktualna vrednost + empirični percentil
+    + glavne klimatološke referenčne vrednosti.
+    """
+
+    if (
+        not valid_number(value)
+        or climatology_parameter is None
+    ):
+        return None
+
+    distribution = (
+        climatology_parameter
+        .get("distribution", [])
+    )
+
+    percentile = empirical_percentile(
+        value,
+        distribution
+    )
+
+    result = {
+        "value": round(
+            float(value),
+            2
+        ),
+
+        "percentile":
+            percentile,
+
+        "n":
+            climatology_parameter
+            .get("n"),
+
+        "p10":
+            climatology_parameter
+            .get("p10"),
+
+        "p50":
+            climatology_parameter
+            .get("p50"),
+
+        "p90":
+            climatology_parameter
+            .get("p90"),
+
+        "p99":
+            climatology_parameter
+            .get("p99"),
+
+        "historical_min":
+            climatology_parameter
+            .get("min"),
+
+        "historical_min_date":
+            climatology_parameter
+            .get("min_date"),
+
+        "historical_max":
+            climatology_parameter
+            .get("max"),
+
+        "historical_max_date":
+            climatology_parameter
+            .get("max_date"),
+    }
+
+    return result
+
+
+def calculate_climatology_comparison(
+    standard_levels,
+    metpy_parameters,
+    nominal_date
+):
+    """
+    Primerja aktualno sondažo z zgodovinsko klimatologijo
+    za isti del leta (±15-dnevno okno).
+    """
+
+    day_climatology = (
+        load_climatology_for_date(
+            nominal_date
+        )
+    )
+
+    if day_climatology is None:
+        return {
+            "available": False,
+            "calendar_day":
+                nominal_date.strftime(
+                    "%m-%d"
+                ),
+        }
+
+    current_values = {}
+
+    for pressure in [850, 700, 500]:
+
+        item = standard_levels.get(
+            f"t{pressure}"
+        )
+
+        current_values[
+            f"t{pressure}"
+        ] = (
+            item.get("value")
+            if item is not None
+            else None
+        )
+
+    current_values[
+        "pwat_mm"
+    ] = metpy_parameters.get(
+        "pwat_mm"
+    )
+
+    current_values[
+        "freezing_level_msl_m"
+    ] = metpy_parameters.get(
+        "freezing_level_msl_m"
+    )
+
+    current_values[
+        "lapse_rate_850_500_c_per_km"
+    ] = metpy_parameters.get(
+        "lapse_rate_850_500_c_per_km"
+    )
+
+    current_values[
+        "lapse_rate_700_500_c_per_km"
+    ] = metpy_parameters.get(
+        "lapse_rate_700_500_c_per_km"
+    )
+
+    parameters = {}
+
+    for name, value in (
+        current_values.items()
+    ):
+
+        result = climatology_result(
+            value,
+            day_climatology.get(name)
+        )
+
+        if result is not None:
+            parameters[name] = result
+
+    return {
+        "available": True,
+
+        "calendar_day":
+            nominal_date.strftime(
+                "%m-%d"
+            ),
+
+        "reference_period":
+            "1996-2025",
+
+        "window":
+            "±15 calendar days",
+
+        "percentile_method":
+            "empirical_midrank",
+
+        "historical_time_caveat":
+            (
+                "Most historical Ljubljana "
+                "soundings were nominally 06 UTC "
+                "and are not fully time-equivalent "
+                "to the current 00/12 UTC schedule."
+            ),
+
+        "parameters":
+            parameters,
+    }
+
+
+# ============================================================
 # SHRANJEVANJE
 # ============================================================
 
@@ -1567,14 +1846,29 @@ def save_json(
         nominal_date.isoformat()
     )
 
+    metpy_parameters = (
+        calculate_metpy_parameters(
+            profile["levels"]
+        )
+    )
+
+    climatology_comparison = (
+        calculate_climatology_comparison(
+            standard_levels,
+            metpy_parameters,
+            nominal_date
+        )
+    )
+
     profile["parameters"] = {
         "standard_levels":
             standard_levels,
 
         "metpy":
-            calculate_metpy_parameters(
-                profile["levels"]
-            ),
+            metpy_parameters,
+
+        "climatology":
+            climatology_comparison,
     }
 
     os.makedirs(
@@ -1708,6 +2002,49 @@ def print_summary(profile):
         ),
         "m/s"
     )
+
+    climatology = p.get(
+        "climatology",
+        {}
+    )
+
+    if climatology.get("available"):
+
+        print()
+        print("--- CLIMATOLOGY ---")
+
+        clim_parameters = (
+            climatology.get(
+                "parameters",
+                {}
+            )
+        )
+
+        for name in [
+            "t850",
+            "t700",
+            "t500",
+            "pwat_mm",
+            "freezing_level_msl_m",
+            "lapse_rate_850_500_c_per_km",
+            "lapse_rate_700_500_c_per_km",
+        ]:
+
+            item = clim_parameters.get(
+                name
+            )
+
+            if item is None:
+                continue
+
+            print(
+                f"{name}:",
+                item.get("value"),
+                "| percentile:",
+                item.get("percentile"),
+                "| N:",
+                item.get("n")
+            )
 
     print("=" * 60)
 
