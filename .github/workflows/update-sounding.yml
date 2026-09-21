@@ -1,0 +1,49 @@
+name: Update LJLM sounding
+
+on:
+  # Omogoči ročni zagon iz zavihka Actions
+  workflow_dispatch:
+
+jobs:
+  update-sounding:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Retrieve Ljubljana sounding
+        run: |
+          python extract_ljlm.py
+
+      - name: Show result
+        run: |
+          echo "Contents of data/latest.json:"
+          cat data/latest.json
+
+      - name: Save sounding to repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/
+
+          if git diff --cached --quiet; then
+            echo "No new sounding to save."
+          else
+            git commit -m "Update LJLM sounding"
+            git push
+          fi
