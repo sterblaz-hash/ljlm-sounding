@@ -151,10 +151,6 @@ def read_ljlm_from_bufr(path):
                 ):
                     continue
 
-                # --------------------------------------------
-                # ČAS
-                # --------------------------------------------
-
                 year = safe_get(handle, "year")
                 month = safe_get(handle, "month")
                 day = safe_get(handle, "day")
@@ -179,10 +175,6 @@ def read_ljlm_from_bufr(path):
                     handle,
                     "longitude"
                 )
-
-                # --------------------------------------------
-                # PROFILNI NIZI
-                # --------------------------------------------
 
                 pressure = safe_array(
                     handle,
@@ -278,10 +270,6 @@ def read_ljlm_from_bufr(path):
                         else None
                     )
 
-                    # ----------------------------------------
-                    # RH iz T in Td
-                    # ----------------------------------------
-
                     rh_pct = None
 
                     if (
@@ -349,6 +337,7 @@ def read_ljlm_from_bufr(path):
                 return {
                     "station": 14015,
                     "station_name": "Ljubljana",
+
                     "launch_time":
                         launch_time
                         .isoformat()
@@ -359,6 +348,7 @@ def read_ljlm_from_bufr(path):
 
                     "qc": {
                         "raw_counts": raw_counts,
+
                         "profile_level_count":
                             len(levels),
 
@@ -373,7 +363,6 @@ def read_ljlm_from_bufr(path):
                 }
 
             except Exception as exc:
-
                 print(
                     "BUFR message error:",
                     exc
@@ -385,6 +374,69 @@ def read_ljlm_from_bufr(path):
                     codes_release(handle)
 
     return None
+
+
+# ============================================================
+# TERMIN SONDAŽE
+# ============================================================
+
+def determine_term(launch_time):
+
+    # 00 UTC sonda je lahko izpuščena
+    # okoli 23:30 UTC prejšnjega dne.
+
+    if launch_time.hour >= 18:
+
+        term = "00"
+
+        nominal_date = (
+            launch_time
+            + timedelta(days=1)
+        ).date()
+
+    elif launch_time.hour < 6:
+
+        term = "00"
+        nominal_date = launch_time.date()
+
+    else:
+
+        term = "12"
+        nominal_date = launch_time.date()
+
+    return term, nominal_date
+
+
+# ============================================================
+# KATERI TERMIN TRENUTNO IŠČEMO?
+# ============================================================
+
+def expected_term(now):
+
+    # Po 18 UTC že iščemo naslednjo 00 UTC sondažo.
+    # Od 06 do 18 UTC iščemo 12 UTC.
+    # Med 00 in 06 UTC iščemo tekočo 00 UTC.
+
+    if now.hour >= 18:
+
+        return (
+            "00",
+            (now + timedelta(days=1)).date()
+        )
+
+    elif now.hour >= 6:
+
+        return (
+            "12",
+            now.date()
+        )
+
+    else:
+
+        return (
+            "00",
+            now.date()
+        )
 
 
 # ============================================================
@@ -410,6 +462,7 @@ def value_at_pressure(
     ]
 
     if exact:
+
         return {
             "value":
                 exact[0][field],
@@ -486,6 +539,7 @@ def simple_pressure_value(
     field,
     target
 ):
+
     result = value_at_pressure(
         levels,
         field,
@@ -499,7 +553,7 @@ def simple_pressure_value(
 
 
 # ============================================================
-# INTERPOLACIJA VIŠINE PRI DOLOČENEM TLAKU
+# VIŠINA PRI TLAKU
 # ============================================================
 
 def height_at_pressure(
@@ -526,16 +580,12 @@ def height_at_pressure(
             .magnitude
         )
 
-        for i in range(
-            len(p) - 1
-        ):
+        for i in range(len(p) - 1):
 
             p1 = p[i]
             p2 = p[i + 1]
 
-            if (
-                p1 >= target >= p2
-            ):
+            if p1 >= target >= p2:
 
                 if p1 == p2:
                     return float(z[i])
@@ -579,16 +629,12 @@ def temperature_at_height(
             x["height_m"]
     )
 
-    for i in range(
-        len(rows) - 1
-    ):
+    for i in range(len(rows) - 1):
 
         z1 = rows[i]["height_m"]
         z2 = rows[i + 1]["height_m"]
 
-        if (
-            z1 <= target_height <= z2
-        ):
+        if z1 <= target_height <= z2:
 
             t1 = rows[i]["temperature_c"]
             t2 = rows[i + 1]["temperature_c"]
@@ -611,7 +657,7 @@ def temperature_at_height(
 
 
 # ============================================================
-# LAPSE RATE MED VIŠINAMA
+# LAPSE RATE
 # ============================================================
 
 def lapse_rate_height_layer(
@@ -647,10 +693,6 @@ def lapse_rate_height_layer(
         2
     )
 
-
-# ============================================================
-# LAPSE RATE MED TLAČNIMA NIVOJEMA
-# ============================================================
 
 def lapse_rate_pressure_layer(
     levels,
@@ -705,24 +747,20 @@ def lapse_rate_pressure_layer(
 
 
 # ============================================================
-# METPY TERMO PROFIL
+# METPY PROFIL
 # ============================================================
 
 def prepare_metpy_profile(levels):
 
-    rows = []
-
-    for level in levels:
-
+    rows = [
+        x for x in levels
         if (
-            level["pressure_hpa"] is None
-            or level["temperature_c"] is None
-            or level["dewpoint_c"] is None
-            or level["height_m"] is None
-        ):
-            continue
-
-        rows.append(level)
+            x["pressure_hpa"] is not None
+            and x["temperature_c"] is not None
+            and x["dewpoint_c"] is not None
+            and x["height_m"] is not None
+        )
+    ]
 
     if len(rows) < 10:
         return None
@@ -733,87 +771,60 @@ def prepare_metpy_profile(levels):
         reverse=True
     )
 
-    # Odstranimo morebitne podvojene tlačne nivoje.
     unique_rows = []
-    last_pressure = None
+    seen = set()
 
     for row in rows:
 
         p = row["pressure_hpa"]
 
-        if (
-            last_pressure is not None
-            and abs(
-                p - last_pressure
-            ) < 0.001
-        ):
+        if p in seen:
             continue
 
+        seen.add(p)
         unique_rows.append(row)
-        last_pressure = p
 
     rows = unique_rows
 
-    pressure = np.array(
-        [
-            x["pressure_hpa"]
-            for x in rows
-        ],
-        dtype=float
+    p = np.array(
+        [x["pressure_hpa"] for x in rows]
     ) * units.hPa
 
-    temperature = np.array(
-        [
-            x["temperature_c"]
-            for x in rows
-        ],
-        dtype=float
+    t = np.array(
+        [x["temperature_c"] for x in rows]
     ) * units.degC
 
-    dewpoint = np.array(
-        [
-            x["dewpoint_c"]
-            for x in rows
-        ],
-        dtype=float
+    td = np.array(
+        [x["dewpoint_c"] for x in rows]
     ) * units.degC
 
-    height = np.array(
-        [
-            x["height_m"]
-            for x in rows
-        ],
-        dtype=float
+    z = np.array(
+        [x["height_m"] for x in rows]
     ) * units.meter
 
     return {
-        "rows": rows,
-        "pressure": pressure,
-        "temperature": temperature,
-        "dewpoint": dewpoint,
-        "height": height,
+        "pressure": p,
+        "temperature": t,
+        "dewpoint": td,
+        "height": z,
     }
 
 
 # ============================================================
-# VETERNI PROFIL
+# VETROVNI PROFIL
 # ============================================================
 
 def prepare_wind_profile(levels):
 
-    rows = []
-
-    for level in levels:
-
+    rows = [
+        x for x in levels
         if (
-            level["pressure_hpa"] is None
-            or level["height_m"] is None
-            or level["wind_speed_ms"] is None
-            or level["wind_direction_deg"] is None
-        ):
-            continue
-
-        rows.append(level)
+            x["pressure_hpa"] is not None
+            and x["height_m"] is not None
+            and x["wind_speed_ms"] is not None
+            and x["wind_direction_deg"] is not None
+        )
+    ]
 
     if len(rows) < 2:
         return None
@@ -825,55 +836,34 @@ def prepare_wind_profile(levels):
     )
 
     unique_rows = []
-    last_pressure = None
+    seen = set()
 
     for row in rows:
 
         p = row["pressure_hpa"]
 
-        if (
-            last_pressure is not None
-            and abs(
-                p - last_pressure
-            ) < 0.001
-        ):
+        if p in seen:
             continue
 
+        seen.add(p)
         unique_rows.append(row)
-        last_pressure = p
 
     rows = unique_rows
 
-    pressure = np.array(
-        [
-            x["pressure_hpa"]
-            for x in rows
-        ],
-        dtype=float
+    p = np.array(
+        [x["pressure_hpa"] for x in rows]
     ) * units.hPa
 
-    height = np.array(
-        [
-            x["height_m"]
-            for x in rows
-        ],
-        dtype=float
+    z = np.array(
+        [x["height_m"] for x in rows]
     ) * units.meter
 
     speed = np.array(
-        [
-            x["wind_speed_ms"]
-            for x in rows
-        ],
-        dtype=float
+        [x["wind_speed_ms"] for x in rows]
     ) * units("m/s")
 
     direction = np.array(
-        [
-            x["wind_direction_deg"]
-            for x in rows
-        ],
-        dtype=float
+        [x["wind_direction_deg"] for x in rows]
     ) * units.degree
 
     u, v = mpcalc.wind_components(
@@ -882,21 +872,18 @@ def prepare_wind_profile(levels):
     )
 
     return {
-        "pressure": pressure,
-        "height": height,
+        "pressure": p,
+        "height": z,
         "u": u,
         "v": v,
     }
 
 
 # ============================================================
-# VARNO IZVAJANJE
+# POMOŽNE METPY FUNKCIJE
 # ============================================================
 
-def safe_parameter(
-    name,
-    function
-):
+def safe_parameter(name, function):
 
     try:
         return function()
@@ -934,18 +921,11 @@ def quantity_value(
         if not math.isfinite(value):
             return None
 
-        return round(
-            value,
-            digits
-        )
+        return round(value, digits)
 
     except Exception:
         return None
 
-
-# ============================================================
-# LCL / LFC / EL SHRANJEVANJE
-# ============================================================
 
 def add_level_result(
     result,
@@ -960,9 +940,7 @@ def add_level_result(
         return
 
     try:
-        level_pressure, level_temperature = (
-            level_result
-        )
+        level_pressure, level_temperature = level_result
     except Exception:
         return
 
@@ -985,16 +963,11 @@ def add_level_result(
         level_pressure
     )
 
-    z_agl = None
-
-    if (
-        z_msl is not None
-        and surface_height is not None
-    ):
-        z_agl = (
-            z_msl
-            - surface_height
-        )
+    z_agl = (
+        z_msl - surface_height
+        if z_msl is not None
+        else None
+    )
 
     result[
         f"{prefix}_pressure_hpa"
@@ -1022,18 +995,14 @@ def add_level_result(
 
 
 # ============================================================
-# METPY PARAMETRI
+# IZRAČUN PARAMETROV
 # ============================================================
 
-def calculate_metpy_parameters(
-    levels
-):
+def calculate_metpy_parameters(levels):
 
     result = {}
 
-    thermo = prepare_metpy_profile(
-        levels
-    )
+    thermo = prepare_metpy_profile(levels)
 
     if thermo is None:
         return result
@@ -1047,10 +1016,7 @@ def calculate_metpy_parameters(
         z[0].to("meter").magnitude
     )
 
-    # ========================================================
     # PWAT
-    # ========================================================
-
     pwat = safe_parameter(
         "PWAT",
         lambda:
@@ -1060,17 +1026,12 @@ def calculate_metpy_parameters(
             )
     )
 
-    result["pwat_mm"] = (
-        quantity_value(
-            pwat,
-            "millimeter"
-        )
+    result["pwat_mm"] = quantity_value(
+        pwat,
+        "millimeter"
     )
 
-    # ========================================================
     # LCL
-    # ========================================================
-
     lcl = safe_parameter(
         "LCL",
         lambda:
@@ -1090,10 +1051,7 @@ def calculate_metpy_parameters(
         surface_height
     )
 
-    # ========================================================
-    # PARCEL PROFILE
-    # ========================================================
-
+    # Surface parcel
     parcel_profile = safe_parameter(
         "parcel profile",
         lambda:
@@ -1104,21 +1062,22 @@ def calculate_metpy_parameters(
             )
     )
 
-    # ========================================================
     # LFC
-    # ========================================================
-
-    lfc = safe_parameter(
-        "LFC",
-        lambda:
-            mpcalc.lfc(
-                p,
-                t,
-                td,
-                parcel_temperature_profile=
-                    parcel_profile
-            )
-    ) if parcel_profile is not None else None
+    lfc = (
+        safe_parameter(
+            "LFC",
+            lambda:
+                mpcalc.lfc(
+                    p,
+                    t,
+                    td,
+                    parcel_temperature_profile=
+                        parcel_profile
+                )
+        )
+        if parcel_profile is not None
+        else None
+    )
 
     add_level_result(
         result,
@@ -1129,21 +1088,22 @@ def calculate_metpy_parameters(
         surface_height
     )
 
-    # ========================================================
     # EL
-    # ========================================================
-
-    el = safe_parameter(
-        "EL",
-        lambda:
-            mpcalc.el(
-                p,
-                t,
-                td,
-                parcel_temperature_profile=
-                    parcel_profile
-            )
-    ) if parcel_profile is not None else None
+    el = (
+        safe_parameter(
+            "EL",
+            lambda:
+                mpcalc.el(
+                    p,
+                    t,
+                    td,
+                    parcel_temperature_profile=
+                        parcel_profile
+                )
+        )
+        if parcel_profile is not None
+        else None
+    )
 
     add_level_result(
         result,
@@ -1154,10 +1114,7 @@ def calculate_metpy_parameters(
         surface_height
     )
 
-    # ========================================================
-    # LIFTED INDEX
-    # ========================================================
-
+    # Lifted Index
     if parcel_profile is not None:
 
         li = safe_parameter(
@@ -1177,10 +1134,7 @@ def calculate_metpy_parameters(
             )
         )
 
-    # ========================================================
-    # K INDEX
-    # ========================================================
-
+    # K-index
     k_index = safe_parameter(
         "K Index",
         lambda:
@@ -1198,10 +1152,7 @@ def calculate_metpy_parameters(
         )
     )
 
-    # ========================================================
-    # TOTAL TOTALS
-    # ========================================================
-
+    # Total Totals
     total_totals = safe_parameter(
         "Total Totals",
         lambda:
@@ -1219,10 +1170,7 @@ def calculate_metpy_parameters(
         )
     )
 
-    # ========================================================
-    # SBCAPE / SBCIN
-    # ========================================================
-
+    # SBCAPE/CIN
     sb = safe_parameter(
         "SBCAPE/CIN",
         lambda:
@@ -1237,25 +1185,17 @@ def calculate_metpy_parameters(
 
         cape, cin = sb
 
-        result["sbcape_jkg"] = (
-            quantity_value(
-                cape,
-                "joule / kilogram"
-            )
+        result["sbcape_jkg"] = quantity_value(
+            cape,
+            "joule / kilogram"
         )
 
-        result["sbcin_jkg"] = (
-            quantity_value(
-                cin,
-                "joule / kilogram"
-            )
+        result["sbcin_jkg"] = quantity_value(
+            cin,
+            "joule / kilogram"
         )
 
-    # ========================================================
-    # MLCAPE / MLCIN
-    # 100-hPa mešana plast
-    # ========================================================
-
+    # MLCAPE/CIN
     ml = safe_parameter(
         "MLCAPE/CIN",
         lambda:
@@ -1271,25 +1211,17 @@ def calculate_metpy_parameters(
 
         cape, cin = ml
 
-        result["mlcape_jkg"] = (
-            quantity_value(
-                cape,
-                "joule / kilogram"
-            )
+        result["mlcape_jkg"] = quantity_value(
+            cape,
+            "joule / kilogram"
         )
 
-        result["mlcin_jkg"] = (
-            quantity_value(
-                cin,
-                "joule / kilogram"
-            )
+        result["mlcin_jkg"] = quantity_value(
+            cin,
+            "joule / kilogram"
         )
 
-    # ========================================================
-    # MOST UNSTABLE PARCEL
-    # Iskanje v spodnjih 300 hPa profila
-    # ========================================================
-
+    # MU parcela
     mu_parcel = safe_parameter(
         "Most Unstable Parcel",
         lambda:
@@ -1333,40 +1265,31 @@ def calculate_metpy_parameters(
                 "degC"
             )
 
-            mu_height_msl = (
-                height_at_pressure(
-                    p,
-                    z,
-                    mu_pressure
-                )
+            mu_height = height_at_pressure(
+                p,
+                z,
+                mu_pressure
             )
 
-            if mu_height_msl is not None:
+            result[
+                "mu_parcel_height_msl_m"
+            ] = (
+                round(mu_height, 0)
+                if mu_height is not None
+                else None
+            )
 
-                result[
-                    "mu_parcel_height_msl_m"
-                ] = round(
-                    mu_height_msl,
-                    0
-                )
-
-                result[
-                    "mu_parcel_height_agl_m"
-                ] = round(
-                    mu_height_msl
+            result[
+                "mu_parcel_height_agl_m"
+            ] = (
+                round(
+                    mu_height
                     - surface_height,
                     0
                 )
-
-            else:
-
-                result[
-                    "mu_parcel_height_msl_m"
-                ] = None
-
-                result[
-                    "mu_parcel_height_agl_m"
-                ] = None
+                if mu_height is not None
+                else None
+            )
 
         except Exception as exc:
 
@@ -1376,11 +1299,7 @@ def calculate_metpy_parameters(
                 exc
             )
 
-    # ========================================================
-    # MUCAPE / MUCIN
-    # Enaka 300-hPa iskalna plast kot zgoraj
-    # ========================================================
-
+    # MUCAPE/CIN
     mu = safe_parameter(
         "MUCAPE/CIN",
         lambda:
@@ -1396,58 +1315,38 @@ def calculate_metpy_parameters(
 
         cape, cin = mu
 
-        result["mucape_jkg"] = (
-            quantity_value(
-                cape,
-                "joule / kilogram"
-            )
+        result["mucape_jkg"] = quantity_value(
+            cape,
+            "joule / kilogram"
         )
 
-        result["mucin_jkg"] = (
-            quantity_value(
-                cin,
-                "joule / kilogram"
-            )
+        result["mucin_jkg"] = quantity_value(
+            cin,
+            "joule / kilogram"
         )
 
-    # ========================================================
-    # NIČTA IZOTERMA
-    # ========================================================
-
+    # Freezing level
     freezing_level = None
 
-    for i in range(
-        len(t) - 1
-    ):
+    for i in range(len(t) - 1):
 
         t1 = float(
-            t[i]
-            .to("degC")
-            .magnitude
+            t[i].to("degC").magnitude
         )
 
         t2 = float(
-            t[i + 1]
-            .to("degC")
-            .magnitude
+            t[i + 1].to("degC").magnitude
         )
 
         z1 = float(
-            z[i]
-            .to("meter")
-            .magnitude
+            z[i].to("meter").magnitude
         )
 
         z2 = float(
-            z[i + 1]
-            .to("meter")
-            .magnitude
+            z[i + 1].to("meter").magnitude
         )
 
-        if (
-            t1 >= 0
-            and t2 < 0
-        ):
+        if t1 >= 0 and t2 < 0:
 
             fraction = (
                 (0 - t1)
@@ -1465,10 +1364,7 @@ def calculate_metpy_parameters(
     result[
         "freezing_level_msl_m"
     ] = (
-        round(
-            float(freezing_level),
-            0
-        )
+        round(freezing_level, 0)
         if freezing_level is not None
         else None
     )
@@ -1477,26 +1373,21 @@ def calculate_metpy_parameters(
         "freezing_level_agl_m"
     ] = (
         round(
-            float(
-                freezing_level
-                - surface_height
-            ),
+            freezing_level
+            - surface_height,
             0
         )
         if freezing_level is not None
         else None
     )
 
-    # ========================================================
-    # LAPSE RATES
-    # ========================================================
-
+    # Lapse rates
     result[
         "lapse_rate_0_3km_c_per_km"
     ] = lapse_rate_height_layer(
         levels,
         surface_height,
-        surface_height + 3000.0
+        surface_height + 3000
     )
 
     result[
@@ -1515,13 +1406,8 @@ def calculate_metpy_parameters(
         500
     )
 
-    # ========================================================
-    # VETROVNI STRIG
-    # ========================================================
-
-    wind = prepare_wind_profile(
-        levels
-    )
+    # Wind shear
+    wind = prepare_wind_profile(levels)
 
     if wind is not None:
 
@@ -1530,13 +1416,9 @@ def calculate_metpy_parameters(
         u = wind["u"]
         v = wind["v"]
 
-        wind_surface_height = wz[0]
+        bottom = wz[0]
 
-        for depth_km in [
-            1,
-            3,
-            6
-        ]:
+        for depth_km in [1, 3, 6]:
 
             shear = safe_parameter(
                 f"{depth_km} km shear",
@@ -1547,8 +1429,7 @@ def calculate_metpy_parameters(
                         u,
                         v,
                         height=wz,
-                        bottom=
-                            wind_surface_height,
+                        bottom=bottom,
                         depth=
                             depth_km
                             * units.kilometer
@@ -1576,39 +1457,55 @@ def calculate_metpy_parameters(
 
 
 # ============================================================
-# TERMIN SONDAŽE
+# ALI JE SONDAŽA ŽE SHRANJENA?
 # ============================================================
 
-def determine_term(
+def archive_path(
+    nominal_date,
+    term
+):
+
+    return os.path.join(
+        "data",
+        f"{nominal_date.year:04d}",
+        f"{nominal_date.month:02d}",
+        (
+            f"{nominal_date:%Y%m%d}"
+            f"_{term}.json"
+        )
+    )
+
+
+def sounding_already_saved(
+    nominal_date,
+    term,
     launch_time
 ):
 
-    # 00 UTC sonda je lahko izpuščena okoli
-    # 23:30 UTC prejšnjega koledarskega dne.
-
-    if launch_time.hour >= 18:
-
-        term = "00"
-
-        nominal_date = (
-            launch_time
-            + timedelta(days=1)
-        ).date()
-
-    elif launch_time.hour < 6:
-
-        term = "00"
-        nominal_date = launch_time.date()
-
-    else:
-
-        term = "12"
-        nominal_date = launch_time.date()
-
-    return (
-        term,
-        nominal_date
+    path = archive_path(
+        nominal_date,
+        term
     )
+
+    if not os.path.exists(path):
+        return False
+
+    try:
+
+        with open(
+            path,
+            "r",
+            encoding="utf-8"
+        ) as f:
+            old = json.load(f)
+
+        return (
+            old.get("launch_time")
+            == launch_time
+        )
+
+    except Exception:
+        return False
 
 
 # ============================================================
@@ -1617,35 +1514,14 @@ def determine_term(
 
 def save_json(
     profile,
-    source_file
+    source_file,
+    term,
+    nominal_date
 ):
-
-    launch = datetime.fromisoformat(
-        profile[
-            "launch_time"
-        ].replace(
-            "Z",
-            "+00:00"
-        )
-    )
-
-    term, nominal_date = (
-        determine_term(
-            launch
-        )
-    )
-
-    # --------------------------------------------------------
-    # STANDARDNI NIVOJI
-    # --------------------------------------------------------
 
     standard_levels = {}
 
-    for pressure in [
-        850,
-        700,
-        500
-    ]:
+    for pressure in [850, 700, 500]:
 
         standard_levels[
             f"t{pressure}"
@@ -1655,12 +1531,6 @@ def save_json(
             pressure
         )
 
-    for pressure in [
-        850,
-        700,
-        500
-    ]:
-
         standard_levels[
             f"td{pressure}"
         ] = value_at_pressure(
@@ -1668,12 +1538,6 @@ def save_json(
             "dewpoint_c",
             pressure
         )
-
-    for pressure in [
-        850,
-        700,
-        500
-    ]:
 
         standard_levels[
             f"rh{pressure}"
@@ -1692,9 +1556,7 @@ def save_json(
     )
 
     profile["retrieved_at"] = (
-        datetime.now(
-            timezone.utc
-        )
+        datetime.now(timezone.utc)
         .isoformat()
         .replace("+00:00", "Z")
     )
@@ -1715,10 +1577,6 @@ def save_json(
             ),
     }
 
-    # --------------------------------------------------------
-    # latest.json
-    # --------------------------------------------------------
-
     os.makedirs(
         "data",
         exist_ok=True
@@ -1737,31 +1595,18 @@ def save_json(
             indent=2
         )
 
-    # --------------------------------------------------------
-    # ARHIV
-    # --------------------------------------------------------
-
-    archive_dir = os.path.join(
-        "data",
-        f"{nominal_date.year:04d}",
-        f"{nominal_date.month:02d}"
+    path = archive_path(
+        nominal_date,
+        term
     )
 
     os.makedirs(
-        archive_dir,
+        os.path.dirname(path),
         exist_ok=True
     )
 
-    archive_file = os.path.join(
-        archive_dir,
-        (
-            f"{nominal_date:%Y%m%d}"
-            f"_{term}.json"
-        )
-    )
-
     with open(
-        archive_file,
+        path,
         "w",
         encoding="utf-8"
     ) as f:
@@ -1773,41 +1618,44 @@ def save_json(
             indent=2
         )
 
-    return archive_file
+    return path
 
 
 # ============================================================
-# IZPIS
+# KRATEK IZPIS
 # ============================================================
 
-def print_results(
-    profile
-):
+def print_summary(profile):
 
-    parameters = (
-        profile["parameters"]
+    p = profile["parameters"]
+    standard = p["standard_levels"]
+    metpy = p["metpy"]
+
+    print()
+    print("=" * 60)
+    print("LJUBLJANA SOUNDING")
+    print("=" * 60)
+
+    print(
+        "Launch:",
+        profile["launch_time"]
     )
 
-    standard = (
-        parameters[
-            "standard_levels"
+    print(
+        "Nominal:",
+        profile["nominal_date"],
+        profile["term"],
+        "UTC"
+    )
+
+    print(
+        "Levels:",
+        profile["qc"][
+            "profile_level_count"
         ]
     )
 
-    metpy = (
-        parameters["metpy"]
-    )
-
     print()
-    print("=" * 60)
-    print(
-        "METEOROLOGICAL PARAMETERS"
-    )
-    print("=" * 60)
-
-    print()
-    print("--- STANDARD LEVELS ---")
-
     print(
         "T850:",
         standard.get("t850")
@@ -1824,98 +1672,20 @@ def print_results(
     )
 
     print(
-        "Td850:",
-        standard.get("td850")
-    )
-
-    print(
-        "RH850:",
-        standard.get("rh850")
-    )
-
-    print()
-    print("--- MOISTURE ---")
-
-    print(
         "PWAT:",
-        metpy.get(
-            "pwat_mm"
-        ),
+        metpy.get("pwat_mm"),
         "mm"
-    )
-
-    print()
-    print("--- INSTABILITY ---")
-
-    print(
-        "Lifted Index:",
-        metpy.get(
-            "lifted_index_c"
-        ),
-        "C"
-    )
-
-    print(
-        "K Index:",
-        metpy.get(
-            "k_index_c"
-        ),
-        "C"
-    )
-
-    print(
-        "Total Totals:",
-        metpy.get(
-            "total_totals_c"
-        ),
-        "C"
-    )
-
-    print(
-        "SBCAPE:",
-        metpy.get(
-            "sbcape_jkg"
-        ),
-        "J/kg"
-    )
-
-    print(
-        "SBCIN:",
-        metpy.get(
-            "sbcin_jkg"
-        ),
-        "J/kg"
     )
 
     print(
         "MLCAPE:",
-        metpy.get(
-            "mlcape_jkg"
-        ),
-        "J/kg"
-    )
-
-    print(
-        "MLCIN:",
-        metpy.get(
-            "mlcin_jkg"
-        ),
+        metpy.get("mlcape_jkg"),
         "J/kg"
     )
 
     print(
         "MUCAPE:",
-        metpy.get(
-            "mucape_jkg"
-        ),
-        "J/kg"
-    )
-
-    print(
-        "MUCIN:",
-        metpy.get(
-            "mucin_jkg"
-        ),
+        metpy.get("mucape_jkg"),
         "J/kg"
     )
 
@@ -1924,141 +1694,22 @@ def print_results(
         metpy.get(
             "mu_parcel_pressure_hpa"
         ),
-        "hPa |",
-        metpy.get(
-            "mu_parcel_temperature_c"
-        ),
-        "C | Td",
-        metpy.get(
-            "mu_parcel_dewpoint_c"
-        ),
-        "C |",
-        metpy.get(
-            "mu_parcel_height_msl_m"
-        ),
-        "m MSL |",
+        "hPa /",
         metpy.get(
             "mu_parcel_height_agl_m"
         ),
         "m AGL"
     )
 
-    print()
-    print("--- LEVELS ---")
-
     print(
-        "LCL:",
-        metpy.get(
-            "lcl_pressure_hpa"
-        ),
-        "hPa |",
-        metpy.get(
-            "lcl_height_msl_m"
-        ),
-        "m MSL |",
-        metpy.get(
-            "lcl_height_agl_m"
-        ),
-        "m AGL"
-    )
-
-    print(
-        "LFC:",
-        metpy.get(
-            "lfc_pressure_hpa"
-        ),
-        "hPa |",
-        metpy.get(
-            "lfc_height_msl_m"
-        ),
-        "m MSL |",
-        metpy.get(
-            "lfc_height_agl_m"
-        ),
-        "m AGL"
-    )
-
-    print(
-        "EL:",
-        metpy.get(
-            "el_pressure_hpa"
-        ),
-        "hPa |",
-        metpy.get(
-            "el_height_msl_m"
-        ),
-        "m MSL |",
-        metpy.get(
-            "el_height_agl_m"
-        ),
-        "m AGL"
-    )
-
-    print(
-        "Freezing level:",
-        metpy.get(
-            "freezing_level_msl_m"
-        ),
-        "m MSL |",
-        metpy.get(
-            "freezing_level_agl_m"
-        ),
-        "m AGL"
-    )
-
-    print()
-    print("--- LAPSE RATES ---")
-
-    print(
-        "0-3 km:",
-        metpy.get(
-            "lapse_rate_0_3km_c_per_km"
-        ),
-        "C/km"
-    )
-
-    print(
-        "850-500 hPa:",
-        metpy.get(
-            "lapse_rate_850_500_c_per_km"
-        ),
-        "C/km"
-    )
-
-    print(
-        "700-500 hPa:",
-        metpy.get(
-            "lapse_rate_700_500_c_per_km"
-        ),
-        "C/km"
-    )
-
-    print()
-    print("--- WIND SHEAR ---")
-
-    print(
-        "0-1 km:",
-        metpy.get(
-            "shear_0_1km_ms"
-        ),
-        "m/s"
-    )
-
-    print(
-        "0-3 km:",
-        metpy.get(
-            "shear_0_3km_ms"
-        ),
-        "m/s"
-    )
-
-    print(
-        "0-6 km:",
+        "0-6 km shear:",
         metpy.get(
             "shear_0_6km_ms"
         ),
         "m/s"
     )
+
+    print("=" * 60)
 
 
 # ============================================================
@@ -2071,32 +1722,27 @@ def main():
         timezone.utc
     )
 
+    wanted_term, wanted_date = (
+        expected_term(now)
+    )
+
     print(
-        "Current UTC time:",
+        "Current UTC:",
         now.isoformat()
     )
 
-    print()
-    print("TEST MODE:")
-
     print(
-        "The newest available Ljubljana "
-        "sounding will be analysed."
+        "Looking for:",
+        wanted_date,
+        wanted_term,
+        "UTC"
     )
 
-    print()
-    print(
-        "Searching DWD radiosonde "
-        "BUFR packages..."
-    )
-
-    candidates = (
-        find_candidate_files()
-    )
+    candidates = find_candidate_files()
 
     print(
-        f"Found {len(candidates)} "
-        "candidate packages."
+        "Candidate DWD packages:",
+        len(candidates)
     )
 
     for number, filename in enumerate(
@@ -2105,8 +1751,7 @@ def main():
     ):
 
         print(
-            f"[{number}/"
-            f"{len(candidates)}] "
+            f"[{number}/{len(candidates)}] "
             f"{unquote(filename)}"
         )
 
@@ -2137,66 +1782,76 @@ def main():
                 tmp.write(content)
                 tmp_path = tmp.name
 
-            profile = (
-                read_ljlm_from_bufr(
-                    tmp_path
-                )
+            profile = read_ljlm_from_bufr(
+                tmp_path
             )
 
             if profile is None:
                 continue
 
-            print()
-            print(
-                "LJUBLJANA 14015 FOUND"
+            launch = datetime.fromisoformat(
+                profile[
+                    "launch_time"
+                ].replace(
+                    "Z",
+                    "+00:00"
+                )
             )
 
-            print(
-                "Launch:",
-                profile["launch_time"]
-            )
-
-            print(
-                "Profile levels:",
-                len(
-                    profile["levels"]
+            term, nominal_date = (
+                determine_term(
+                    launch
                 )
             )
 
             print(
-                "QC:",
-                profile["qc"]
+                "LJLM found:",
+                profile["launch_time"],
+                "->",
+                nominal_date,
+                term
             )
 
-            # TEST MODE:
-            # trenutno namenoma ne preverjamo,
-            # ali profil pripada pričakovanemu
-            # trenutnemu 00/12 UTC terminu.
+            # Ne sprejmemo stare sondaže.
+            if (
+                term != wanted_term
+                or nominal_date != wanted_date
+            ):
+
+                print(
+                    "Not the requested term."
+                )
+
+                continue
+
+            # Ne zapisujemo iste sondaže ponovno.
+            if sounding_already_saved(
+                nominal_date,
+                term,
+                profile["launch_time"]
+            ):
+
+                print()
+                print(
+                    "Sounding already archived."
+                )
+
+                print(
+                    "Nothing to update."
+                )
+
+                return
 
             archive_file = save_json(
                 profile,
-                filename
+                filename,
+                term,
+                nominal_date
             )
 
-            print_results(
-                profile
-            )
+            print_summary(profile)
 
             print()
-            print("=" * 60)
-
-            print(
-                "Nominal date:",
-                profile[
-                    "nominal_date"
-                ]
-            )
-
-            print(
-                "Term:",
-                profile["term"]
-            )
-
             print(
                 "Saved:",
                 OUTPUT_LATEST
@@ -2217,13 +1872,12 @@ def main():
                     tmp_path
                 )
             ):
-                os.remove(
-                    tmp_path
-                )
+                os.remove(tmp_path)
 
     print()
     print(
-        "LJLM 14015 was not found."
+        "Requested LJLM sounding "
+        "is not available yet."
     )
 
 
