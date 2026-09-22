@@ -17345,7 +17345,7 @@
   ],
   "source": "DWD Open Data BUFR",
   "source_file": "Z__C_EDZW_20260922003502_bda01,temp_bufr_999999_999999__MW_817.bin",
-  "retrieved_at": "2026-09-22T09:28:26.949242Z",
+  "retrieved_at": "2026-09-22T09:58:54.413984Z",
   "term": "00",
   "nominal_date": "2026-09-22",
   "parameters": {
@@ -17756,6 +17756,34 @@
             "delta": -3.82,
             "unit": "m/s"
           },
+          "q_surface_gkg": {
+            "label": "q surface",
+            "current": 7.55,
+            "previous": 9.15,
+            "delta": -1.6,
+            "unit": "g/kg"
+          },
+          "q925_gkg": {
+            "label": "q925",
+            "current": 7.1,
+            "previous": 9.88,
+            "delta": -2.78,
+            "unit": "g/kg"
+          },
+          "q850_gkg": {
+            "label": "q850",
+            "current": 4.18,
+            "previous": 8.57,
+            "delta": -4.39,
+            "unit": "g/kg"
+          },
+          "ivt_kg_m1_s1": {
+            "label": "IVT",
+            "current": 79.2,
+            "previous": 105.2,
+            "delta": -26.0,
+            "unit": "kg m-1 s-1"
+          },
           "lapse_rate_850_500_c_per_km": {
             "label": "Lapse rate 850-500",
             "current": 5.41,
@@ -17769,7 +17797,104 @@
         "archive_file": "data/2026/09/20260921_12.json"
       },
       "previous_day_same_term": {
-        "available": false,
+        "available": true,
+        "previous_launch_time": "2026-09-20T23:30:00Z",
+        "previous_nominal_date": "2026-09-21",
+        "previous_term": "00",
+        "delta_definition": "current_minus_previous",
+        "parameters": {
+          "t850_c": {
+            "label": "T850",
+            "current": 6.5,
+            "previous": 15.18,
+            "delta": -8.68,
+            "unit": "degC"
+          },
+          "t700_c": {
+            "label": "T700",
+            "current": -2.03,
+            "previous": 3.43,
+            "delta": -5.46,
+            "unit": "degC"
+          },
+          "t500_c": {
+            "label": "T500",
+            "current": -16.03,
+            "previous": -11.42,
+            "delta": -4.61,
+            "unit": "degC"
+          },
+          "pwat_mm": {
+            "label": "PWAT",
+            "current": 17.42,
+            "previous": 35.22,
+            "delta": -17.8,
+            "unit": "mm"
+          },
+          "freezing_level_msl_m": {
+            "label": "Freezing level",
+            "current": 2316.0,
+            "previous": 3720.0,
+            "delta": -1404.0,
+            "unit": "m"
+          },
+          "mlcape_jkg": {
+            "label": "MLCAPE",
+            "current": 43.35,
+            "previous": 93.2,
+            "delta": -49.85,
+            "unit": "J/kg"
+          },
+          "mucape_jkg": {
+            "label": "MUCAPE",
+            "current": 159.77,
+            "previous": 910.93,
+            "delta": -751.16,
+            "unit": "J/kg"
+          },
+          "shear_0_6km_ms": {
+            "label": "0-6 km shear",
+            "current": 28.91,
+            "previous": 23.04,
+            "delta": 5.87,
+            "unit": "m/s"
+          },
+          "q_surface_gkg": {
+            "label": "q surface",
+            "current": 7.55,
+            "previous": 10.35,
+            "delta": -2.8,
+            "unit": "g/kg"
+          },
+          "q925_gkg": {
+            "label": "q925",
+            "current": 7.1,
+            "previous": 11.58,
+            "delta": -4.48,
+            "unit": "g/kg"
+          },
+          "q850_gkg": {
+            "label": "q850",
+            "current": 4.18,
+            "previous": 8.25,
+            "delta": -4.07,
+            "unit": "g/kg"
+          },
+          "ivt_kg_m1_s1": {
+            "label": "IVT",
+            "current": 79.2,
+            "previous": 198.8,
+            "delta": -119.6,
+            "unit": "kg m-1 s-1"
+          },
+          "lapse_rate_850_500_c_per_km": {
+            "label": "Lapse rate 850-500",
+            "current": 5.41,
+            "previous": 6.24,
+            "delta": -0.83,
+            "unit": "degC/km"
+          }
+        },
         "requested_nominal_date": "2026-09-21",
         "requested_term": "00",
         "archive_file": "data/2026/09/20260921_00.json"
