@@ -113,6 +113,163 @@ def valid_number(value):
         return False
 
 
+def build_trajectory(
+    latitude,
+    longitude,
+    pressure,
+    height,
+    time_period,
+    latitude_displacement,
+    longitude_displacement
+):
+    """
+    Reconstructs the ascent trajectory from BUFR displacement arrays.
+
+    The DWD LJLM BUFR contains approximately 2-second trajectory data.
+    We keep a decimated track (about every 10 s) plus positions near
+    standard pressure levels. A time reset or the maximum-height point
+    prevents a later/descent segment from being joined blindly.
+    """
+
+    if not (
+        valid_number(latitude)
+        and valid_number(longitude)
+    ):
+        return {
+            "available": False,
+            "reason": "missing launch coordinates"
+        }
+
+    arrays = [
+        pressure,
+        height,
+        time_period,
+        latitude_displacement,
+        longitude_displacement,
+    ]
+
+    lengths = [
+        len(x) for x in arrays
+        if x
+    ]
+
+    if len(lengths) < 5:
+        return {
+            "available": False,
+            "reason": "trajectory arrays missing"
+        }
+
+    n = min(lengths)
+
+    rows = []
+
+    previous_time = None
+
+    for i in range(n):
+        p = pressure[i]
+        z = height[i]
+        tp = time_period[i]
+        dlat = latitude_displacement[i]
+        dlon = longitude_displacement[i]
+
+        if not all(
+            valid_number(x)
+            for x in [p, z, tp, dlat, dlon]
+        ):
+            continue
+
+        tp = float(tp)
+
+        # A time reset usually marks another BUFR segment.
+        if (
+            previous_time is not None
+            and tp < previous_time
+        ):
+            break
+
+        previous_time = tp
+
+        p_hpa = float(p) / 100.0
+
+        if not (0 < p_hpa <= 1100):
+            continue
+
+        rows.append({
+            "time_s": round(tp, 1),
+            "pressure_hpa": round(p_hpa, 2),
+            "height_m": round(float(z), 1),
+            "latitude": round(
+                float(latitude) + float(dlat),
+                6
+            ),
+            "longitude": round(
+                float(longitude) + float(dlon),
+                6
+            ),
+        })
+
+    if len(rows) < 2:
+        return {
+            "available": False,
+            "reason": "insufficient trajectory points"
+        }
+
+    # For the operational trajectory product use the ascent only.
+    max_index = max(
+        range(len(rows)),
+        key=lambda i: rows[i]["height_m"]
+    )
+
+    ascent = rows[:max_index + 1]
+
+    # Roughly 10-second display spacing, while always keeping the
+    # first and last ascent point.
+    display_points = []
+
+    last_kept_time = None
+
+    for point in ascent:
+        if (
+            last_kept_time is None
+            or point["time_s"] - last_kept_time >= 10
+        ):
+            display_points.append(point)
+            last_kept_time = point["time_s"]
+
+    if display_points[-1] != ascent[-1]:
+        display_points.append(ascent[-1])
+
+    standard_levels = {}
+
+    for target in [925, 850, 700, 500, 300, 250, 200]:
+        nearest = min(
+            ascent,
+            key=lambda x:
+                abs(x["pressure_hpa"] - target)
+        )
+
+        if abs(
+            nearest["pressure_hpa"] - target
+        ) <= 5:
+            standard_levels[str(target)] = nearest
+
+    return {
+        "available": True,
+        "source": "BUFR latitude/longitude displacement",
+        "segment": "ascent",
+        "raw_point_count": len(ascent),
+        "display_point_count": len(display_points),
+        "duration_s": ascent[-1]["time_s"],
+        "max_height_m": max(
+            x["height_m"] for x in ascent
+        ),
+        "start": ascent[0],
+        "end": ascent[-1],
+        "standard_levels": standard_levels,
+        "points": display_points,
+    }
+
+
 # ============================================================
 # BRANJE LJUBLJANSKE SONDAŽE
 # ============================================================
@@ -207,6 +364,31 @@ def read_ljlm_from_bufr(path):
                     "windDirection"
                 )
 
+                time_period = safe_array(
+                    handle,
+                    "timePeriod"
+                )
+
+                latitude_displacement = safe_array(
+                    handle,
+                    "latitudeDisplacement"
+                )
+
+                longitude_displacement = safe_array(
+                    handle,
+                    "longitudeDisplacement"
+                )
+
+                trajectory = build_trajectory(
+                    latitude,
+                    longitude,
+                    pressure,
+                    height,
+                    time_period,
+                    latitude_displacement,
+                    longitude_displacement
+                )
+
                 raw_counts = {
                     "pressure": len(pressure),
                     "temperature": len(temperature),
@@ -214,6 +396,11 @@ def read_ljlm_from_bufr(path):
                     "height": len(height),
                     "wind_speed": len(wind_speed),
                     "wind_direction": len(wind_direction),
+                    "time_period": len(time_period),
+                    "latitude_displacement":
+                        len(latitude_displacement),
+                    "longitude_displacement":
+                        len(longitude_displacement),
                 }
 
                 profile_lengths = [
@@ -360,6 +547,8 @@ def read_ljlm_from_bufr(path):
                             ),
                     },
 
+                    "trajectory": trajectory,
+
                     "levels": levels,
                 }
 
@@ -381,31 +570,113 @@ def read_ljlm_from_bufr(path):
 # TERMIN SONDAŽE
 # ============================================================
 
+def classify_sounding(launch_time):
+    """
+    Classifies the current LJLM schedule.
+
+    Regular 00 UTC: expected launch around 23:30 UTC previous day.
+    Regular 12 UTC: expected launch around 11:30 UTC.
+    A +/- 2 hour window is allowed. Everything else is preserved
+    as a special sounding and cannot overwrite a regular sounding.
+    """
+
+    candidates = []
+
+    # Candidate regular 12 UTC on launch calendar day.
+    nominal_12 = datetime(
+        launch_time.year,
+        launch_time.month,
+        launch_time.day,
+        11,
+        30,
+        tzinfo=timezone.utc
+    )
+
+    candidates.append((
+        abs(
+            (launch_time - nominal_12)
+            .total_seconds()
+        ),
+        "12",
+        launch_time.date()
+    ))
+
+    # 00 UTC launch is normally 23:30 on the previous calendar day.
+    nominal_date_00 = (
+        launch_time + timedelta(days=1)
+    ).date()
+
+    nominal_00 = datetime(
+        launch_time.year,
+        launch_time.month,
+        launch_time.day,
+        23,
+        30,
+        tzinfo=timezone.utc
+    )
+
+    candidates.append((
+        abs(
+            (launch_time - nominal_00)
+            .total_seconds()
+        ),
+        "00",
+        nominal_date_00
+    ))
+
+    # Also allow an after-midnight 00 UTC launch.
+    midnight = datetime(
+        launch_time.year,
+        launch_time.month,
+        launch_time.day,
+        0,
+        0,
+        tzinfo=timezone.utc
+    )
+
+    candidates.append((
+        abs(
+            (launch_time - midnight)
+            .total_seconds()
+        ),
+        "00",
+        launch_time.date()
+    ))
+
+    difference_s, term, nominal_date = min(
+        candidates,
+        key=lambda x: x[0]
+    )
+
+    if difference_s <= 2 * 3600:
+        return {
+            "kind": "regular",
+            "term": term,
+            "nominal_date": nominal_date,
+            "launch_offset_minutes":
+                round(difference_s / 60.0, 1),
+        }
+
+    return {
+        "kind": "special",
+        "term": (
+            "special_"
+            + launch_time.strftime("%H%M")
+        ),
+        "nominal_date": launch_time.date(),
+        "launch_offset_minutes": None,
+    }
+
+
 def determine_term(launch_time):
+    classification = classify_sounding(
+        launch_time
+    )
 
-    # 00 UTC sonda je lahko izpuščena
-    # okoli 23:30 UTC prejšnjega dne.
-
-    if launch_time.hour >= 18:
-
-        term = "00"
-
-        nominal_date = (
-            launch_time
-            + timedelta(days=1)
-        ).date()
-
-    elif launch_time.hour < 6:
-
-        term = "00"
-        nominal_date = launch_time.date()
-
-    else:
-
-        term = "12"
-        nominal_date = launch_time.date()
-
-    return term, nominal_date
+    return (
+        classification["term"],
+        classification["nominal_date"]
+    )
 
 
 # ============================================================
@@ -1576,9 +1847,40 @@ def add_level_result(
 # IZRAČUN PARAMETROV
 # ============================================================
 
+
+def nonnegative_cape_value(quantity, label, qc_list):
+    """
+    CAPE is physically non-negative. If the numerical calculation
+    returns a negative value, publish 0 J/kg and retain the raw value
+    in QC metadata.
+    """
+    value = quantity_value(
+        quantity,
+        "joule / kilogram"
+    )
+
+    if value is None:
+        return None
+
+    if value < 0:
+        qc_list.append({
+            "parameter": label,
+            "raw_value_jkg": round(float(value), 2),
+            "published_value_jkg": 0.0,
+            "reason": "negative numerical CAPE corrected to zero",
+        })
+        return 0.0
+
+    return value
+
 def calculate_metpy_parameters(levels):
 
     result = {}
+
+    cape_qc = []
+    result["qc"] = {
+        "cape_corrections": cape_qc
+    }
 
     thermo = prepare_metpy_profile(levels)
 
@@ -1778,9 +2080,10 @@ def calculate_metpy_parameters(levels):
 
         cape, cin = sb
 
-        result["sbcape_jkg"] = quantity_value(
+        result["sbcape_jkg"] = nonnegative_cape_value(
             cape,
-            "joule / kilogram"
+            "SBCAPE",
+            cape_qc
         )
 
         result["sbcin_jkg"] = quantity_value(
@@ -1804,9 +2107,10 @@ def calculate_metpy_parameters(levels):
 
         cape, cin = ml
 
-        result["mlcape_jkg"] = quantity_value(
+        result["mlcape_jkg"] = nonnegative_cape_value(
             cape,
-            "joule / kilogram"
+            "MLCAPE",
+            cape_qc
         )
 
         result["mlcin_jkg"] = quantity_value(
@@ -1908,9 +2212,10 @@ def calculate_metpy_parameters(levels):
 
         cape, cin = mu
 
-        result["mucape_jkg"] = quantity_value(
+        result["mucape_jkg"] = nonnegative_cape_value(
             cape,
-            "joule / kilogram"
+            "MUCAPE",
+            cape_qc
         )
 
         result["mucin_jkg"] = quantity_value(
@@ -2221,12 +2526,34 @@ def sounding_already_saved(
             )
         )
 
+        has_trajectory_upgrade = (
+            isinstance(
+                old.get("trajectory"),
+                dict
+            )
+            and old.get(
+                "trajectory", {}
+            ).get("available")
+            is True
+        )
+
+        has_cape_qc_upgrade = (
+            isinstance(
+                metpy.get("qc", {}).get(
+                    "cape_corrections"
+                ),
+                list
+            )
+        )
+
         return (
             same_launch
             and has_climatology
             and has_wind_upgrade
             and has_moisture_transport_upgrade
             and has_change_upgrade
+            and has_trajectory_upgrade
+            and has_cape_qc_upgrade
         )
 
     except Exception:
@@ -2728,10 +3055,25 @@ def calculate_previous_comparisons(
     term
 ):
     """
-    Dve primerjavi:
+    Dve primerjavi za redna termina:
     1) neposredno prejšnji termin
     2) isti termin prejšnjega dne
+
+    Izredne sondaže so ohranjene, vendar jih ne tlačimo v
+    redno 00/12 primerjalno zaporedje.
     """
+
+    if term not in ("00", "12"):
+        return {
+            "previous_term": {
+                "available": False,
+                "reason": "special sounding"
+            },
+            "previous_day_same_term": {
+                "available": False,
+                "reason": "special sounding"
+            },
+        }
 
     prev_term_date, prev_term = (
         previous_term_reference(
@@ -2855,6 +3197,21 @@ def save_json(
     profile["nominal_date"] = (
         nominal_date.isoformat()
     )
+
+    launch_dt = datetime.fromisoformat(
+        profile["launch_time"].replace(
+            "Z",
+            "+00:00"
+        )
+    )
+
+    profile["sounding_classification"] = (
+        classify_sounding(launch_dt)
+    )
+
+    profile["sounding_classification"][
+        "nominal_date"
+    ] = nominal_date.isoformat()
 
     metpy_parameters = (
         calculate_metpy_parameters(
@@ -3318,20 +3675,14 @@ def main():
         timezone.utc
     )
 
-    wanted_term, wanted_date = (
-        expected_term(now)
-    )
-
     print(
         "Current UTC:",
         now.isoformat()
     )
 
     print(
-        "Looking for:",
-        wanted_date,
-        wanted_term,
-        "UTC"
+        "Mode: discover every new LJLM sounding "
+        "(regular + special)"
     )
 
     candidates = find_candidate_files()
@@ -3340,6 +3691,8 @@ def main():
         "Candidate DWD packages:",
         len(candidates)
     )
+
+    found = {}
 
     for number, filename in enumerate(
         candidates,
@@ -3352,29 +3705,23 @@ def main():
         )
 
         try:
-
             content = download(
                 DWD_URL + filename
             )
-
         except Exception as exc:
-
             print(
                 "Download failed:",
                 exc
             )
-
             continue
 
         tmp_path = None
 
         try:
-
             with tempfile.NamedTemporaryFile(
                 suffix=".bufr",
                 delete=False
             ) as tmp:
-
                 tmp.write(content)
                 tmp_path = tmp.name
 
@@ -3394,10 +3741,15 @@ def main():
                 )
             )
 
-            term, nominal_date = (
-                determine_term(
+            classification = (
+                classify_sounding(
                     launch
                 )
+            )
+
+            term = classification["term"]
+            nominal_date = (
+                classification["nominal_date"]
             )
 
             print(
@@ -3405,63 +3757,46 @@ def main():
                 profile["launch_time"],
                 "->",
                 nominal_date,
-                term
+                term,
+                classification["kind"]
             )
 
-            # Ne sprejmemo stare sondaže.
+            # Same launch may occur in more than one DWD package.
+            # Keep the copy with the largest profile.
+            key = profile["launch_time"]
+
+            old = found.get(key)
+
             if (
-                term != wanted_term
-                or nominal_date != wanted_date
+                old is None
+                or profile.get(
+                    "qc", {}
+                ).get(
+                    "profile_level_count",
+                    0
+                )
+                > old["profile"].get(
+                    "qc", {}
+                ).get(
+                    "profile_level_count",
+                    0
+                )
             ):
+                found[key] = {
+                    "profile": profile,
+                    "filename": filename,
+                    "term": term,
+                    "nominal_date":
+                        nominal_date,
+                }
 
-                print(
-                    "Not the requested term."
-                )
-
-                continue
-
-            # Ne zapisujemo iste sondaže ponovno.
-            if sounding_already_saved(
-                nominal_date,
-                term,
-                profile["launch_time"]
-            ):
-
-                print()
-                print(
-                    "Sounding already archived."
-                )
-
-                print(
-                    "Nothing to update."
-                )
-
-                return
-
-            archive_file = save_json(
-                profile,
-                filename,
-                term,
-                nominal_date
-            )
-
-            print_summary(profile)
-
-            print()
+        except Exception as exc:
             print(
-                "Saved:",
-                OUTPUT_LATEST
+                "Package warning:",
+                exc
             )
-
-            print(
-                "Archive:",
-                archive_file
-            )
-
-            return
 
         finally:
-
             if (
                 tmp_path
                 and os.path.exists(
@@ -3470,10 +3805,103 @@ def main():
             ):
                 os.remove(tmp_path)
 
+    items = sorted(
+        found.values(),
+        key=lambda item:
+            item["profile"]["launch_time"]
+    )
+
+    if not items:
+        print()
+        print(
+            "No LJLM sounding found "
+            "in candidate packages."
+        )
+        return
+
+    saved_count = 0
+
+    for item in items:
+        profile = item["profile"]
+        term = item["term"]
+        nominal_date = item["nominal_date"]
+
+        if sounding_already_saved(
+            nominal_date,
+            term,
+            profile["launch_time"]
+        ):
+            print(
+                "Already complete:",
+                profile["launch_time"],
+                term
+            )
+            continue
+
+        archive_file = save_json(
+            profile,
+            item["filename"],
+            term,
+            nominal_date
+        )
+
+        saved_count += 1
+
+        print()
+        print(
+            "Saved new/updated sounding:",
+            archive_file
+        )
+
+    # Rebuild regular comparisons after all newly discovered
+    # profiles are on disk.
+    if saved_count:
+        for item in items:
+            profile = item["profile"]
+            term = item["term"]
+            nominal_date = item[
+                "nominal_date"
+            ]
+
+            if term not in ("00", "12"):
+                continue
+
+            save_json(
+                profile,
+                item["filename"],
+                term,
+                nominal_date
+            )
+
+    # Ensure latest.json is the newest profile from this scan.
+    newest = items[-1]
+
+    save_json(
+        newest["profile"],
+        newest["filename"],
+        newest["term"],
+        newest["nominal_date"]
+    )
+
+    print_summary(
+        newest["profile"]
+    )
+
     print()
     print(
-        "Requested LJLM sounding "
-        "is not available yet."
+        "Unique LJLM launches found:",
+        len(items)
+    )
+
+    print(
+        "New/updated soundings:",
+        saved_count
+    )
+
+    print(
+        "Newest:",
+        newest["profile"]["launch_time"],
+        newest["term"]
     )
 
 
