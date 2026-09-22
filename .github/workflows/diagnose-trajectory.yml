@@ -1,1 +1,26 @@
+name: Diagnose LJLM trajectory
 
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose-trajectory:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Inspect LJLM BUFR trajectory fields
+        run: |
+          python diagnose_trajectory.py
