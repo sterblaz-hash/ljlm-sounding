@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Diagnostic inversion detector for the newest Ljubljana (LJLM) sounding.
+LJLM inversion / stability diagnostic v2.
 
-Reads:
-    data/latest.json
+Reads data/latest.json only. Does not modify the sounding archive.
 
-Does NOT modify the archive. It prints candidate temperature inversions
-so thresholds can be meteorologically validated before integration into
-extract_ljlm.py.
+Goals:
+- high-sensitivity inversion detection from surface to 700 hPa
+- selective detection from 700 to 300 hPa
+- theta and theta-e diagnostics
+- candidate cap assessment in the lower troposphere
 """
 
 import json
@@ -15,15 +16,24 @@ import math
 from pathlib import Path
 
 import numpy as np
+import metpy.calc as mpcalc
+from metpy.units import units
 
 INPUT_FILE = Path("data/latest.json")
 
-# Diagnostic settings: intentionally permissive.
 GRID_STEP_M = 10.0
 SMOOTH_WINDOW_M = 50.0
-MAX_HEIGHT_AGL_M = 12000.0
-MIN_LAYER_DEPTH_M = 20.0
-MIN_DELTA_T_C = 0.10
+
+# High-sensitivity lower-troposphere thresholds.
+LOWER_BOUND_HPA = 700.0
+LOWER_MIN_DEPTH_M = 20.0
+LOWER_MIN_DELTA_T_C = 0.10
+
+# More selective middle-troposphere thresholds.
+UPPER_BOUND_HPA = 300.0
+MID_MIN_DEPTH_M = 50.0
+MID_MIN_DELTA_T_C = 0.50
+
 MERGE_GAP_M = 40.0
 MERGE_COOLING_C = 0.15
 
@@ -46,35 +56,32 @@ def valid_number(value):
 def moving_average(values, window_points):
     if window_points <= 1:
         return values.copy()
-
     if window_points % 2 == 0:
         window_points += 1
-
     half = window_points // 2
     padded = np.pad(values, (half, half), mode="edge")
     kernel = np.ones(window_points, dtype=float) / window_points
     return np.convolve(padded, kernel, mode="valid")
 
 
-def interpolate_profile(levels):
+def prepare_grid(levels):
     rows = []
-
     for level in levels:
         z = level.get("height_m")
         p = level.get("pressure_hpa")
         t = level.get("temperature_c")
-
+        td = level.get("dewpoint_c")
         if not all(valid_number(x) for x in (z, p, t)):
             continue
-
-        rows.append((float(z), float(p), float(t)))
+        rows.append((
+            float(z), float(p), float(t),
+            float(td) if valid_number(td) else np.nan
+        ))
 
     rows.sort(key=lambda x: x[0])
 
-    # Remove duplicate heights by retaining the first occurrence.
     clean = []
     seen = set()
-
     for row in rows:
         key = round(row[0], 1)
         if key in seen:
@@ -83,118 +90,88 @@ def interpolate_profile(levels):
         clean.append(row)
 
     if len(clean) < 10:
-        raise RuntimeError("Too few valid T/p/z levels.")
+        raise RuntimeError("Too few valid p/T/z levels.")
 
-    z = np.array([x[0] for x in clean], dtype=float)
-    p = np.array([x[1] for x in clean], dtype=float)
-    t = np.array([x[2] for x in clean], dtype=float)
+    z = np.array([x[0] for x in clean])
+    p = np.array([x[1] for x in clean])
+    t = np.array([x[2] for x in clean])
+    td = np.array([x[3] for x in clean])
 
     station_z = z[0]
-    max_z = min(z[-1], station_z + MAX_HEIGHT_AGL_M)
 
-    grid_z = np.arange(
-        station_z,
-        max_z + GRID_STEP_M,
-        GRID_STEP_M
-    )
+    # Only diagnose classical tropospheric inversions down to 300 hPa.
+    valid_300 = np.where(p >= UPPER_BOUND_HPA)[0]
+    if len(valid_300) < 2:
+        raise RuntimeError("Profile does not reach 300 hPa.")
 
+    top_z = z[valid_300[-1]]
+
+    grid_z = np.arange(station_z, top_z + GRID_STEP_M, GRID_STEP_M)
     grid_t = np.interp(grid_z, z, t)
-
-    # Pressure interpolation in log(p).
-    grid_logp = np.interp(
-        grid_z,
-        z,
-        np.log(p)
-    )
+    grid_logp = np.interp(grid_z, z, np.log(p))
     grid_p = np.exp(grid_logp)
 
-    window_points = max(
-        1,
-        round(SMOOTH_WINDOW_M / GRID_STEP_M)
-    )
+    # Dewpoint: interpolate only through finite observations.
+    finite_td = np.isfinite(td)
+    if finite_td.sum() >= 2:
+        grid_td = np.interp(
+            grid_z, z[finite_td], td[finite_td]
+        )
+    else:
+        grid_td = np.full_like(grid_z, np.nan)
 
-    smooth_t = moving_average(
-        grid_t,
-        window_points
-    )
+    window_points = max(1, round(SMOOTH_WINDOW_M / GRID_STEP_M))
+    smooth_t = moving_average(grid_t, window_points)
+    smooth_td = moving_average(grid_td, window_points)
 
     theta = (
         (smooth_t + 273.15)
         * (1000.0 / grid_p) ** KAPPA
     )
 
-    return (
-        station_z,
-        grid_z,
-        grid_p,
-        smooth_t,
-        theta
-    )
+    theta_e = np.full_like(theta, np.nan)
+    for i in range(len(grid_z)):
+        if not valid_number(smooth_td[i]):
+            continue
+        try:
+            value = mpcalc.equivalent_potential_temperature(
+                grid_p[i] * units.hPa,
+                smooth_t[i] * units.degC,
+                smooth_td[i] * units.degC,
+            )
+            theta_e[i] = float(value.to("kelvin").magnitude)
+        except Exception:
+            pass
+
+    return station_z, grid_z, grid_p, smooth_t, smooth_td, theta, theta_e
 
 
-def raw_inversion_segments(grid_z, smooth_t):
-    dt = np.diff(smooth_t)
-
-    segments = []
+def raw_segments(t):
+    dt = np.diff(t)
+    result = []
     start = None
 
     for i, delta in enumerate(dt):
         if delta > 0:
             if start is None:
                 start = i
-        else:
-            if start is not None:
-                segments.append([start, i])
-                start = None
+        elif start is not None:
+            result.append([start, i])
+            start = None
 
     if start is not None:
-        segments.append([start, len(grid_z) - 1])
+        result.append([start, len(t) - 1])
 
-    return segments
-
-
-def segment_metrics(segment, station_z, z, p, t, theta):
-    i0, i1 = segment
-
-    base_z = float(z[i0])
-    top_z = float(z[i1])
-
-    depth = top_z - base_z
-    delta_t = float(t[i1] - t[i0])
-    delta_theta = float(theta[i1] - theta[i0])
-
-    return {
-        "i0": i0,
-        "i1": i1,
-        "base_msl_m": base_z,
-        "top_msl_m": top_z,
-        "base_agl_m": base_z - station_z,
-        "top_agl_m": top_z - station_z,
-        "base_pressure_hpa": float(p[i0]),
-        "top_pressure_hpa": float(p[i1]),
-        "depth_m": depth,
-        "base_temp_c": float(t[i0]),
-        "top_temp_c": float(t[i1]),
-        "delta_t_c": delta_t,
-        "gradient_c_per_km": (
-            1000.0 * delta_t / depth
-            if depth > 0 else None
-        ),
-        "base_theta_k": float(theta[i0]),
-        "top_theta_k": float(theta[i1]),
-        "delta_theta_k": delta_theta,
-    }
+    return result
 
 
-def merge_segments(segments, station_z, z, p, t, theta):
+def merge_segments(segments, z, t):
     if not segments:
         return []
 
     merged = [segments[0][:]]
-
     for current in segments[1:]:
         previous = merged[-1]
-
         prev_end = previous[1]
         cur_start = current[0]
 
@@ -212,162 +189,189 @@ def merge_segments(segments, station_z, z, p, t, theta):
     return merged
 
 
-def classify_layer(layer):
-    base_agl = layer["base_agl_m"]
+def metrics(seg, station_z, z, p, t, td, theta, theta_e):
+    i0, i1 = seg
+    depth = float(z[i1] - z[i0])
+    delta_t = float(t[i1] - t[i0])
+
+    layer = {
+        "base_msl_m": float(z[i0]),
+        "top_msl_m": float(z[i1]),
+        "base_agl_m": float(z[i0] - station_z),
+        "top_agl_m": float(z[i1] - station_z),
+        "base_pressure_hpa": float(p[i0]),
+        "top_pressure_hpa": float(p[i1]),
+        "depth_m": depth,
+        "base_temp_c": float(t[i0]),
+        "top_temp_c": float(t[i1]),
+        "delta_t_c": delta_t,
+        "gradient_c_per_km": (
+            1000.0 * delta_t / depth if depth > 0 else None
+        ),
+        "base_theta_k": float(theta[i0]),
+        "top_theta_k": float(theta[i1]),
+        "delta_theta_k": float(theta[i1] - theta[i0]),
+    }
+
+    if np.isfinite(theta_e[i0]) and np.isfinite(theta_e[i1]):
+        layer.update({
+            "base_theta_e_k": float(theta_e[i0]),
+            "top_theta_e_k": float(theta_e[i1]),
+            "delta_theta_e_k": float(theta_e[i1] - theta_e[i0]),
+        })
+
+    # Moisture change across the layer is useful when evaluating a cap.
+    if np.isfinite(td[i0]) and np.isfinite(td[i1]):
+        layer["base_dewpoint_c"] = float(td[i0])
+        layer["top_dewpoint_c"] = float(td[i1])
+        layer["delta_dewpoint_c"] = float(td[i1] - td[i0])
+
+    return layer
+
+
+def keep_layer(layer):
+    base_p = layer["base_pressure_hpa"]
+    top_p = layer["top_pressure_hpa"]
+    depth = layer["depth_m"]
     delta_t = layer["delta_t_c"]
+
+    # Any inversion that begins at/above 700 hPa but still lies below 300 hPa:
+    # selective mode.
+    if base_p < LOWER_BOUND_HPA:
+        if top_p < UPPER_BOUND_HPA:
+            return False, "above_300"
+        return (
+            depth >= MID_MIN_DEPTH_M
+            and delta_t >= MID_MIN_DELTA_T_C
+        ), "700-300 hPa selective"
+
+    # Surface through 700 hPa: high sensitivity.
+    return (
+        depth >= LOWER_MIN_DEPTH_M
+        and delta_t >= LOWER_MIN_DELTA_T_C
+    ), "surface-700 hPa high sensitivity"
+
+
+def cap_score(layer):
+    """
+    Diagnostic, not a final physical definition of a cap.
+    We flag lower-tropospheric elevated inversions that may inhibit
+    parcel ascent. CIN remains the more direct parcel diagnostic.
+    """
+    if layer["base_agl_m"] <= 50:
+        return "surface inversion"
+
+    if layer["base_pressure_hpa"] < LOWER_BOUND_HPA:
+        return "not lower-tropospheric cap candidate"
+
+    dt = layer["delta_t_c"]
+    dtheta = layer["delta_theta_k"]
     depth = layer["depth_m"]
 
-    if base_agl <= 50:
-        kind = "surface"
-    else:
-        kind = "elevated"
-
-    # Diagnostic significance only; these are not yet final thresholds.
-    if delta_t >= 2.0 and depth >= 100:
-        significance = "strong_candidate"
-    elif delta_t >= 0.5 and depth >= 50:
-        significance = "clear_candidate"
-    else:
-        significance = "weak_candidate"
-
-    return kind, significance
+    if dt >= 1.0 or dtheta >= 2.0:
+        return "notable cap candidate"
+    if dt >= 0.3 or dtheta >= 1.0:
+        return "weak cap candidate"
+    return "very weak cap candidate"
 
 
 def main():
     if not INPUT_FILE.exists():
-        raise SystemExit(
-            "data/latest.json not found. Run the sounding update first."
-        )
+        raise SystemExit("data/latest.json not found.")
 
     with INPUT_FILE.open("r", encoding="utf-8") as f:
         sounding = json.load(f)
 
-    levels = sounding.get("levels", [])
-
     (
-        station_z,
-        grid_z,
-        grid_p,
-        smooth_t,
-        theta,
-    ) = interpolate_profile(levels)
+        station_z, z, p, t, td, theta, theta_e
+    ) = prepare_grid(sounding.get("levels", []))
 
-    segments = raw_inversion_segments(
-        grid_z,
-        smooth_t
-    )
+    segments = merge_segments(raw_segments(t), z, t)
 
-    segments = merge_segments(
-        segments,
-        station_z,
-        grid_z,
-        grid_p,
-        smooth_t,
-        theta
-    )
+    kept = []
+    rejected = 0
 
-    candidates = []
-
-    for segment in segments:
-        layer = segment_metrics(
-            segment,
-            station_z,
-            grid_z,
-            grid_p,
-            smooth_t,
-            theta
+    for seg in segments:
+        layer = metrics(
+            seg, station_z, z, p, t, td, theta, theta_e
         )
-
-        if layer["depth_m"] < MIN_LAYER_DEPTH_M:
+        keep, regime = keep_layer(layer)
+        if not keep:
+            rejected += 1
             continue
-
-        if layer["delta_t_c"] < MIN_DELTA_T_C:
-            continue
-
-        kind, significance = classify_layer(layer)
-        layer["type"] = kind
-        layer["diagnostic_class"] = significance
-        candidates.append(layer)
+        layer["regime"] = regime
+        layer["cap_assessment"] = cap_score(layer)
+        kept.append(layer)
 
     print()
-    print("LJLM INVERSION DIAGNOSTIC")
-    print("=" * 72)
+    print("LJLM INVERSION / STABILITY DIAGNOSTIC v2")
+    print("=" * 78)
     print("Launch:", sounding.get("launch_time"))
+    print("Nominal:", sounding.get("nominal_date"), sounding.get("term"), "UTC")
+    print(f"Station height: {station_z:.0f} m MSL")
+    print(f"Grid {GRID_STEP_M:.0f} m | T/Td smoothing ~{SMOOTH_WINDOW_M:.0f} m")
     print(
-        "Nominal:",
-        sounding.get("nominal_date"),
-        sounding.get("term"),
-        "UTC"
-    )
-    print(f"Station height used: {station_z:.0f} m MSL")
-    print(
-        f"Grid: {GRID_STEP_M:.0f} m | "
-        f"T smoothing: ~{SMOOTH_WINDOW_M:.0f} m | "
-        f"search top: {MAX_HEIGHT_AGL_M/1000:.1f} km AGL"
+        "Surface-700 hPa:",
+        f"depth >= {LOWER_MIN_DEPTH_M:.0f} m,",
+        f"Delta T >= {LOWER_MIN_DELTA_T_C:.2f} C"
     )
     print(
-        "Diagnostic thresholds:",
-        f"depth >= {MIN_LAYER_DEPTH_M:.0f} m,",
-        f"Delta T >= {MIN_DELTA_T_C:.2f} C"
+        "700-300 hPa:",
+        f"depth >= {MID_MIN_DEPTH_M:.0f} m,",
+        f"Delta T >= {MID_MIN_DELTA_T_C:.2f} C"
     )
-    print(
-        "Merge:",
-        f"gap <= {MERGE_GAP_M:.0f} m and",
-        f"intervening cooling <= {MERGE_COOLING_C:.2f} C"
-    )
-    print("-" * 72)
+    print("-" * 78)
 
-    if not candidates:
-        print("No inversion candidates found.")
-        return
-
-    for number, layer in enumerate(candidates, start=1):
+    for n, layer in enumerate(kept, 1):
         print()
         print(
-            f"#{number:02d} "
-            f"{layer['type'].upper()} | "
-            f"{layer['diagnostic_class']}"
+            f"#{n:02d} | {layer['regime']} | "
+            f"{layer['cap_assessment']}"
         )
         print(
-            f"  base/top MSL: "
-            f"{layer['base_msl_m']:.0f} / "
-            f"{layer['top_msl_m']:.0f} m"
+            f"  {layer['base_pressure_hpa']:.1f} -> "
+            f"{layer['top_pressure_hpa']:.1f} hPa | "
+            f"{layer['base_agl_m']:.0f} -> "
+            f"{layer['top_agl_m']:.0f} m AGL"
         )
         print(
-            f"  base/top AGL: "
-            f"{layer['base_agl_m']:.0f} / "
-            f"{layer['top_agl_m']:.0f} m"
-        )
-        print(
-            f"  pressure: "
-            f"{layer['base_pressure_hpa']:.1f} -> "
-            f"{layer['top_pressure_hpa']:.1f} hPa"
-        )
-        print(
-            f"  depth: {layer['depth_m']:.0f} m"
-        )
-        print(
-            f"  T: {layer['base_temp_c']:.2f} -> "
+            f"  depth {layer['depth_m']:.0f} m | "
+            f"T {layer['base_temp_c']:.2f} -> "
             f"{layer['top_temp_c']:.2f} C | "
-            f"Delta T = +{layer['delta_t_c']:.2f} C"
-        )
-        print(
-            f"  inversion gradient: "
+            f"Delta T +{layer['delta_t_c']:.2f} C | "
             f"+{layer['gradient_c_per_km']:.2f} C/km"
         )
         print(
-            f"  theta: {layer['base_theta_k']:.2f} -> "
+            f"  theta {layer['base_theta_k']:.2f} -> "
             f"{layer['top_theta_k']:.2f} K | "
-            f"Delta theta = +{layer['delta_theta_k']:.2f} K"
+            f"Delta theta +{layer['delta_theta_k']:.2f} K"
         )
 
+        if "delta_theta_e_k" in layer:
+            sign = "+" if layer["delta_theta_e_k"] >= 0 else ""
+            print(
+                f"  theta-e {layer['base_theta_e_k']:.2f} -> "
+                f"{layer['top_theta_e_k']:.2f} K | "
+                f"Delta theta-e {sign}"
+                f"{layer['delta_theta_e_k']:.2f} K"
+            )
+
+        if "delta_dewpoint_c" in layer:
+            sign = "+" if layer["delta_dewpoint_c"] >= 0 else ""
+            print(
+                f"  Td {layer['base_dewpoint_c']:.2f} -> "
+                f"{layer['top_dewpoint_c']:.2f} C | "
+                f"Delta Td {sign}{layer['delta_dewpoint_c']:.2f} C"
+            )
+
     print()
-    print("=" * 72)
-    print("Candidate count:", len(candidates))
+    print("=" * 78)
+    print("Retained inversion layers:", len(kept))
+    print("Rejected weak/upper candidates:", rejected)
     print()
     print(
-        "NOTE: This is a deliberately permissive diagnostic. "
-        "Do not treat weak candidates as final inversion layers yet."
+        "CAP labels are diagnostic only. They should be interpreted "
+        "together with CIN, parcel origin and the full T/Td/theta-e profile."
     )
 
 
