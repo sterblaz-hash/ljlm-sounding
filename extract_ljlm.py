@@ -42,6 +42,19 @@ MAX_CANDIDATE_FILES = 250
 # Profiles outside this tolerance are preserved as special soundings.
 REGULAR_LAUNCH_TOLERANCE_MINUTES = 120
 
+# Inversion diagnostics. Surface to 700 hPa is intentionally sensitive
+# because thin/weak low-level inversions can be operationally important.
+INVERSION_GRID_STEP_M = 10.0
+INVERSION_SMOOTH_WINDOW_M = 50.0
+INVERSION_LOWER_BOUND_HPA = 700.0
+INVERSION_UPPER_BOUND_HPA = 300.0
+INVERSION_LOW_MIN_DEPTH_M = 20.0
+INVERSION_LOW_MIN_DELTA_T_C = 0.10
+INVERSION_MID_MIN_DEPTH_M = 50.0
+INVERSION_MID_MIN_DELTA_T_C = 0.50
+INVERSION_MERGE_GAP_M = 40.0
+INVERSION_MERGE_COOLING_C = 0.15
+
 
 # ============================================================
 # PRENOS
@@ -483,6 +496,32 @@ def read_ljlm_from_bufr(path):
                         except Exception:
                             rh_pct = None
 
+                    theta_k = None
+                    theta_e_k = None
+
+                    if t_c is not None:
+                        try:
+                            theta_k = float(
+                                mpcalc.potential_temperature(
+                                    p_hpa * units.hPa,
+                                    t_c * units.degC
+                                ).to("kelvin").magnitude
+                            )
+                        except Exception:
+                            theta_k = None
+
+                    if t_c is not None and td_c is not None:
+                        try:
+                            theta_e_k = float(
+                                mpcalc.equivalent_potential_temperature(
+                                    p_hpa * units.hPa,
+                                    t_c * units.degC,
+                                    td_c * units.degC
+                                ).to("kelvin").magnitude
+                            )
+                        except Exception:
+                            theta_e_k = None
+
                     levels.append(
                         {
                             "pressure_hpa":
@@ -506,6 +545,16 @@ def read_ljlm_from_bufr(path):
                             "relative_humidity_pct":
                                 round(rh_pct, 1)
                                 if rh_pct is not None
+                                else None,
+
+                            "potential_temperature_k":
+                                round(theta_k, 2)
+                                if theta_k is not None
+                                else None,
+
+                            "equivalent_potential_temperature_k":
+                                round(theta_e_k, 2)
+                                if theta_e_k is not None
                                 else None,
 
                             "wind_speed_ms":
@@ -2550,6 +2599,22 @@ def sounding_already_saved(
             )
         )
 
+        old_levels = old.get("levels", [])
+        has_theta_upgrade = (
+            bool(old_levels)
+            and "potential_temperature_k" in old_levels[0]
+            and "equivalent_potential_temperature_k" in old_levels[0]
+        )
+
+        inversion_block = (
+            old.get("parameters", {}).get("inversions", {})
+        )
+        has_inversion_upgrade = (
+            inversion_block.get("available") is True
+            and isinstance(inversion_block.get("layers"), list)
+            and isinstance(inversion_block.get("summary"), dict)
+        )
+
         return (
             same_launch
             and has_climatology
@@ -2558,6 +2623,8 @@ def sounding_already_saved(
             and has_change_upgrade
             and has_trajectory_upgrade
             and has_cape_qc_upgrade
+            and has_theta_upgrade
+            and has_inversion_upgrade
         )
 
     except Exception:
@@ -3144,6 +3211,260 @@ def calculate_previous_comparisons(
 
 
 # ============================================================
+# INVERZIJE / THETA / THETA-E
+# ============================================================
+
+def _moving_average(values, window_points):
+    if window_points <= 1:
+        return values.copy()
+    if window_points % 2 == 0:
+        window_points += 1
+    half = window_points // 2
+    padded = np.pad(values, (half, half), mode="edge")
+    kernel = np.ones(window_points, dtype=float) / window_points
+    return np.convolve(padded, kernel, mode="valid")
+
+
+def _inversion_temperature_strength(delta_t_c, depth_m):
+    """Describes the temperature inversion itself, not parcel capping."""
+    if delta_t_c >= 1.0:
+        return "strong"
+    if delta_t_c >= 0.5:
+        return "moderate"
+    return "weak"
+
+
+def _inversion_boundary_strength(delta_td_c, delta_theta_e_k):
+    """Separate moisture/thermodynamic-boundary description."""
+    magnitudes = []
+    if valid_number(delta_td_c):
+        magnitudes.append(abs(float(delta_td_c)))
+    if valid_number(delta_theta_e_k):
+        magnitudes.append(abs(float(delta_theta_e_k)))
+
+    if not magnitudes:
+        return "unknown"
+
+    magnitude = max(magnitudes)
+    if magnitude >= 3.0:
+        return "strong"
+    if magnitude >= 1.0:
+        return "moderate"
+    return "weak"
+
+
+def calculate_inversions(levels):
+    """
+    Detect temperature inversions on a 10-m interpolated height grid.
+
+    Surface--700 hPa: high sensitivity (20 m, +0.10 C).
+    700--300 hPa: selective (50 m, +0.50 C).
+    Above 300 hPa is deliberately excluded; tropopause structure will
+    be handled separately.
+
+    Temperature-inversion strength and moisture/thermodynamic-boundary
+    strength are kept separate. No layer is labelled a 'cap' here;
+    capping should later be assessed together with parcel/CIN diagnostics.
+    """
+    rows = []
+    for level in levels:
+        z = level.get("height_m")
+        p = level.get("pressure_hpa")
+        t = level.get("temperature_c")
+        td = level.get("dewpoint_c")
+        if not all(valid_number(x) for x in (z, p, t)):
+            continue
+        rows.append((
+            float(z), float(p), float(t),
+            float(td) if valid_number(td) else np.nan
+        ))
+
+    rows.sort(key=lambda x: x[0])
+    clean = []
+    seen = set()
+    for row in rows:
+        key = round(row[0], 1)
+        if key in seen:
+            continue
+        seen.add(key)
+        clean.append(row)
+
+    if len(clean) < 10:
+        return {"available": False, "reason": "too few valid p/T/z levels"}
+
+    z_obs = np.array([x[0] for x in clean], dtype=float)
+    p_obs = np.array([x[1] for x in clean], dtype=float)
+    t_obs = np.array([x[2] for x in clean], dtype=float)
+    td_obs = np.array([x[3] for x in clean], dtype=float)
+    station_z = float(z_obs[0])
+
+    idx_300 = np.where(p_obs >= INVERSION_UPPER_BOUND_HPA)[0]
+    if len(idx_300) < 2:
+        return {"available": False, "reason": "profile does not reach 300 hPa"}
+
+    top_z = float(z_obs[idx_300[-1]])
+    grid_z = np.arange(station_z, top_z + INVERSION_GRID_STEP_M,
+                       INVERSION_GRID_STEP_M)
+    grid_t = np.interp(grid_z, z_obs, t_obs)
+    grid_p = np.exp(np.interp(grid_z, z_obs, np.log(p_obs)))
+
+    finite_td = np.isfinite(td_obs)
+    if finite_td.sum() >= 2:
+        grid_td = np.interp(grid_z, z_obs[finite_td], td_obs[finite_td])
+    else:
+        grid_td = np.full_like(grid_z, np.nan)
+
+    window_points = max(1, round(INVERSION_SMOOTH_WINDOW_M /
+                                 INVERSION_GRID_STEP_M))
+    smooth_t = _moving_average(grid_t, window_points)
+    smooth_td = _moving_average(grid_td, window_points)
+
+    theta = (smooth_t + 273.15) * (1000.0 / grid_p) ** (287.05 / 1004.0)
+    theta_e = np.full_like(theta, np.nan)
+    for i in range(len(grid_z)):
+        if not np.isfinite(smooth_td[i]):
+            continue
+        try:
+            theta_e[i] = float(
+                mpcalc.equivalent_potential_temperature(
+                    grid_p[i] * units.hPa,
+                    smooth_t[i] * units.degC,
+                    smooth_td[i] * units.degC
+                ).to("kelvin").magnitude
+            )
+        except Exception:
+            pass
+
+    # Raw contiguous layers where temperature rises with height.
+    raw = []
+    start = None
+    for i, delta in enumerate(np.diff(smooth_t)):
+        if delta > 0:
+            if start is None:
+                start = i
+        elif start is not None:
+            raw.append([start, i])
+            start = None
+    if start is not None:
+        raw.append([start, len(smooth_t) - 1])
+
+    # Merge tiny gaps so noise does not split one physical inversion.
+    merged = []
+    for segment in raw:
+        if not merged:
+            merged.append(segment[:])
+            continue
+        previous = merged[-1]
+        gap_depth = grid_z[segment[0]] - grid_z[previous[1]]
+        gap_cooling = smooth_t[previous[1]] - smooth_t[segment[0]]
+        if (gap_depth <= INVERSION_MERGE_GAP_M and
+                gap_cooling <= INVERSION_MERGE_COOLING_C):
+            previous[1] = segment[1]
+        else:
+            merged.append(segment[:])
+
+    layers = []
+    rejected = 0
+    for i0, i1 in merged:
+        depth = float(grid_z[i1] - grid_z[i0])
+        delta_t = float(smooth_t[i1] - smooth_t[i0])
+        base_p = float(grid_p[i0])
+        top_p = float(grid_p[i1])
+
+        if base_p >= INVERSION_LOWER_BOUND_HPA:
+            keep = (depth >= INVERSION_LOW_MIN_DEPTH_M and
+                    delta_t >= INVERSION_LOW_MIN_DELTA_T_C)
+            regime = "surface-700 hPa high sensitivity"
+        else:
+            keep = (top_p >= INVERSION_UPPER_BOUND_HPA and
+                    depth >= INVERSION_MID_MIN_DEPTH_M and
+                    delta_t >= INVERSION_MID_MIN_DELTA_T_C)
+            regime = "700-300 hPa selective"
+
+        if not keep:
+            rejected += 1
+            continue
+
+        delta_td = None
+        if np.isfinite(smooth_td[i0]) and np.isfinite(smooth_td[i1]):
+            delta_td = float(smooth_td[i1] - smooth_td[i0])
+
+        delta_theta_e = None
+        if np.isfinite(theta_e[i0]) and np.isfinite(theta_e[i1]):
+            delta_theta_e = float(theta_e[i1] - theta_e[i0])
+
+        layer = {
+            "type": "surface" if (grid_z[i0] - station_z) <= 50 else "elevated",
+            "regime": regime,
+            "base_msl_m": round(float(grid_z[i0]), 0),
+            "top_msl_m": round(float(grid_z[i1]), 0),
+            "base_agl_m": round(float(grid_z[i0] - station_z), 0),
+            "top_agl_m": round(float(grid_z[i1] - station_z), 0),
+            "base_pressure_hpa": round(base_p, 1),
+            "top_pressure_hpa": round(top_p, 1),
+            "depth_m": round(depth, 0),
+            "base_temperature_c": round(float(smooth_t[i0]), 2),
+            "top_temperature_c": round(float(smooth_t[i1]), 2),
+            "delta_temperature_c": round(delta_t, 2),
+            "temperature_gradient_c_per_km": round(1000.0 * delta_t / depth, 2),
+            "temperature_inversion_strength": _inversion_temperature_strength(delta_t, depth),
+            "base_theta_k": round(float(theta[i0]), 2),
+            "top_theta_k": round(float(theta[i1]), 2),
+            "delta_theta_k": round(float(theta[i1] - theta[i0]), 2),
+            "base_dewpoint_c": round(float(smooth_td[i0]), 2) if np.isfinite(smooth_td[i0]) else None,
+            "top_dewpoint_c": round(float(smooth_td[i1]), 2) if np.isfinite(smooth_td[i1]) else None,
+            "delta_dewpoint_c": round(delta_td, 2) if delta_td is not None else None,
+            "base_theta_e_k": round(float(theta_e[i0]), 2) if np.isfinite(theta_e[i0]) else None,
+            "top_theta_e_k": round(float(theta_e[i1]), 2) if np.isfinite(theta_e[i1]) else None,
+            "delta_theta_e_k": round(delta_theta_e, 2) if delta_theta_e is not None else None,
+            "thermodynamic_boundary_strength": _inversion_boundary_strength(delta_td, delta_theta_e),
+        }
+        layers.append(layer)
+
+    low_layers = [x for x in layers if x["base_pressure_hpa"] >= INVERSION_LOWER_BOUND_HPA]
+    summary = {
+        "total_count": len(layers),
+        "surface_to_700_hpa_count": len(low_layers),
+        "surface_to_700_hpa_total_depth_m": round(sum(x["depth_m"] for x in low_layers), 0),
+        "strongest_low_level_delta_temperature_c": (
+            max((x["delta_temperature_c"] for x in low_layers), default=None)
+        ),
+        "strongest_low_level_gradient_c_per_km": (
+            max((x["temperature_gradient_c_per_km"] for x in low_layers), default=None)
+        ),
+        "rejected_candidate_count": rejected,
+    }
+
+    return {
+        "available": True,
+        "method": {
+            "vertical_grid_m": INVERSION_GRID_STEP_M,
+            "temperature_smoothing_m": INVERSION_SMOOTH_WINDOW_M,
+            "surface_to_700_hpa": {
+                "mode": "high_sensitivity",
+                "minimum_depth_m": INVERSION_LOW_MIN_DEPTH_M,
+                "minimum_delta_temperature_c": INVERSION_LOW_MIN_DELTA_T_C,
+            },
+            "700_to_300_hpa": {
+                "mode": "selective",
+                "minimum_depth_m": INVERSION_MID_MIN_DEPTH_M,
+                "minimum_delta_temperature_c": INVERSION_MID_MIN_DELTA_T_C,
+            },
+            "above_300_hpa": "excluded; tropopause diagnostics handled separately",
+            "merge_gap_m": INVERSION_MERGE_GAP_M,
+            "merge_max_intervening_cooling_c": INVERSION_MERGE_COOLING_C,
+        },
+        "interpretation_note": (
+            "Temperature inversion strength and thermodynamic/moisture boundary "
+            "strength are separate diagnostics. No inversion is automatically "
+            "classified as a convective cap; parcel and CIN context is required."
+        ),
+        "summary": summary,
+        "layers": layers,
+    }
+
+
+# ============================================================
 # SHRANJEVANJE
 # ============================================================
 
@@ -3229,6 +3550,10 @@ def save_json(
         )
     )
 
+    inversion_diagnostics = calculate_inversions(
+        profile["levels"]
+    )
+
     climatology_comparison = (
         calculate_climatology_comparison(
             standard_levels,
@@ -3246,6 +3571,9 @@ def save_json(
 
         "climatology":
             climatology_comparison,
+
+        "inversions":
+            inversion_diagnostics,
     }
 
     profile["parameters"]["change"] = (
@@ -3388,6 +3716,16 @@ def print_summary(profile):
         "m/s"
     )
 
+    inversions = p.get("inversions", {})
+    if inversions.get("available"):
+        inv_summary = inversions.get("summary", {})
+        print(
+            "Inversions surface-700 hPa:",
+            inv_summary.get("surface_to_700_hpa_count"),
+            "| total depth:",
+            inv_summary.get("surface_to_700_hpa_total_depth_m"),
+            "m"
+        )
 
     standard_winds = metpy.get("standard_winds", {})
 
