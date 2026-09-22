@@ -1,0 +1,46 @@
+name: Diagnose IGRA archive
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run IGRA diagnostic
+        run: |
+          python diagnose_igra_archive.py
+
+      - name: Show diagnostic files
+        run: |
+          echo "=== diagnostics ==="
+          ls -lh diagnostics
+          echo
+          echo "=== yearly resolution ==="
+          cat diagnostics/igra_resolution_by_year.csv
+
+      - name: Commit diagnostics
+        run: |
+          if git diff --quiet -- diagnostics; then
+            echo "No diagnostic changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add diagnostics
+          git commit -m "Add IGRA archive resolution diagnostics"
+          git push
