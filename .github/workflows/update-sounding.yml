@@ -1,37 +1,26 @@
 name: Update LJLM sounding
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
   schedule:
-    # GitHub uporablja UTC.
-    #
-    # Več poskusov po vsakem terminu,
-    # ker čas prihoda BUFR v DWD ni vedno enak.
-    #
-    # 00 UTC
-    - cron: "20 0 * * *"
-    - cron: "50 0 * * *"
-    - cron: "20 1 * * *"
-    - cron: "50 1 * * *"
+    # GitHub cron uses UTC.
+    # Hourly discovery catches both regular 00/12 UTC profiles
+    # and occasional special LJLM soundings.
+    - cron: "17 * * * *"
 
-    # 12 UTC
-    - cron: "20 12 * * *"
-    - cron: "50 12 * * *"
-    - cron: "20 13 * * *"
-    - cron: "50 13 * * *"
+concurrency:
+  group: update-ljlm-sounding
+  cancel-in-progress: false
 
 jobs:
-
   update-sounding:
-
     runs-on: ubuntu-latest
 
     permissions:
       contents: write
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v7
 
@@ -45,41 +34,58 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Retrieve Ljubljana sounding
+      - name: Discover Ljubljana soundings
         run: |
           python extract_ljlm.py
 
-      - name: Show latest sounding
+      - name: Validate newest sounding
         if: always()
         run: |
-          if [ -f data/latest.json ]; then
-            echo "latest.json exists"
-            python - <<'PY'
-          import json
-
-          with open(
-              "data/latest.json",
-              "r",
-              encoding="utf-8"
-          ) as f:
-              d = json.load(f)
-
-          print(
-              "Nominal:",
-              d.get("nominal_date"),
-              d.get("term")
-          )
-
-          print(
-              "Launch:",
-              d.get("launch_time")
-          )
-          PY
-          else
-            echo "No latest.json yet."
+          if [ ! -f data/latest.json ]; then
+            echo "ERROR: data/latest.json does not exist."
+            exit 1
           fi
 
-      - name: Commit new sounding
+          python - <<'PY'
+          import json
+
+          with open("data/latest.json", "r", encoding="utf-8") as f:
+              d = json.load(f)
+
+          print("Launch:", d.get("launch_time"))
+          print("Nominal:", d.get("nominal_date"), d.get("term"))
+          print("Sounding ID:", d.get("sounding_id"))
+          print("Classification:", d.get("sounding_classification"))
+
+          trajectory = d.get("trajectory", {})
+          print(
+              "Trajectory:",
+              trajectory.get("available"),
+              "| raw points:",
+              trajectory.get("raw_point_count"),
+              "| display points:",
+              trajectory.get("display_point_count"),
+              "| max height:",
+              trajectory.get("max_height_m"),
+          )
+
+          metpy = d.get("parameters", {}).get("metpy", {})
+          print("MLCAPE:", metpy.get("mlcape_jkg"))
+          print("MUCAPE:", metpy.get("mucape_jkg"))
+          print(
+              "CAPE corrections:",
+              metpy.get("qc", {}).get("cape_corrections", [])
+          )
+
+          classification = d.get("sounding_classification", {})
+          if classification.get("kind") not in ("regular", "special"):
+              raise SystemExit("Invalid sounding classification")
+
+          if trajectory.get("available") is not True:
+              raise SystemExit("Trajectory is unavailable in newest sounding")
+          PY
+
+      - name: Commit sounding archive
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -87,7 +93,7 @@ jobs:
           git add data/
 
           if git diff --cached --quiet; then
-            echo "No new sounding to commit."
+            echo "No archive changes to commit."
           else
             git commit -m "Update LJLM sounding"
             git push
