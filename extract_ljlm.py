@@ -413,31 +413,38 @@ def determine_term(launch_time):
 # ============================================================
 
 def expected_term(now):
+    """
+    Vrne zadnji termin, ki ga je ob trenutnem času smiselno
+    pričakovati v DWD Open Data.
 
-    # Po 18 UTC že iščemo naslednjo 00 UTC sondažo.
-    # Od 06 do 18 UTC iščemo 12 UTC.
-    # Med 00 in 06 UTC iščemo tekočo 00 UTC.
+    00 UTC sonda je izpuščena približno ob 23:30 UTC
+    prejšnjega dne, 12 UTC pa približno ob 11:30 UTC.
+    Dodamo približno eno uro rezerve za prihod podatkov v DWD.
+    """
 
-    if now.hour >= 18:
-
-        return (
-            "00",
-            (now + timedelta(days=1)).date()
+    # Od 12:30 UTC naprej iščemo današnjo 12 UTC sondažo.
+    if (
+        now.hour > 12
+        or (
+            now.hour == 12
+            and now.minute >= 30
         )
+    ):
+        return "12", now.date()
 
-    elif now.hour >= 6:
-
-        return (
-            "12",
-            now.date()
+    # Od 00:30 do 12:29 UTC iščemo današnjo 00 UTC sondažo.
+    if (
+        now.hour > 0
+        or (
+            now.hour == 0
+            and now.minute >= 30
         )
+    ):
+        return "00", now.date()
 
-    else:
-
-        return (
-            "00",
-            now.date()
-        )
+    # Med 00:00 in 00:29 UTC je varneje še uporabiti
+    # včerajšnjo 12 UTC sondažo.
+    return "12", (now - timedelta(days=1)).date()
 
 
 # ============================================================
