@@ -1,0 +1,96 @@
+name: Build IGRA historical archive
+
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: build-igra-historical-archive
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build historical IGRA archive
+        run: |
+          python build_igra_archive.py
+
+      - name: Validate archive
+        run: |
+          python - <<'PY'
+          import gzip
+          import json
+          from pathlib import Path
+
+          s = Path("historical/igra_1996_2025_summary.json")
+          p = Path("historical/igra_1996_2025_profiles.json.gz")
+          r = Path("historical/igra_build_report.json")
+
+          assert s.exists(), "summary missing"
+          assert p.exists(), "profiles archive missing"
+          assert r.exists(), "build report missing"
+
+          summary = json.loads(s.read_text(encoding="utf-8"))
+          report = json.loads(r.read_text(encoding="utf-8"))
+
+          with gzip.open(p, "rt", encoding="utf-8") as f:
+              profiles = json.load(f)
+
+          n1 = summary["profile_count"]
+          n2 = len(summary["profiles"])
+          n3 = len(profiles["profiles"])
+
+          print("Summary profiles:", n1)
+          print("Summary array:", n2)
+          print("Detailed profiles:", n3)
+          print("Resolution classes:", report["resolution_classes"])
+          print("Errors:", len(report["errors"]))
+
+          assert n1 == n2 == n3
+          assert n1 > 9000
+          assert len(report["errors"]) == 0
+
+          first = summary["profiles"][0]
+          assert first["source"]["dataset"] == "NOAA IGRA v2"
+          assert "resolution" in first
+          assert "standard_levels" in first
+          assert "observed_stable_layers" in first["parameters"]
+
+          print("Validation OK")
+          PY
+
+      - name: Commit historical archive
+        run: |
+          if git diff --quiet -- historical; then
+            echo "No historical archive changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add historical
+          git commit -m "Build 1996-2025 IGRA historical sounding archive"
+
+          # A scheduled/current-sounding workflow may have pushed while this
+          # long build was running. Rebase our generated archive commit onto
+          # the newest main before pushing, rather than failing with fetch-first.
+          git pull --rebase origin main
+          git push origin main
