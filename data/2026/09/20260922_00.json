@@ -17345,7 +17345,7 @@
   ],
   "source": "DWD Open Data BUFR",
   "source_file": "Z__C_EDZW_20260922003502_bda01,temp_bufr_999999_999999__MW_817.bin",
-  "retrieved_at": "2026-09-22T08:42:58.859685Z",
+  "retrieved_at": "2026-09-22T09:03:08.883205Z",
   "term": "00",
   "nominal_date": "2026-09-22",
   "parameters": {
@@ -17398,6 +17398,55 @@
     },
     "metpy": {
       "pwat_mm": 17.42,
+      "moisture_transport": {
+        "humidity_profile": {
+          "surface": {
+            "pressure_hpa": 990.3,
+            "height_m": 299.0,
+            "specific_humidity_gkg": 7.55,
+            "mixing_ratio_gkg": 7.61,
+            "method": "lowest_common_profile_level"
+          },
+          "925": {
+            "pressure_hpa": 925.0,
+            "specific_humidity_gkg": 7.1,
+            "mixing_ratio_gkg": 7.16,
+            "method": "log_pressure_interpolation"
+          },
+          "850": {
+            "pressure_hpa": 850.0,
+            "specific_humidity_gkg": 4.18,
+            "mixing_ratio_gkg": 4.2,
+            "method": "measured"
+          },
+          "surface_to_925": {
+            "delta_q_925_minus_surface_gkg": -0.45,
+            "delta_mixing_ratio_925_minus_surface_gkg": -0.45
+          }
+        },
+        "moisture_transport_850": {
+          "pressure_hpa": 850.0,
+          "specific_humidity_gkg": 4.18,
+          "wind_speed_ms": 8.7,
+          "qv_magnitude_kgkg_ms": 0.03637,
+          "qv_u_kgkg_ms": -0.03418,
+          "qv_v_kgkg_ms": 0.01244,
+          "transport_to_direction_deg": 290.0,
+          "method": "measured"
+        },
+        "ivt": {
+          "available": true,
+          "layer": "lowest_common_level_to_300hpa",
+          "bottom_pressure_hpa": 990.3,
+          "top_pressure_hpa": 300.0,
+          "magnitude_kg_m1_s1": 79.2,
+          "u_kg_m1_s1": -51.0,
+          "v_kg_m1_s1": -60.5,
+          "transport_to_direction_deg": 220.2,
+          "integration": "pressure_coordinate_trapezoidal",
+          "formula": "IVT=(1/g)*integral(q*V dp)"
+        }
+      },
       "lcl_pressure_hpa": 973.61,
       "lcl_temperature_c": 9.39,
       "lcl_height_msl_m": 442.0,
