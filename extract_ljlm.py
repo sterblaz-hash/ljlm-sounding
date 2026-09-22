@@ -1721,7 +1721,7 @@ def calculate_moisture_transport(levels):
     gravity = 9.80665
 
     ivt_u = (
-        -np.trapz(
+        -np.trapezoid(
             q_values * u_values,
             p_pa
         )
@@ -1729,7 +1729,7 @@ def calculate_moisture_transport(levels):
     )
 
     ivt_v = (
-        -np.trapz(
+        -np.trapezoid(
             q_values * v_values,
             p_pa
         )
