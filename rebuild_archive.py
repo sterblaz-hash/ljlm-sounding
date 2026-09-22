@@ -187,7 +187,7 @@ def rebuild_one(path):
     # e.g. data/2026/09/20260920_00.json.
     if not nominal_text or not term:
         match = re.search(
-            r"(\\d{8})_(00|12|special_\\d{4})\\.json$",
+            r"(\d{8})_(00|12|special_\d{4})\.json$",
             path
         )
 
