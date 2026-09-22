@@ -2203,11 +2203,30 @@ def sounding_already_saved(
             )
         )
 
+        change = (
+            old.get("parameters", {})
+               .get("change", {})
+        )
+
+        has_change_upgrade = (
+            isinstance(
+                change.get("previous_term"),
+                dict
+            )
+            and isinstance(
+                change.get(
+                    "previous_day_same_term"
+                ),
+                dict
+            )
+        )
+
         return (
             same_launch
             and has_climatology
             and has_wind_upgrade
             and has_moisture_transport_upgrade
+            and has_change_upgrade
         )
 
     except Exception:
@@ -2492,6 +2511,292 @@ def calculate_climatology_comparison(
     }
 
 
+
+# ============================================================
+# PRIMERJAVA S PREJŠNJIMI SONDAŽAMI
+# ============================================================
+
+def nested_get(data, path):
+    """Varno prebere gnezdeno vrednost iz slovarja."""
+    current = data
+
+    for key in path:
+        if not isinstance(current, dict):
+            return None
+
+        current = current.get(key)
+
+        if current is None:
+            return None
+
+    return current
+
+
+def previous_term_reference(nominal_date, term):
+    """Vrne datum/termin neposredno prejšnje sondaže."""
+    if term == "12":
+        return nominal_date, "00"
+
+    return nominal_date - timedelta(days=1), "12"
+
+
+def previous_day_reference(nominal_date, term):
+    """Vrne isti termin prejšnjega dne."""
+    return nominal_date - timedelta(days=1), term
+
+
+def load_archived_sounding(nominal_date, term):
+    path = archive_path(
+        nominal_date,
+        term
+    )
+
+    if not os.path.exists(path):
+        return None, path
+
+    try:
+        with open(
+            path,
+            "r",
+            encoding="utf-8"
+        ) as f:
+            return json.load(f), path
+
+    except Exception as exc:
+        print(
+            "Previous sounding read warning:",
+            path,
+            exc
+        )
+        return None, path
+
+
+COMPARISON_PARAMETERS = {
+    "t850_c": (
+        "T850",
+        ["parameters", "standard_levels", "t850", "value"],
+        "degC"
+    ),
+    "t700_c": (
+        "T700",
+        ["parameters", "standard_levels", "t700", "value"],
+        "degC"
+    ),
+    "t500_c": (
+        "T500",
+        ["parameters", "standard_levels", "t500", "value"],
+        "degC"
+    ),
+    "pwat_mm": (
+        "PWAT",
+        ["parameters", "metpy", "pwat_mm"],
+        "mm"
+    ),
+    "freezing_level_msl_m": (
+        "Freezing level",
+        ["parameters", "metpy", "freezing_level_msl_m"],
+        "m"
+    ),
+    "mlcape_jkg": (
+        "MLCAPE",
+        ["parameters", "metpy", "mlcape_jkg"],
+        "J/kg"
+    ),
+    "mucape_jkg": (
+        "MUCAPE",
+        ["parameters", "metpy", "mucape_jkg"],
+        "J/kg"
+    ),
+    "shear_0_6km_ms": (
+        "0-6 km shear",
+        ["parameters", "metpy", "shear_0_6km_ms"],
+        "m/s"
+    ),
+    "q_surface_gkg": (
+        "q surface",
+        [
+            "parameters", "metpy", "moisture_transport",
+            "humidity_profile", "surface",
+            "specific_humidity_gkg"
+        ],
+        "g/kg"
+    ),
+    "q925_gkg": (
+        "q925",
+        [
+            "parameters", "metpy", "moisture_transport",
+            "humidity_profile", "925",
+            "specific_humidity_gkg"
+        ],
+        "g/kg"
+    ),
+    "q850_gkg": (
+        "q850",
+        [
+            "parameters", "metpy", "moisture_transport",
+            "humidity_profile", "850",
+            "specific_humidity_gkg"
+        ],
+        "g/kg"
+    ),
+    "ivt_kg_m1_s1": (
+        "IVT",
+        [
+            "parameters", "metpy", "moisture_transport",
+            "ivt", "magnitude_kg_m1_s1"
+        ],
+        "kg m-1 s-1"
+    ),
+    "lapse_rate_850_500_c_per_km": (
+        "Lapse rate 850-500",
+        [
+            "parameters", "metpy",
+            "lapse_rate_850_500_c_per_km"
+        ],
+        "degC/km"
+    ),
+}
+
+
+def build_comparison(current_profile, old_profile):
+    """
+    Primerja trenutno sondažo s starejšo.
+    Delta = current - previous.
+    """
+
+    if old_profile is None:
+        return {
+            "available": False
+        }
+
+    values = {}
+
+    for key, (
+        label,
+        path,
+        unit
+    ) in COMPARISON_PARAMETERS.items():
+
+        current_value = nested_get(
+            current_profile,
+            path
+        )
+
+        previous_value = nested_get(
+            old_profile,
+            path
+        )
+
+        if (
+            not valid_number(current_value)
+            or not valid_number(previous_value)
+        ):
+            continue
+
+        current_value = float(current_value)
+        previous_value = float(previous_value)
+
+        values[key] = {
+            "label": label,
+            "current": round(current_value, 2),
+            "previous": round(previous_value, 2),
+            "delta": round(
+                current_value - previous_value,
+                2
+            ),
+            "unit": unit,
+        }
+
+    return {
+        "available": True,
+        "previous_launch_time":
+            old_profile.get("launch_time"),
+        "previous_nominal_date":
+            old_profile.get("nominal_date"),
+        "previous_term":
+            old_profile.get("term"),
+        "delta_definition":
+            "current_minus_previous",
+        "parameters":
+            values,
+    }
+
+
+def calculate_previous_comparisons(
+    current_profile,
+    nominal_date,
+    term
+):
+    """
+    Dve primerjavi:
+    1) neposredno prejšnji termin
+    2) isti termin prejšnjega dne
+    """
+
+    prev_term_date, prev_term = (
+        previous_term_reference(
+            nominal_date,
+            term
+        )
+    )
+
+    prev_day_date, prev_day_term = (
+        previous_day_reference(
+            nominal_date,
+            term
+        )
+    )
+
+    prev_term_profile, prev_term_path = (
+        load_archived_sounding(
+            prev_term_date,
+            prev_term
+        )
+    )
+
+    prev_day_profile, prev_day_path = (
+        load_archived_sounding(
+            prev_day_date,
+            prev_day_term
+        )
+    )
+
+    previous_term = build_comparison(
+        current_profile,
+        prev_term_profile
+    )
+
+    previous_term.update({
+        "requested_nominal_date":
+            prev_term_date.isoformat(),
+        "requested_term":
+            prev_term,
+        "archive_file":
+            prev_term_path,
+    })
+
+    previous_day = build_comparison(
+        current_profile,
+        prev_day_profile
+    )
+
+    previous_day.update({
+        "requested_nominal_date":
+            prev_day_date.isoformat(),
+        "requested_term":
+            prev_day_term,
+        "archive_file":
+            prev_day_path,
+    })
+
+    return {
+        "previous_term":
+            previous_term,
+        "previous_day_same_term":
+            previous_day,
+    }
+
+
 # ============================================================
 # SHRANJEVANJE
 # ============================================================
@@ -2575,6 +2880,14 @@ def save_json(
         "climatology":
             climatology_comparison,
     }
+
+    profile["parameters"]["change"] = (
+        calculate_previous_comparisons(
+            profile,
+            nominal_date,
+            term
+        )
+    )
 
     os.makedirs(
         "data",
@@ -2863,6 +3176,91 @@ def print_summary(profile):
             ),
             "hPa"
         )
+
+    change = p.get(
+        "change",
+        {}
+    )
+
+    if change:
+        print()
+        print("--- CHANGE ---")
+
+        for title, key in [
+            (
+                "Previous term",
+                "previous_term"
+            ),
+            (
+                "Previous day same term",
+                "previous_day_same_term"
+            ),
+        ]:
+            item = change.get(key, {})
+
+            print()
+            print(
+                title + ":",
+                item.get(
+                    "requested_nominal_date"
+                ),
+                item.get(
+                    "requested_term"
+                ),
+                "UTC"
+            )
+
+            if not item.get("available"):
+                print(
+                    "  archived sounding "
+                    "not available"
+                )
+                continue
+
+            values = item.get(
+                "parameters",
+                {}
+            )
+
+            for parameter in [
+                "t850_c",
+                "t700_c",
+                "t500_c",
+                "pwat_mm",
+                "freezing_level_msl_m",
+                "q_surface_gkg",
+                "q925_gkg",
+                "q850_gkg",
+                "ivt_kg_m1_s1",
+                "shear_0_6km_ms",
+                "mlcape_jkg",
+                "mucape_jkg",
+            ]:
+                value = values.get(parameter)
+
+                if value is None:
+                    continue
+
+                delta = value.get("delta")
+                sign = (
+                    "+"
+                    if (
+                        delta is not None
+                        and delta > 0
+                    )
+                    else ""
+                )
+
+                print(
+                    " ",
+                    value.get("label") + ":",
+                    value.get("current"),
+                    "| prev",
+                    value.get("previous"),
+                    "| delta",
+                    f"{sign}{delta}",
+                    value.get("unit")
+                )
 
     climatology = p.get(
         "climatology",
