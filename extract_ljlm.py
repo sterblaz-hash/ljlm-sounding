@@ -38,6 +38,10 @@ CLIMATOLOGY_FILE = "climatology/daily_climatology.json"
 
 MAX_CANDIDATE_FILES = 250
 
+# Regular launches are normally near 23:30 and 11:30 UTC.
+# Profiles outside this tolerance are preserved as special soundings.
+REGULAR_LAUNCH_TOLERANCE_MINUTES = 120
+
 
 # ============================================================
 # PRENOS
@@ -222,7 +226,7 @@ def build_trajectory(
 
     ascent = rows[:max_index + 1]
 
-    # Roughly 10-second display spacing, while always keeping the
+    # Roughly 20-second display spacing, while always keeping the
     # first and last ascent point.
     display_points = []
 
@@ -231,7 +235,7 @@ def build_trajectory(
     for point in ascent:
         if (
             last_kept_time is None
-            or point["time_s"] - last_kept_time >= 10
+            or point["time_s"] - last_kept_time >= 20
         ):
             display_points.append(point)
             last_kept_time = point["time_s"]
@@ -648,7 +652,7 @@ def classify_sounding(launch_time):
         key=lambda x: x[0]
     )
 
-    if difference_s <= 2 * 3600:
+    if difference_s <= REGULAR_LAUNCH_TOLERANCE_MINUTES * 60:
         return {
             "kind": "regular",
             "term": term,
@@ -3212,6 +3216,12 @@ def save_json(
     profile["sounding_classification"][
         "nominal_date"
     ] = nominal_date.isoformat()
+
+    profile["sounding_id"] = (
+        nominal_date.strftime("%Y%m%d")
+        + "_"
+        + term
+    )
 
     metpy_parameters = (
         calculate_metpy_parameters(
