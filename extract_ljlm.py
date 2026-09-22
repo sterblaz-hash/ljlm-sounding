@@ -880,6 +880,88 @@ def prepare_wind_profile(levels):
     }
 
 
+
+# ============================================================
+# VETROVNE POMOŽNE FUNKCIJE
+# ============================================================
+
+def wind_at_pressure(levels, target):
+    """Veter na tlačni ploskvi; u/v interpolacija v log(p)."""
+    rows = [
+        x for x in levels
+        if x.get("pressure_hpa") is not None
+        and x.get("wind_speed_ms") is not None
+        and x.get("wind_direction_deg") is not None
+    ]
+    if not rows:
+        return None
+
+    rows.sort(key=lambda x: x["pressure_hpa"], reverse=True)
+
+    def uv(row):
+        speed = row["wind_speed_ms"] * units("m/s")
+        direction = row["wind_direction_deg"] * units.degree
+        u, v = mpcalc.wind_components(speed, direction)
+        return float(u.to("m/s").magnitude), float(v.to("m/s").magnitude)
+
+    exact = [x for x in rows if abs(x["pressure_hpa"] - target) <= 0.1]
+
+    if exact:
+        u_ms, v_ms = uv(exact[0])
+        method = "measured"
+    else:
+        above = below = None
+        for row in rows:
+            p = row["pressure_hpa"]
+            if p > target and (above is None or p < above["pressure_hpa"]):
+                above = row
+            elif p < target and (below is None or p > below["pressure_hpa"]):
+                below = row
+
+        if above is None or below is None:
+            return None
+
+        p1, p2 = above["pressure_hpa"], below["pressure_hpa"]
+        if abs(p1 - p2) > 100:
+            return None
+
+        u1, v1 = uv(above)
+        u2, v2 = uv(below)
+        f = math.log(target / p1) / math.log(p2 / p1)
+        u_ms = u1 + f * (u2 - u1)
+        v_ms = v1 + f * (v2 - v1)
+        method = "log_pressure_uv_interpolation"
+
+    speed_ms = math.sqrt(u_ms ** 2 + v_ms ** 2)
+    direction_deg = math.degrees(math.atan2(-u_ms, -v_ms)) % 360.0
+
+    return {
+        "pressure_hpa": target,
+        "speed_ms": round(speed_ms, 2),
+        "direction_deg": round(direction_deg, 1),
+        "u_ms": round(u_ms, 2),
+        "v_ms": round(v_ms, 2),
+        "method": method,
+    }
+
+
+def vector_speed_direction(u_component, v_component):
+    u_ms = quantity_value(u_component, "m/s")
+    v_ms = quantity_value(v_component, "m/s")
+    if u_ms is None or v_ms is None:
+        return None
+
+    speed_ms = math.sqrt(u_ms ** 2 + v_ms ** 2)
+    direction_deg = math.degrees(math.atan2(-u_ms, -v_ms)) % 360.0
+
+    return {
+        "speed_ms": round(speed_ms, 2),
+        "direction_deg": round(direction_deg, 1),
+        "u_ms": round(u_ms, 2),
+        "v_ms": round(v_ms, 2),
+    }
+
+
 # ============================================================
 # POMOŽNE METPY FUNKCIJE
 # ============================================================
@@ -1407,52 +1489,118 @@ def calculate_metpy_parameters(levels):
         500
     )
 
-    # Wind shear
+    # WIND
+    result["standard_winds"] = {}
+
+    for pressure_level in [925, 850, 700, 500, 300, 250, 200]:
+        item = wind_at_pressure(levels, pressure_level)
+        if item is not None:
+            result["standard_winds"][str(pressure_level)] = item
+
     wind = prepare_wind_profile(levels)
 
     if wind is not None:
-
         wp = wind["pressure"]
         wz = wind["height"]
         u = wind["u"]
         v = wind["v"]
-
         bottom = wz[0]
 
-        for depth_km in [1, 3, 6]:
+        result["bulk_shear"] = {}
 
+        for depth_km in [1, 3, 6]:
             shear = safe_parameter(
                 f"{depth_km} km shear",
-
-                lambda depth_km=depth_km:
-                    mpcalc.bulk_shear(
-                        wp,
-                        u,
-                        v,
-                        height=wz,
-                        bottom=bottom,
-                        depth=
-                            depth_km
-                            * units.kilometer
-                    )
+                lambda depth_km=depth_km: mpcalc.bulk_shear(
+                    wp, u, v,
+                    height=wz,
+                    bottom=bottom,
+                    depth=depth_km * units.kilometer
+                )
             )
 
             if shear is None:
                 continue
 
             u_shear, v_shear = shear
+            magnitude = np.sqrt(u_shear ** 2 + v_shear ** 2)
 
-            magnitude = np.sqrt(
-                u_shear ** 2
-                + v_shear ** 2
-            )
+            magnitude_ms = quantity_value(magnitude, "m/s")
+            u_ms = quantity_value(u_shear, "m/s")
+            v_ms = quantity_value(v_shear, "m/s")
 
-            result[
-                f"shear_0_{depth_km}km_ms"
-            ] = quantity_value(
-                magnitude,
-                "m/s"
-            )
+            result[f"shear_0_{depth_km}km_ms"] = magnitude_ms
+            result["bulk_shear"][f"0_{depth_km}km"] = {
+                "magnitude_ms": magnitude_ms,
+                "u_ms": u_ms,
+                "v_ms": v_ms,
+            }
+
+        bunkers = safe_parameter(
+            "Bunkers storm motion",
+            lambda: mpcalc.bunkers_storm_motion(wp, u, v, wz)
+        )
+
+        rm_u = rm_v = lm_u = lm_v = None
+
+        if bunkers is not None:
+            try:
+                right_mover, left_mover, mean_wind = bunkers
+                rm_u, rm_v = right_mover
+                lm_u, lm_v = left_mover
+                mean_u, mean_v = mean_wind
+
+                result["bunkers"] = {
+                    "right_mover": vector_speed_direction(rm_u, rm_v),
+                    "left_mover": vector_speed_direction(lm_u, lm_v),
+                    "mean_wind_0_6km": vector_speed_direction(mean_u, mean_v),
+                }
+            except Exception as exc:
+                print("MetPy warning (Bunkers details):", exc)
+
+        result["srh"] = {}
+
+        for depth_km in [1, 3]:
+            for label, storm_u, storm_v in [
+                ("right_mover", rm_u, rm_v),
+                ("left_mover", lm_u, lm_v),
+            ]:
+                if storm_u is None or storm_v is None:
+                    continue
+
+                srh = safe_parameter(
+                    f"SRH 0-{depth_km} km {label}",
+                    lambda depth_km=depth_km, storm_u=storm_u, storm_v=storm_v:
+                        mpcalc.storm_relative_helicity(
+                            wz, u, v,
+                            depth=depth_km * units.kilometer,
+                            bottom=wz[0],
+                            storm_u=storm_u,
+                            storm_v=storm_v
+                        )
+                )
+
+                if srh is None:
+                    continue
+
+                try:
+                    positive, negative, total = srh
+                    result["srh"][f"0_{depth_km}km_{label}"] = {
+                        "positive_m2s2": quantity_value(
+                            positive, "meter**2 / second**2"
+                        ),
+                        "negative_m2s2": quantity_value(
+                            negative, "meter**2 / second**2"
+                        ),
+                        "total_m2s2": quantity_value(
+                            total, "meter**2 / second**2"
+                        ),
+                    }
+                except Exception as exc:
+                    print(
+                        f"MetPy warning (SRH 0-{depth_km} km {label}):",
+                        exc
+                    )
 
     return result
 
@@ -1500,9 +1648,31 @@ def sounding_already_saved(
         ) as f:
             old = json.load(f)
 
-        return (
+        same_launch = (
             old.get("launch_time")
             == launch_time
+        )
+
+        metpy = old.get("parameters", {}).get("metpy", {})
+
+        has_climatology = (
+            old.get("parameters", {})
+               .get("climatology", {})
+               .get("available")
+            is True
+        )
+
+        has_wind_upgrade = (
+            isinstance(metpy.get("standard_winds"), dict)
+            and isinstance(metpy.get("bulk_shear"), dict)
+            and "bunkers" in metpy
+            and isinstance(metpy.get("srh"), dict)
+        )
+
+        return (
+            same_launch
+            and has_climatology
+            and has_wind_upgrade
         )
 
     except Exception:
@@ -2002,6 +2172,50 @@ def print_summary(profile):
         ),
         "m/s"
     )
+
+
+    standard_winds = metpy.get("standard_winds", {})
+
+    if standard_winds:
+        print()
+        print("--- WIND ---")
+
+        for pressure_level in ["925", "850", "700", "500", "300", "250", "200"]:
+            item = standard_winds.get(pressure_level)
+            if item is None:
+                continue
+            print(
+                f"Wind {pressure_level}:",
+                item.get("direction_deg"),
+                "deg /",
+                item.get("speed_ms"),
+                "m/s"
+            )
+
+    right_mover = (
+        metpy.get("bunkers", {})
+             .get("right_mover")
+    )
+
+    if right_mover:
+        print(
+            "Bunkers RM:",
+            right_mover.get("direction_deg"),
+            "deg /",
+            right_mover.get("speed_ms"),
+            "m/s"
+        )
+
+    srh = metpy.get("srh", {})
+
+    for depth_km in [1, 3]:
+        item = srh.get(f"0_{depth_km}km_right_mover")
+        if item is not None:
+            print(
+                f"SRH 0-{depth_km} km RM:",
+                item.get("total_m2s2"),
+                "m2/s2"
+            )
 
     climatology = p.get(
         "climatology",
