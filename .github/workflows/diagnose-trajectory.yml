@@ -1,7 +1,7 @@
 name: Diagnose LJLM trajectory
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 jobs:
   diagnose-trajectory:
