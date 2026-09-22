@@ -4252,6 +4252,30 @@ def main():
         newest["term"]
     )
 
-
 if __name__ == "__main__":
-    main()
+    import sys
+
+    try:
+        main()
+
+        # Pomembno pri GitHub Actions:
+        # ecCodes/eccodeslib se lahko pri normalnem zaključevanju
+        # interpreterja sesuje z:
+        #   free(): invalid pointer
+        #
+        # Do tega pride šele po uspešno končanem main().
+        # os._exit(0) preskoči problematično native cleanup fazo.
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(0)
+
+    except Exception:
+        # Prave Python napake morajo še vedno povzročiti
+        # neuspešen GitHub Actions workflow.
+        import traceback
+
+        traceback.print_exc()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(1)
+
