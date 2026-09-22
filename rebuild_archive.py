@@ -29,12 +29,19 @@ import glob
 import json
 import math
 import os
+import re
 from datetime import date
 
 import metpy.calc as mpcalc
 from metpy.units import units
 
 import extract_ljlm as core
+
+# NumPy 2.x removed np.trapz. The live extractor is also updated to use
+# np.trapezoid, but keep this compatibility alias so an archive rebuild
+# cannot lose IVT if GitHub checks out an older extractor revision.
+if not hasattr(core.np, "trapz") and hasattr(core.np, "trapezoid"):
+    core.np.trapz = core.np.trapezoid
 
 
 def valid(value):
@@ -175,10 +182,35 @@ def rebuild_one(path):
     nominal_text = profile.get("nominal_date")
     term = profile.get("term")
 
+    # Older archive files may pre-date the nominal_date/term schema.
+    # Recover these fields from the canonical archive filename first,
+    # e.g. data/2026/09/20260920_00.json.
     if not nominal_text or not term:
-        raise ValueError("missing nominal_date or term")
+        match = re.search(
+            r"(\\d{8})_(00|12|special_\\d{4})\\.json$",
+            path
+        )
 
-    nominal_date = date.fromisoformat(nominal_text)
+        if match:
+            nominal_date = date.fromisoformat(
+                f"{match.group(1)[0:4]}-"
+                f"{match.group(1)[4:6]}-"
+                f"{match.group(1)[6:8]}"
+            )
+            term = match.group(2)
+            nominal_text = nominal_date.isoformat()
+
+            profile["nominal_date"] = nominal_text
+            profile["term"] = term
+            profile["sounding_id"] = (
+                nominal_date.strftime("%Y%m%d") + "_" + term
+            )
+        else:
+            raise ValueError(
+                "missing nominal_date or term and filename cannot recover them"
+            )
+    else:
+        nominal_date = date.fromisoformat(nominal_text)
 
     profile["levels"] = refresh_level_thermodynamics(levels)
 
