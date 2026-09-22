@@ -55,6 +55,23 @@ def refresh_level_thermodynamics(levels):
     for old in levels:
         row = copy.deepcopy(old)
 
+        # Normalize old archive schemas before passing levels to the current
+        # extractor helpers. Some earliest JSON records omitted keys entirely
+        # when a value was unavailable; current helpers expect the keys to
+        # exist and allow their value to be None.
+        for key in (
+            "pressure_hpa",
+            "height_m",
+            "temperature_c",
+            "dewpoint_c",
+            "relative_humidity_pct",
+            "wind_speed_ms",
+            "wind_direction_deg",
+            "potential_temperature_k",
+            "equivalent_potential_temperature_k",
+        ):
+            row.setdefault(key, None)
+
         p = row.get("pressure_hpa")
         t = row.get("temperature_c")
         td = row.get("dewpoint_c")
