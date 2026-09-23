@@ -44,6 +44,17 @@ MAX_CANDIDATE_FILES = 250
 DWD_SCAN_CACHE_FILE = "data/dwd_scan_cache.json"
 DWD_SCAN_CACHE_RETENTION_HOURS = 72
 
+# Operational availability/status file used by the future web application.
+STATUS_FILE = "data/status.json"
+STATUS_RETENTION_DAYS = 14
+
+# Regular status lifecycle. A term becomes "waiting" at the main scheduled
+# check and "missing" only after the reserve check has also had a chance
+# to find it. Times are UTC and match the GitHub Actions schedule.
+STATUS_MAIN_CHECK_MINUTE = 50
+STATUS_RESERVE_00_HOUR = 1
+STATUS_RESERVE_12_HOUR = 13
+
 # During scheduled runs, once the expected 00/12 UTC LJLM sounding is found,
 # scan a short tail of older packages as well. This preserves nearby duplicate
 # copies and allows the script to keep the most complete profile.
@@ -2859,6 +2870,364 @@ def sounding_already_saved(
 
 
 # ============================================================
+# OPERATIVNI STATUS SONDAŽ
+# ============================================================
+
+def iso_utc(dt):
+    return (
+        dt.astimezone(timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def status_key(nominal_date, term):
+    return f"{nominal_date:%Y-%m-%d}_{term}"
+
+
+def regular_status_times(nominal_date, term):
+    """Return (waiting_from, missing_from) for a regular 00/12 UTC term."""
+    if term == "00":
+        waiting_from = datetime(
+            nominal_date.year,
+            nominal_date.month,
+            nominal_date.day,
+            0,
+            STATUS_MAIN_CHECK_MINUTE,
+            tzinfo=timezone.utc,
+        )
+        missing_from = datetime(
+            nominal_date.year,
+            nominal_date.month,
+            nominal_date.day,
+            STATUS_RESERVE_00_HOUR,
+            STATUS_MAIN_CHECK_MINUTE,
+            tzinfo=timezone.utc,
+        )
+    elif term == "12":
+        waiting_from = datetime(
+            nominal_date.year,
+            nominal_date.month,
+            nominal_date.day,
+            12,
+            STATUS_MAIN_CHECK_MINUTE,
+            tzinfo=timezone.utc,
+        )
+        missing_from = datetime(
+            nominal_date.year,
+            nominal_date.month,
+            nominal_date.day,
+            STATUS_RESERVE_12_HOUR,
+            STATUS_MAIN_CHECK_MINUTE,
+            tzinfo=timezone.utc,
+        )
+    else:
+        raise ValueError(f"Unsupported regular term: {term}")
+
+    return waiting_from, missing_from
+
+
+def load_status_file():
+    empty = {
+        "version": 1,
+        "station": 14015,
+        "station_name": "Ljubljana",
+        "updated_at": None,
+        "terms": {},
+        "special_soundings": {},
+    }
+
+    if not os.path.exists(STATUS_FILE):
+        return empty
+
+    try:
+        with open(STATUS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as exc:
+        print("WARNING: status.json could not be read:", exc)
+        return empty
+
+    if not isinstance(data, dict):
+        return empty
+
+    terms = data.get("terms", {})
+    specials = data.get("special_soundings", {})
+
+    if not isinstance(terms, dict):
+        terms = {}
+    if not isinstance(specials, dict):
+        specials = {}
+
+    empty.update(data)
+    empty["terms"] = terms
+    empty["special_soundings"] = specials
+    return empty
+
+
+def archive_status_metadata(nominal_date, term):
+    """Return compact metadata for an archived sounding, or None."""
+    path = archive_path(nominal_date, term)
+
+    if not os.path.exists(path):
+        return None
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            profile = json.load(f)
+    except Exception as exc:
+        print("WARNING: archived sounding could not be read:", path, exc)
+        return None
+
+    return {
+        "launch_time": profile.get("launch_time"),
+        "retrieved_at": profile.get("retrieved_at"),
+        "archive_file": path.replace(os.sep, "/"),
+        "profile_level_count": (
+            profile.get("qc", {}).get("profile_level_count")
+        ),
+    }
+
+
+def prune_status_data(data, now):
+    cutoff_date = (now - timedelta(days=STATUS_RETENTION_DAYS)).date()
+
+    kept_terms = {}
+    for key, entry in data.get("terms", {}).items():
+        try:
+            nominal_date = datetime.strptime(
+                entry.get("nominal_date", ""),
+                "%Y-%m-%d",
+            ).date()
+        except Exception:
+            # Keep unknown legacy entries rather than deleting them blindly.
+            kept_terms[key] = entry
+            continue
+
+        if nominal_date >= cutoff_date:
+            kept_terms[key] = entry
+
+    kept_specials = {}
+    for key, entry in data.get("special_soundings", {}).items():
+        launch_text = entry.get("launch_time")
+        try:
+            launch_dt = datetime.fromisoformat(
+                launch_text.replace("Z", "+00:00")
+            )
+        except Exception:
+            kept_specials[key] = entry
+            continue
+
+        if launch_dt.date() >= cutoff_date:
+            kept_specials[key] = entry
+
+    data["terms"] = kept_terms
+    data["special_soundings"] = kept_specials
+
+
+def set_regular_term_status(data, nominal_date, term, now):
+    key = status_key(nominal_date, term)
+    waiting_from, missing_from = regular_status_times(
+        nominal_date,
+        term,
+    )
+
+    # Do not create a future term before its first operational check.
+    if now < waiting_from:
+        return
+
+    old = data.setdefault("terms", {}).get(key, {})
+    archived = archive_status_metadata(nominal_date, term)
+
+    if archived is not None:
+        entry = {
+            "status": "ok",
+            "nominal_date": nominal_date.isoformat(),
+            "term": term,
+            "waiting_from": iso_utc(waiting_from),
+            "missing_after": iso_utc(missing_from),
+            "checked_at": iso_utc(now),
+            **archived,
+        }
+
+        # Preserve the first time this term entered the status file.
+        if old.get("first_seen_at"):
+            entry["first_seen_at"] = old["first_seen_at"]
+        else:
+            entry["first_seen_at"] = iso_utc(now)
+
+        data["terms"][key] = entry
+        return
+
+    new_status = "missing" if now >= missing_from else "waiting"
+
+    entry = {
+        "status": new_status,
+        "nominal_date": nominal_date.isoformat(),
+        "term": term,
+        "waiting_from": iso_utc(waiting_from),
+        "missing_after": iso_utc(missing_from),
+        "checked_at": iso_utc(now),
+        "first_seen_at": old.get("first_seen_at", iso_utc(now)),
+    }
+
+    if new_status == "missing":
+        entry["missing_since"] = old.get(
+            "missing_since",
+            iso_utc(missing_from),
+        )
+
+    data["terms"][key] = entry
+
+
+def update_status_file(now, items):
+    """Build the operational 00/12 status file from archive + current scan."""
+    data = load_status_file()
+
+    data["version"] = 1
+    data["station"] = 14015
+    data["station_name"] = "Ljubljana"
+
+    # Explicitly register regular soundings found by this run. This matters
+    # for manual catch-up runs and makes status recovery independent of the
+    # exact current clock time.
+    for item in items:
+        term = item.get("term")
+        nominal_date = item.get("nominal_date")
+        profile = item.get("profile", {})
+
+        if term in ("00", "12") and nominal_date is not None:
+            key = status_key(nominal_date, term)
+            waiting_from, missing_from = regular_status_times(
+                nominal_date,
+                term,
+            )
+            old = data.setdefault("terms", {}).get(key, {})
+            archived = archive_status_metadata(nominal_date, term)
+
+            if archived is None:
+                archived = {
+                    "launch_time": profile.get("launch_time"),
+                    "retrieved_at": profile.get("retrieved_at"),
+                    "archive_file": archive_path(
+                        nominal_date,
+                        term,
+                    ).replace(os.sep, "/"),
+                    "profile_level_count": (
+                        profile.get("qc", {}).get(
+                            "profile_level_count"
+                        )
+                    ),
+                }
+
+            data["terms"][key] = {
+                "status": "ok",
+                "nominal_date": nominal_date.isoformat(),
+                "term": term,
+                "waiting_from": iso_utc(waiting_from),
+                "missing_after": iso_utc(missing_from),
+                "checked_at": iso_utc(now),
+                "first_seen_at": old.get(
+                    "first_seen_at",
+                    iso_utc(now),
+                ),
+                **archived,
+            }
+
+        elif term and term.startswith("special_"):
+            launch_time = profile.get("launch_time")
+            if launch_time:
+                special_key = launch_time
+                data.setdefault("special_soundings", {})[
+                    special_key
+                ] = {
+                    "status": "special",
+                    "launch_time": launch_time,
+                    "nominal_date": (
+                        nominal_date.isoformat()
+                        if nominal_date is not None
+                        else None
+                    ),
+                    "term": term,
+                    "archive_file": archive_path(
+                        nominal_date,
+                        term,
+                    ).replace(os.sep, "/")
+                    if nominal_date is not None
+                    else None,
+                    "checked_at": iso_utc(now),
+                }
+
+    # Reconcile yesterday and today against the on-disk archive. This lets a
+    # later run repair waiting/missing states even if the profile came from an
+    # earlier run.
+    today = now.date()
+    for day_offset in (1, 0):
+        date_to_check = today - timedelta(days=day_offset)
+        for term in ("00", "12"):
+            set_regular_term_status(
+                data,
+                date_to_check,
+                term,
+                now,
+            )
+
+    prune_status_data(data, now)
+
+    current_term, current_date = expected_term(now)
+    current_key = status_key(current_date, current_term)
+    current_entry = data.get("terms", {}).get(current_key)
+
+    data["current_expected"] = {
+        "key": current_key,
+        "nominal_date": current_date.isoformat(),
+        "term": current_term,
+        "status": (
+            current_entry.get("status")
+            if isinstance(current_entry, dict)
+            else "not_due"
+        ),
+    }
+
+    data["updated_at"] = iso_utc(now)
+
+    os.makedirs("data", exist_ok=True)
+    with open(STATUS_FILE, "w", encoding="utf-8") as f:
+        json.dump(
+            data,
+            f,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+
+    print()
+    print("=" * 60)
+    print("STATUS SUMMARY")
+    print("=" * 60)
+    print("Current expected:", current_key)
+    print(
+        "Current status:",
+        data["current_expected"]["status"],
+    )
+
+    recent = sorted(
+        data.get("terms", {}).items(),
+        reverse=True,
+    )[:4]
+
+    for key, entry in reversed(recent):
+        print(key, "->", entry.get("status"))
+
+    print(
+        "Special soundings in status window:",
+        len(data.get("special_soundings", {})),
+    )
+    print("=" * 60)
+
+    return data
+
+
+# ============================================================
 # KLIMATOLOŠKI PERCENTILI
 # ============================================================
 
@@ -4507,6 +4876,11 @@ def main():
     )
 
     if not items:
+        update_status_file(
+            now,
+            items
+        )
+
         print()
         print(
             "No LJLM sounding found "
@@ -4576,6 +4950,11 @@ def main():
         newest["filename"],
         newest["term"],
         newest["nominal_date"]
+    )
+
+    update_status_file(
+        now,
+        items
     )
 
     print_summary(
