@@ -46,6 +46,10 @@ jobs:
             git add -f data/dwd_scan_cache.json
           fi
 
+          if [ -f data/status.json ]; then
+            git add -f data/status.json
+          fi
+
           echo "=== Git status before commit ==="
           git status --short
 
