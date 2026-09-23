@@ -39,6 +39,16 @@ CLIMATOLOGY_FILE = "climatology/daily_climatology.json"
 
 MAX_CANDIDATE_FILES = 250
 
+# Cache DWD packages that have already been scanned and do not contain LJLM.
+# This avoids repeatedly downloading/decoding the same irrelevant BUFR files.
+DWD_SCAN_CACHE_FILE = "data/dwd_scan_cache.json"
+DWD_SCAN_CACHE_RETENTION_HOURS = 72
+
+# During scheduled runs, once the expected 00/12 UTC LJLM sounding is found,
+# scan a short tail of older packages as well. This preserves nearby duplicate
+# copies and allows the script to keep the most complete profile.
+SCHEDULED_EARLY_STOP_TAIL_PACKAGES = 12
+
 # Regular launches are normally near 23:30 and 11:30 UTC.
 # Profiles outside this tolerance are preserved as special soundings.
 REGULAR_LAUNCH_TOLERANCE_MINUTES = 120
@@ -78,6 +88,143 @@ def get_directory_listing():
     )
 
 
+def is_manual_run():
+    event_name = os.environ.get(
+        "GITHUB_EVENT_NAME",
+        "manual_local"
+    )
+
+    return (
+        event_name == "workflow_dispatch"
+        or event_name == "manual_local"
+    )
+
+
+def dwd_filename_time(filename):
+    """Return UTC timestamp embedded in a DWD package filename, if present."""
+    decoded = unquote(filename)
+
+    match = re.search(
+        r'_(\d{14})_',
+        decoded
+    )
+
+    if match is None:
+        return None
+
+    try:
+        return datetime.strptime(
+            match.group(1),
+            "%Y%m%d%H%M%S"
+        ).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def load_dwd_scan_cache(now=None):
+    """Load and prune the persistent cache of already scanned DWD packages."""
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    empty = {
+        "version": 1,
+        "updated_at": None,
+        "packages": {},
+    }
+
+    if not os.path.exists(DWD_SCAN_CACHE_FILE):
+        return empty
+
+    try:
+        with open(
+            DWD_SCAN_CACHE_FILE,
+            "r",
+            encoding="utf-8"
+        ) as f:
+            data = json.load(f)
+    except Exception as exc:
+        print("WARNING: DWD scan cache could not be read:", exc)
+        return empty
+
+    packages = data.get("packages", {})
+    if not isinstance(packages, dict):
+        return empty
+
+    cutoff = now - timedelta(
+        hours=DWD_SCAN_CACHE_RETENTION_HOURS
+    )
+
+    kept = {}
+
+    for filename, item in packages.items():
+        file_time = dwd_filename_time(filename)
+
+        # Keep unparseable names rather than deleting potentially useful
+        # cache entries. Normal DWD filenames are pruned by embedded time.
+        if file_time is None or file_time >= cutoff:
+            kept[filename] = item
+
+    return {
+        "version": 1,
+        "updated_at": data.get("updated_at"),
+        "packages": kept,
+    }
+
+
+def save_dwd_scan_cache(cache):
+    os.makedirs("data", exist_ok=True)
+
+    cache["version"] = 1
+    cache["updated_at"] = (
+        datetime.now(timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+    with open(
+        DWD_SCAN_CACHE_FILE,
+        "w",
+        encoding="utf-8"
+    ) as f:
+        json.dump(
+            cache,
+            f,
+            indent=2,
+            ensure_ascii=False,
+            sort_keys=True
+        )
+
+
+def update_dwd_scan_cache(
+    cache,
+    filename,
+    profile=None
+):
+    """Record a successfully scanned package.
+
+    Positive packages are remembered for diagnostics but are deliberately
+    not skipped on later runs: DWD can expose duplicate copies and the code
+    should still be able to select the most complete LJLM profile.
+    """
+    item = {
+        "scanned_at": (
+            datetime.now(timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z")
+        ),
+        "contains_ljlm": profile is not None,
+    }
+
+    if profile is not None:
+        item["launch_time"] = profile.get("launch_time")
+        item["profile_level_count"] = (
+            profile.get("qc", {})
+            .get("profile_level_count")
+        )
+
+    cache.setdefault("packages", {})[filename] = item
+
+
 def find_candidate_files():
     """Return only recent DWD TEMP BUFR packages.
 
@@ -113,10 +260,7 @@ def find_candidate_files():
         "manual_local"
     )
 
-    manual_run = (
-        event_name == "workflow_dispatch"
-        or event_name == "manual_local"
-    )
+    manual_run = is_manual_run()
 
     search_hours = 24 if manual_run else 3
 
@@ -127,24 +271,11 @@ def find_candidate_files():
     timestamped_files = 0
 
     for filename in files:
-        decoded = unquote(filename)
-
         # Example:
         # Z__C_EDZW_20260922131201_...temp_bufr....bin
-        match = re.search(
-            r'_(\d{14})_',
-            decoded
-        )
+        file_time = dwd_filename_time(filename)
 
-        if match is None:
-            continue
-
-        try:
-            file_time = datetime.strptime(
-                match.group(1),
-                "%Y%m%d%H%M%S"
-            ).replace(tzinfo=timezone.utc)
-        except ValueError:
+        if file_time is None:
             continue
 
         timestamped_files += 1
@@ -4127,10 +4258,25 @@ def main():
         now.isoformat()
     )
 
+    manual_run = is_manual_run()
+
+    if manual_run:
+        expected_term_name = None
+        expected_nominal_date = None
+    else:
+        expected_term_name, expected_nominal_date = expected_term(now)
+
     print(
-        "Mode: discover every new LJLM sounding "
-        "(regular + special)"
+        "Mode:",
+        "manual catch-up (regular + special)"
+        if manual_run
+        else (
+            "scheduled target "
+            f"{expected_nominal_date} {expected_term_name} UTC"
+        )
     )
+
+    scan_cache = load_dwd_scan_cache(now)
 
     candidates = find_candidate_files()
     directory_elapsed = time.perf_counter() - directory_started
@@ -4149,6 +4295,9 @@ def main():
     download_seconds = 0.0
     bufr_seconds = 0.0
     packages_with_ljlm = 0
+    packages_skipped_cache = 0
+    early_stop_used = False
+    early_stop_remaining = None
 
     found = {}
 
@@ -4156,6 +4305,35 @@ def main():
         candidates,
         start=1
     ):
+
+        cached = scan_cache.get(
+            "packages", {}
+        ).get(filename)
+
+        # Negative cache entries are safe to skip. Positive LJLM packages
+        # are rescanned so duplicate/updated profiles can still be compared.
+        if (
+            isinstance(cached, dict)
+            and cached.get("contains_ljlm") is False
+        ):
+            packages_skipped_cache += 1
+            print(
+                f"[{number}/{len(candidates)}] "
+                f"{unquote(filename)}"
+                "  -> cached: no LJLM"
+            )
+
+            if early_stop_remaining is not None:
+                early_stop_remaining -= 1
+                if early_stop_remaining <= 0:
+                    early_stop_used = True
+                    print(
+                        "Scheduled early-stop: expected sounding found "
+                        "and tail packages checked."
+                    )
+                    break
+
+            continue
 
         print(
             f"[{number}/{len(candidates)}] "
@@ -4204,7 +4382,22 @@ def main():
                 f"{one_bufr_s:.2f} s"
             )
 
+            update_dwd_scan_cache(
+                scan_cache,
+                filename,
+                profile
+            )
+
             if profile is None:
+                if early_stop_remaining is not None:
+                    early_stop_remaining -= 1
+                    if early_stop_remaining <= 0:
+                        early_stop_used = True
+                        print(
+                            "Scheduled early-stop: expected sounding found "
+                            "and tail packages checked."
+                        )
+                        break
                 continue
 
             launch = datetime.fromisoformat(
@@ -4238,6 +4431,18 @@ def main():
                 classification["kind"]
             )
 
+            if (
+                not manual_run
+                and term == expected_term_name
+                and nominal_date == expected_nominal_date
+            ):
+                # Reset the tail on every matching duplicate. This gives
+                # nearby duplicate packages a chance to provide a fuller
+                # profile while still avoiding a complete 3-hour scan.
+                early_stop_remaining = (
+                    SCHEDULED_EARLY_STOP_TAIL_PACKAGES
+                )
+
             # Same launch may occur in more than one DWD package.
             # Keep the copy with the largest profile.
             key = profile["launch_time"]
@@ -4267,6 +4472,16 @@ def main():
                         nominal_date,
                 }
 
+            if early_stop_remaining is not None:
+                early_stop_remaining -= 1
+                if early_stop_remaining <= 0:
+                    early_stop_used = True
+                    print(
+                        "Scheduled early-stop: expected sounding found "
+                        "and tail packages checked."
+                    )
+                    break
+
         except Exception as exc:
             print(
                 "Package warning:",
@@ -4281,6 +4496,9 @@ def main():
                 )
             ):
                 os.remove(tmp_path)
+
+    # Persist all successful negative scans even if no LJLM profile was found.
+    save_dwd_scan_cache(scan_cache)
 
     items = sorted(
         found.values(),
@@ -4388,9 +4606,11 @@ def main():
     print("PERFORMANCE SUMMARY")
     print("=" * 60)
     print("Candidate packages:", len(candidates))
+    print("Packages skipped by cache:", packages_skipped_cache)
     print("Packages downloaded:", downloaded_count)
     print("Downloaded data:", f"{downloaded_bytes / (1024 * 1024):.2f} MiB")
     print("Packages containing LJLM:", packages_with_ljlm)
+    print("Scheduled early-stop used:", early_stop_used)
     print("Unique LJLM launches:", len(items))
     print("Directory/filter:", f"{directory_elapsed:.1f} s")
     print("Downloads total:", f"{download_seconds:.1f} s")
