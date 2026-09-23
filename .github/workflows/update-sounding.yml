@@ -2,8 +2,8 @@ name: Update LJLM sounding
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "17 * * * *"
+schedule:
+  - cron: "50 0,12 * * *
 
 permissions:
   contents: write
@@ -40,13 +40,16 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add data climatology diagnostics 2>/dev/null || true
+          # Dodaj vse rezultate projekta.
+          git add -A data climatology diagnostics 2>/dev/null || true
 
           # Cache mora ostati med posameznimi GitHub Actions zagoni.
-          # -f ga doda tudi, če je v .gitignore.
           if [ -f data/dwd_scan_cache.json ]; then
             git add -f data/dwd_scan_cache.json
           fi
+
+          echo "=== Git status before commit ==="
+          git status --short
 
           if git diff --cached --quiet; then
             echo "No sounding changes to commit."
@@ -55,7 +58,11 @@ jobs:
 
           git commit -m "Update LJLM sounding"
 
-          # Drug workflow ali ročni popravek lahko med izvajanjem spremeni main.
-          # Zato naš commit pred pushom rebasamo na najnovejši main.
-          git pull --rebase origin main
+          echo "=== Git status after commit ==="
+          git status --short
+
+          # Če je med obdelavo main napredoval, rebase.
+          # --autostash začasno umakne morebitne preostale lokalne spremembe.
+          git pull --rebase --autostash origin main
+
           git push origin HEAD:main
