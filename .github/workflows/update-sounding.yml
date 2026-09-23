@@ -2,8 +2,12 @@ name: Update LJLM sounding
 
 on:
   workflow_dispatch:
-schedule:
-  - cron: "50 0,12 * * *
+  schedule:
+    # Glavna termina: približno eno uro po rednem izpustu 00/12 UTC.
+    - cron: "50 0,12 * * *"
+
+    # Rezervni poskus eno uro pozneje, če podatki na DWD zamujajo.
+    - cron: "50 1,13 * * *"
 
 permissions:
   contents: write
@@ -44,6 +48,7 @@ jobs:
           git add -A data climatology diagnostics 2>/dev/null || true
 
           # Cache mora ostati med posameznimi GitHub Actions zagoni.
+          # -f ga doda tudi, če je v .gitignore.
           if [ -f data/dwd_scan_cache.json ]; then
             git add -f data/dwd_scan_cache.json
           fi
@@ -61,8 +66,10 @@ jobs:
           echo "=== Git status after commit ==="
           git status --short
 
-          # Če je med obdelavo main napredoval, rebase.
-          # --autostash začasno umakne morebitne preostale lokalne spremembe.
+          # Če je med obdelavo repozitorij napredoval,
+          # rebase našega commita na najnovejši main.
+          # --autostash varno začasno umakne morebitne
+          # preostale lokalne spremembe.
           git pull --rebase --autostash origin main
 
           git push origin HEAD:main
