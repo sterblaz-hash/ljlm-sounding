@@ -3,6 +3,7 @@ import math
 import os
 import re
 import tempfile
+import time
 from datetime import datetime, timezone, timedelta
 from urllib.request import urlopen, Request
 from urllib.parse import unquote
@@ -4114,6 +4115,9 @@ def print_summary(profile):
 
 def main():
 
+    run_started = time.perf_counter()
+    directory_started = time.perf_counter()
+
     now = datetime.now(
         timezone.utc
     )
@@ -4129,11 +4133,22 @@ def main():
     )
 
     candidates = find_candidate_files()
+    directory_elapsed = time.perf_counter() - directory_started
 
     print(
         "Candidate DWD packages:",
         len(candidates)
     )
+    print(
+        "Directory/filter time:",
+        f"{directory_elapsed:.1f} s"
+    )
+
+    downloaded_count = 0
+    downloaded_bytes = 0
+    download_seconds = 0.0
+    bufr_seconds = 0.0
+    packages_with_ljlm = 0
 
     found = {}
 
@@ -4148,8 +4163,18 @@ def main():
         )
 
         try:
+            download_started = time.perf_counter()
             content = download(
                 DWD_URL + filename
+            )
+            one_download_s = time.perf_counter() - download_started
+            download_seconds += one_download_s
+            downloaded_count += 1
+            downloaded_bytes += len(content)
+            print(
+                "  download:",
+                f"{len(content) / 1024:.1f} KiB",
+                f"in {one_download_s:.2f} s"
             )
         except Exception as exc:
             print(
@@ -4168,8 +4193,15 @@ def main():
                 tmp.write(content)
                 tmp_path = tmp.name
 
+            bufr_started = time.perf_counter()
             profile = read_ljlm_from_bufr(
                 tmp_path
+            )
+            one_bufr_s = time.perf_counter() - bufr_started
+            bufr_seconds += one_bufr_s
+            print(
+                "  BUFR scan:",
+                f"{one_bufr_s:.2f} s"
             )
 
             if profile is None:
@@ -4194,6 +4226,8 @@ def main():
             nominal_date = (
                 classification["nominal_date"]
             )
+
+            packages_with_ljlm += 1
 
             print(
                 "LJLM found:",
@@ -4346,6 +4380,24 @@ def main():
         newest["profile"]["launch_time"],
         newest["term"]
     )
+
+    total_elapsed = time.perf_counter() - run_started
+
+    print()
+    print("=" * 60)
+    print("PERFORMANCE SUMMARY")
+    print("=" * 60)
+    print("Candidate packages:", len(candidates))
+    print("Packages downloaded:", downloaded_count)
+    print("Downloaded data:", f"{downloaded_bytes / (1024 * 1024):.2f} MiB")
+    print("Packages containing LJLM:", packages_with_ljlm)
+    print("Unique LJLM launches:", len(items))
+    print("Directory/filter:", f"{directory_elapsed:.1f} s")
+    print("Downloads total:", f"{download_seconds:.1f} s")
+    print("BUFR scans total:", f"{bufr_seconds:.1f} s")
+    print("Other processing:", f"{max(0.0, total_elapsed - directory_elapsed - download_seconds - bufr_seconds):.1f} s")
+    print("TOTAL:", f"{total_elapsed:.1f} s")
+    print("=" * 60)
 
 if __name__ == "__main__":
     import sys
