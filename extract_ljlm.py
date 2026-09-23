@@ -78,6 +78,17 @@ def get_directory_listing():
 
 
 def find_candidate_files():
+    """Return only recent DWD TEMP BUFR packages.
+
+    Scheduled GitHub Actions runs use a short 3-hour window because the
+    regular 00/12 UTC soundings normally arrive shortly after the launch.
+    A manual workflow_dispatch run uses a 24-hour catch-up window, useful
+    for delayed or special soundings.
+
+    Filtering is done from the timestamp embedded in the DWD filename,
+    before any BUFR file is downloaded or opened with ecCodes.
+    """
+
     html = get_directory_listing()
 
     files = re.findall(
@@ -94,6 +105,90 @@ def find_candidate_files():
     files = sorted(
         set(files),
         reverse=True
+    )
+
+    event_name = os.environ.get(
+        "GITHUB_EVENT_NAME",
+        "manual_local"
+    )
+
+    manual_run = (
+        event_name == "workflow_dispatch"
+        or event_name == "manual_local"
+    )
+
+    search_hours = 24 if manual_run else 3
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=search_hours)
+
+    recent_files = []
+    timestamped_files = 0
+
+    for filename in files:
+        decoded = unquote(filename)
+
+        # Example:
+        # Z__C_EDZW_20260922131201_...temp_bufr....bin
+        match = re.search(
+            r'_(\d{14})_',
+            decoded
+        )
+
+        if match is None:
+            continue
+
+        try:
+            file_time = datetime.strptime(
+                match.group(1),
+                "%Y%m%d%H%M%S"
+            ).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+
+        timestamped_files += 1
+
+        if cutoff <= file_time <= now + timedelta(minutes=10):
+            recent_files.append(filename)
+
+    print(
+        "GitHub event:",
+        event_name
+    )
+
+    print(
+        "Search mode:",
+        "manual catch-up" if manual_run else "scheduled"
+    )
+
+    print(
+        "DWD search window:",
+        f"{search_hours} h"
+    )
+
+    print(
+        "DWD TEMP packages listed:",
+        len(files)
+    )
+
+    print(
+        "Packages with readable timestamp:",
+        timestamped_files
+    )
+
+    print(
+        "Packages selected before download:",
+        len(recent_files)
+    )
+
+    if recent_files:
+        return recent_files
+
+    # Safety fallback: if DWD changes the filename convention or the
+    # directory timestamp cannot be parsed, retain the old behaviour.
+    print(
+        "WARNING: no recent timestamped packages found; "
+        "using legacy fallback."
     )
 
     return files[:MAX_CANDIDATE_FILES]
@@ -4278,4 +4373,3 @@ if __name__ == "__main__":
         sys.stdout.flush()
         sys.stderr.flush()
         os._exit(1)
-
