@@ -2981,6 +2981,7 @@ def archive_status_metadata(nominal_date, term):
     return {
         "launch_time": profile.get("launch_time"),
         "retrieved_at": profile.get("retrieved_at"),
+        "processed_at": profile.get("processed_at"),
         "archive_file": path.replace(os.sep, "/"),
         "profile_level_count": (
             profile.get("qc", {}).get("profile_level_count")
@@ -3108,6 +3109,7 @@ def update_status_file(now, items):
                 archived = {
                     "launch_time": profile.get("launch_time"),
                     "retrieved_at": profile.get("retrieved_at"),
+                    "processed_at": profile.get("processed_at"),
                     "archive_file": archive_path(
                         nominal_date,
                         term,
@@ -4107,11 +4109,53 @@ def save_json(
         unquote(source_file)
     )
 
-    profile["retrieved_at"] = (
+    # Preserve the original retrieval time when the same archived launch is
+    # reprocessed. This separates "when we first obtained the sounding" from
+    # "when we last recalculated/rebuilt the derived products".
+    processed_at = (
         datetime.now(timezone.utc)
         .isoformat()
         .replace("+00:00", "Z")
     )
+
+    existing_path = archive_path(
+        nominal_date,
+        term
+    )
+
+    original_retrieved_at = None
+
+    if os.path.exists(existing_path):
+        try:
+            with open(
+                existing_path,
+                "r",
+                encoding="utf-8"
+            ) as f:
+                existing_profile = json.load(f)
+
+            if (
+                existing_profile.get("launch_time")
+                == profile.get("launch_time")
+            ):
+                original_retrieved_at = (
+                    existing_profile.get("retrieved_at")
+                )
+        except Exception as exc:
+            print(
+                "WARNING: existing archive metadata "
+                "could not be read:",
+                existing_path,
+                exc
+            )
+
+    profile["retrieved_at"] = (
+        original_retrieved_at
+        or profile.get("retrieved_at")
+        or processed_at
+    )
+
+    profile["processed_at"] = processed_at
 
     profile["term"] = term
 
