@@ -40,14 +40,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add -A data climatology diagnostics 2>/dev/null || true
+          # Dodaj spremembe v climatology in diagnostics.
+          git add -A climatology diagnostics 2>/dev/null || true
 
-          if [ -f data/dwd_scan_cache.json ]; then
-            git add -f data/dwd_scan_cache.json
-          fi
-
-          if [ -f data/status.json ]; then
-            git add -f data/status.json
+          # Prisili dodajanje vseh JSON datotek v data/,
+          # tudi če jih .gitignore sicer ignorira.
+          if [ -d data ]; then
+            find data -type f -name "*.json" -print0 | xargs -0 -r git add -f --
           fi
 
           echo "=== Git status before commit ==="
