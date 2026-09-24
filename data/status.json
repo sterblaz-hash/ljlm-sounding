@@ -1,9 +1,9 @@
 {
   "current_expected": {
-    "key": "2026-09-24_00",
+    "key": "2026-09-24_12",
     "nominal_date": "2026-09-24",
     "status": "ok",
-    "term": "00"
+    "term": "12"
   },
   "special_soundings": {},
   "station": 14015,
@@ -39,7 +39,7 @@
     },
     "2026-09-23_00": {
       "archive_file": "data/2026/09/20260923_00.json",
-      "checked_at": "2026-09-24T01:56:47.057982Z",
+      "checked_at": "2026-09-24T12:59:20.642036Z",
       "first_seen_at": "2026-09-23T12:02:05.034486Z",
       "launch_time": "2026-09-22T23:30:00Z",
       "missing_after": "2026-09-23T01:50:00Z",
@@ -53,7 +53,7 @@
     },
     "2026-09-23_12": {
       "archive_file": "data/2026/09/20260923_12.json",
-      "checked_at": "2026-09-24T01:56:47.057982Z",
+      "checked_at": "2026-09-24T12:59:20.642036Z",
       "first_seen_at": "2026-09-23T12:59:19.282061Z",
       "launch_time": "2026-09-23T11:30:00Z",
       "missing_after": "2026-09-23T13:50:00Z",
@@ -67,7 +67,7 @@
     },
     "2026-09-24_00": {
       "archive_file": "data/2026/09/20260924_00.json",
-      "checked_at": "2026-09-24T01:56:47.057982Z",
+      "checked_at": "2026-09-24T12:59:20.642036Z",
       "first_seen_at": "2026-09-24T00:58:04.433895Z",
       "launch_time": "2026-09-23T23:30:00Z",
       "missing_after": "2026-09-24T01:50:00Z",
@@ -78,8 +78,22 @@
       "status": "ok",
       "term": "00",
       "waiting_from": "2026-09-24T00:50:00Z"
+    },
+    "2026-09-24_12": {
+      "archive_file": "data/2026/09/20260924_12.json",
+      "checked_at": "2026-09-24T12:59:20.642036Z",
+      "first_seen_at": "2026-09-24T12:59:20.642036Z",
+      "launch_time": "2026-09-24T11:30:00Z",
+      "missing_after": "2026-09-24T13:50:00Z",
+      "nominal_date": "2026-09-24",
+      "processed_at": "2026-09-24T13:00:57.018727Z",
+      "profile_level_count": 1979,
+      "retrieved_at": "2026-09-24T13:00:53.511225Z",
+      "status": "ok",
+      "term": "12",
+      "waiting_from": "2026-09-24T12:50:00Z"
     }
   },
-  "updated_at": "2026-09-24T01:56:47.057982Z",
+  "updated_at": "2026-09-24T12:59:20.642036Z",
   "version": 1
 }
