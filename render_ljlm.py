@@ -1,115 +1,96 @@
-    ax.set_xlabel("u wind (kt)")
-    ax.set_ylabel("v wind (kt)")
+#!/usr/bin/env python3
+"""
+Render static LJLM sounding products from a processed sounding JSON.
 
-    station = data.get("station_name", "Ljubljana")
-    station_id = data.get("station", 14015)
-    nominal = _nominal_title(data)
-    ax.set_title("Hodograph · 0–12 km AGL", loc="left", pad=18)
-    ax.text(
-        0.0, 1.012,
-        f"{station} ({station_id})  ·  {nominal}",
-        transform=ax.transAxes,
-        ha="left", va="bottom", fontsize=9.5, color=MUTED,
-    )
+Outputs:
+  diagnostics/latest_skewt.png
+  diagnostics/latest_hodograph.png
+  diagnostics/latest_products.json
+  diagnostics/YYYY/MM/YYYYMMDD_TERM_skewt.png
+  diagnostics/YYYY/MM/YYYYMMDD_TERM_hodograph.png
 
-    handles, labels = ax.get_legend_handles_labels()
-    if handles:
-        legend = ax.legend(
-            handles, labels,
-            loc="upper right",
-            frameon=False,
-            fontsize=8.5,
-            handlelength=2.4,
-        )
-        for text in legend.get_texts():
-            text.set_color(MUTED)
+Designed for the JSON produced by extract_ljlm.py.
+"""
 
-    # Compact diagnostic footer.
-    shear = metpy_data.get("bulk_shear", {})
-    srh = metpy_data.get("srh", {})
-    footer = []
-    for key, label in (("0_1km", "0–1"), ("0_3km", "0–3"), ("0_6km", "0–6")):
-        item = shear.get(key, {})
-        if _finite(item.get("magnitude_ms")):
-            kt = (float(item["magnitude_ms"]) * units("m/s")).to("knots").magnitude
-            footer.append(f"{label} km shear {kt:.0f} kt")
-    rm_srh = srh.get("0_3km_right_mover", {})
-    if _finite(rm_srh.get("total_m2s2")):
-        footer.append(f"0–3 km SRH(RM) {float(rm_srh['total_m2s2']):.0f} m²/s²")
+from __future__ import annotations
 
-    if footer:
-        ax.text(
-            0.0, -0.105,
-            "   ·   ".join(footer),
-            transform=ax.transAxes,
-            ha="left", va="top", fontsize=8.5, color=MUTED,
-        )
+import argparse
+import json
+import math
+import os
+import shutil
+from pathlib import Path
 
-    fig.savefig(output, bbox_inches="tight", pad_inches=0.14)
-    plt.close(fig)
+import matplotlib
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+import metpy.calc as mpcalc
+from metpy.plots import Hodograph, SkewT
+from metpy.units import units
 
 
-# -----------------------------------------------------------------------------
-# PUBLIC ENTRY POINT
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------
+# VISUAL SETTINGS
+# ---------------------------------------------------------------------
 
-def render_products(input_path: str | os.PathLike, diagnostics_root="diagnostics"):
-    input_path = Path(input_path)
-    diagnostics_root = Path(diagnostics_root)
-    diagnostics_root.mkdir(parents=True, exist_ok=True)
+BG = "#ffffff"
+TEXT = "#172033"
+MUTED = "#6b7280"
+GRID = "#d9dee7"
+TEMP = "#c73b32"
+DEW = "#16836b"
+PARCEL = "#3867d6"
+WIND = "#243244"
+INV = "#f2c66d"
 
-    with input_path.open("r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    latest_skewt = diagnostics_root / "latest_skewt.png"
-    latest_hodo = diagnostics_root / "latest_hodograph.png"
-    archive_skewt, archive_hodo = _archive_paths(data, diagnostics_root)
-
-    # Render archive products first, then copy by re-rendering latest names.
-    # Re-rendering avoids file-copy platform assumptions and guarantees both
-    # outputs are complete images if a run is interrupted.
-    render_skewt(data, archive_skewt)
-    render_hodograph(data, archive_hodo)
-    render_skewt(data, latest_skewt)
-    render_hodograph(data, latest_hodo)
-
-    generated_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    manifest = {
-        "version": 1,
-        "station": data.get("station"),
-        "station_name": data.get("station_name"),
-        "sounding_id": data.get("sounding_id"),
-        "nominal_date": data.get("nominal_date"),
-        "term": data.get("term"),
-        "launch_time": data.get("launch_time"),
-        "processed_at": data.get("processed_at"),
-        "rendered_at": generated_at,
-        "latest": {
-            "skewt": latest_skewt.as_posix(),
-            "hodograph": latest_hodo.as_posix(),
-        },
-        "archive": {
-            "skewt": archive_skewt.as_posix(),
-            "hodograph": archive_hodo.as_posix(),
-        },
-    }
-    with (diagnostics_root / "latest_products.json").open("w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False, indent=2)
-
-    print("Rendered:", latest_skewt)
-    print("Rendered:", latest_hodo)
-    print("Archived:", archive_skewt)
-    print("Archived:", archive_hodo)
-    return manifest
+DPI = 170
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Render LJLM Skew-T and hodograph PNG products.")
-    parser.add_argument("--input", default="data/latest.json", help="Input sounding JSON")
-    parser.add_argument("--diagnostics", default="diagnostics", help="Output diagnostics directory")
-    args = parser.parse_args()
-    render_products(args.input, args.diagnostics)
+# ---------------------------------------------------------------------
+# HELPERS
+# ---------------------------------------------------------------------
+
+def valid_number(value):
+    try:
+        return value is not None and math.isfinite(float(value))
+    except Exception:
+        return False
 
 
-if __name__ == "__main__":
-    main()
+def load_profile(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def clean_levels(profile):
+    rows = []
+    for item in profile.get("levels", []):
+        p = item.get("pressure_hpa")
+        z = item.get("height_m")
+        t = item.get("temperature_c")
+        td = item.get("dewpoint_c")
+        ws = item.get("wind_speed_ms")
+        wd = item.get("wind_direction_deg")
+
+        if not all(valid_number(x) for x in (p, z, t)):
+            continue
+
+        rows.append({
+            "p": float(p),
+            "z": float(z),
+            "t": float(t),
+            "td": float(td) if valid_number(td) else np.nan,
+            "ws": float(ws) if valid_number(ws) else np.nan,
+            "wd": float(wd) if valid_number(wd) else np.nan,
+        })
+
+    # Sort from highest pressure / lowest altitude upward.
+    rows.sort(key=lambda x: (-x["p"], x["z"]))
+
+    # Remove obvious duplicate pressure-height rows.
+    cleaned = []
+    seen = set()
+    for row in rows:
