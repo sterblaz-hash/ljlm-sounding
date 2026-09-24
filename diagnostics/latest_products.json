@@ -4,9 +4,13 @@
   "nominal_date": "2026-09-24",
   "term": "12",
   "launch_time": "2026-09-24T11:30:00Z",
-  "processed_at": "2026-09-24T14:30:35.684955Z",
+  "processed_at": "2026-09-24T14:51:30.905810Z",
   "skewt": "diagnostics/latest_skewt.png",
+  "skewt_zoom": "diagnostics/latest_skewt_zoom.png",
+  "thetae": "diagnostics/latest_thetae.png",
   "hodograph": "diagnostics/latest_hodograph.png",
   "archive_skewt": "diagnostics/2026/09/20260924_12_skewt.png",
+  "archive_skewt_zoom": "diagnostics/2026/09/20260924_12_skewt_zoom.png",
+  "archive_thetae": "diagnostics/2026/09/20260924_12_thetae.png",
   "archive_hodograph": "diagnostics/2026/09/20260924_12_hodograph.png"
 }

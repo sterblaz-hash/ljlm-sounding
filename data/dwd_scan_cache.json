@@ -1316,7 +1316,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-09-23T23:30:00Z",
       "profile_level_count": 1617,
-      "scanned_at": "2026-09-24T14:29:23.619001Z"
+      "scanned_at": "2026-09-24T14:51:30.893197Z"
     },
     "Z__C_EDZW_20260924002513_bda01%2Ctemp_bufr_999999_999999__MW_243.bin": {
       "contains_ljlm": false,
@@ -1326,7 +1326,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-09-23T23:30:00Z",
       "profile_level_count": 1816,
-      "scanned_at": "2026-09-24T14:29:18.280977Z"
+      "scanned_at": "2026-09-24T14:51:25.820859Z"
     },
     "Z__C_EDZW_20260924003401_bda01%2Ctemp_bufr_999999_999999__MW_245.bin": {
       "contains_ljlm": false,
@@ -1740,7 +1740,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-09-24T11:30:00Z",
       "profile_level_count": 1539,
-      "scanned_at": "2026-09-24T14:28:00.272990Z"
+      "scanned_at": "2026-09-24T14:51:20.764402Z"
     },
     "Z__C_EDZW_20260924122502_bda01%2Ctemp_bufr_999999_999999__MW_348.bin": {
       "contains_ljlm": false,
@@ -1766,7 +1766,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-09-24T11:30:00Z",
       "profile_level_count": 1979,
-      "scanned_at": "2026-09-24T14:27:54.759238Z"
+      "scanned_at": "2026-09-24T14:51:15.551548Z"
     },
     "Z__C_EDZW_20260924124126_bda01%2Ctemp_bufr_999999_999999__MW_354.bin": {
       "contains_ljlm": false,
@@ -1915,8 +1915,20 @@
     "Z__C_EDZW_20260924141302_bda01%2Ctemp_bufr_999999_999999__MW_390.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-09-24T14:26:25.847169Z"
+    },
+    "Z__C_EDZW_20260924142128_bda01%2Ctemp_bufr_999999_999999__MW_391.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-09-24T14:51:10.089525Z"
+    },
+    "Z__C_EDZW_20260924143102_bda01%2Ctemp_bufr_999999_999999__MW_392.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-09-24T14:51:08.479294Z"
+    },
+    "Z__C_EDZW_20260924143604_bda01%2Ctemp_bufr_999999_999999__MW_393.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-09-24T14:51:05.576974Z"
     }
   },
-  "updated_at": "2026-09-24T14:30:35.670374Z",
+  "updated_at": "2026-09-24T14:51:30.893709Z",
   "version": 1
 }
