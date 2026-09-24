@@ -32,6 +32,9 @@ jobs:
       - name: Update LJLM sounding
         run: python extract_ljlm.py
 
+      - name: Render Skew-T and hodograph
+        run: python render_ljlm.py --input data/latest.json
+
       - name: Commit and push
         shell: bash
         run: |
@@ -40,11 +43,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Dodaj spremembe v climatology in diagnostics.
           git add -A climatology diagnostics 2>/dev/null || true
 
-          # Prisili dodajanje vseh JSON datotek v data/,
-          # tudi če jih .gitignore sicer ignorira.
           if [ -d data ]; then
             find data -type f -name "*.json" -print0 | xargs -0 -r git add -f --
           fi
