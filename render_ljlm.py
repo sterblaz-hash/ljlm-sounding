@@ -4,10 +4,11 @@ Render static LJLM sounding products from a processed sounding JSON.
 
 Outputs:
   diagnostics/latest_skewt.png
+  diagnostics/latest_skewt_zoom.png
+  diagnostics/latest_thetae.png
   diagnostics/latest_hodograph.png
   diagnostics/latest_products.json
-  diagnostics/YYYY/MM/YYYYMMDD_TERM_skewt.png
-  diagnostics/YYYY/MM/YYYYMMDD_TERM_hodograph.png
+  diagnostics/YYYY/MM/YYYYMMDD_TERM_*.png
 
 Designed for the JSON produced by extract_ljlm.py.
 """
@@ -31,7 +32,6 @@ import metpy.calc as mpcalc
 from metpy.plots import Hodograph, SkewT
 from metpy.units import units
 
-
 # ---------------------------------------------------------------------
 # VISUAL SETTINGS
 # ---------------------------------------------------------------------
@@ -40,14 +40,17 @@ BG = "#ffffff"
 TEXT = "#172033"
 MUTED = "#6b7280"
 GRID = "#d9dee7"
-TEMP = "#c73b32"
-DEW = "#16836b"
-PARCEL = "#3867d6"
+TEMP = "#d13b33"
+DEW = "#14806a"
+PARCEL = "#315fd8"
+THETAE = "#5c2ca1"
+THETA = "#d7861f"
 WIND = "#243244"
 INV = "#f2c66d"
+CAPE = "#f4a261"
+CIN = "#90caf9"
 
 DPI = 170
-
 
 # ---------------------------------------------------------------------
 # HELPERS
@@ -65,9 +68,17 @@ def load_profile(path):
         return json.load(f)
 
 
+def safe_param(dct, *keys):
+    node = dct
+    for key in keys:
+        if not isinstance(node, dict):
+            return None
+        node = node.get(key)
+    return node
+
+
 def clean_levels(profile):
     rows = []
-
     for item in profile.get("levels", []):
         p = item.get("pressure_hpa")
         z = item.get("height_m")
@@ -75,6 +86,8 @@ def clean_levels(profile):
         td = item.get("dewpoint_c")
         ws = item.get("wind_speed_ms")
         wd = item.get("wind_direction_deg")
+        theta = item.get("potential_temperature_k")
+        thetae = item.get("equivalent_potential_temperature_k")
 
         if not all(valid_number(x) for x in (p, z, t)):
             continue
@@ -86,29 +99,18 @@ def clean_levels(profile):
             "td": float(td) if valid_number(td) else np.nan,
             "ws": float(ws) if valid_number(ws) else np.nan,
             "wd": float(wd) if valid_number(wd) else np.nan,
+            "theta": float(theta) if valid_number(theta) else np.nan,
+            "thetae": float(thetae) if valid_number(thetae) else np.nan,
         })
 
-    # Sort from highest pressure / lowest altitude upward.
-    rows.sort(
-        key=lambda x: (
-            -x["p"],
-            x["z"],
-        )
-    )
+    rows.sort(key=lambda x: (-x["p"], x["z"]))
 
-    # Remove obvious duplicate pressure-height rows.
     cleaned = []
     seen = set()
-
     for row in rows:
-        key = (
-            round(row["p"], 2),
-            round(row["z"], 1),
-        )
-
+        key = (round(row["p"], 2), round(row["z"], 1))
         if key in seen:
             continue
-
         seen.add(key)
         cleaned.append(row)
 
@@ -117,677 +119,459 @@ def clean_levels(profile):
 
 def profile_arrays(profile):
     rows = clean_levels(profile)
-
     if len(rows) < 10:
-        raise ValueError(
-            "Too few valid sounding levels."
-        )
+        raise ValueError("Too few valid sounding levels.")
 
-    p = np.array(
-        [r["p"] for r in rows],
-        dtype=float,
-    )
+    p = np.array([r["p"] for r in rows], dtype=float)
+    z = np.array([r["z"] for r in rows], dtype=float)
+    t = np.array([r["t"] for r in rows], dtype=float)
+    td = np.array([r["td"] for r in rows], dtype=float)
+    ws = np.array([r["ws"] for r in rows], dtype=float)
+    wd = np.array([r["wd"] for r in rows], dtype=float)
+    theta = np.array([r["theta"] for r in rows], dtype=float)
+    thetae = np.array([r["thetae"] for r in rows], dtype=float)
 
-    z = np.array(
-        [r["z"] for r in rows],
-        dtype=float,
-    )
-
-    t = np.array(
-        [r["t"] for r in rows],
-        dtype=float,
-    )
-
-    td = np.array(
-        [r["td"] for r in rows],
-        dtype=float,
-    )
-
-    ws = np.array(
-        [r["ws"] for r in rows],
-        dtype=float,
-    )
-
-    wd = np.array(
-        [r["wd"] for r in rows],
-        dtype=float,
-    )
-
-    return (
-        rows,
-        p,
-        z,
-        t,
-        td,
-        ws,
-        wd,
-    )
+    return rows, p, z, t, td, ws, wd, theta, thetae
 
 
-def wind_components_knots(
-    ws_ms,
-    wd_deg,
-):
-    mask = (
-        np.isfinite(ws_ms)
-        & np.isfinite(wd_deg)
-    )
-
-    u = np.full_like(
-        ws_ms,
-        np.nan,
-        dtype=float,
-    )
-
-    v = np.full_like(
-        ws_ms,
-        np.nan,
-        dtype=float,
-    )
+def wind_components_knots(ws_ms, wd_deg):
+    mask = np.isfinite(ws_ms) & np.isfinite(wd_deg)
+    u = np.full_like(ws_ms, np.nan, dtype=float)
+    v = np.full_like(ws_ms, np.nan, dtype=float)
 
     if mask.any():
-        uq, vq = (
-            mpcalc.wind_components(
-                ws_ms[mask]
-                * units("m/s"),
-
-                wd_deg[mask]
-                * units.degree,
-            )
+        uq, vq = mpcalc.wind_components(
+            ws_ms[mask] * units("m/s"),
+            wd_deg[mask] * units.degree,
         )
-
-        u[mask] = (
-            uq.to("knots")
-            .magnitude
-        )
-
-        v[mask] = (
-            vq.to("knots")
-            .magnitude
-        )
+        u[mask] = uq.to("knots").magnitude
+        v[mask] = vq.to("knots").magnitude
 
     return u, v
 
 
-def nearest_indices_for_pressures(
-    p,
-    targets,
-):
+def nearest_indices_for_pressures(p, targets):
     indices = []
-
+    valid = np.where(np.isfinite(p))[0]
     for target in targets:
-        candidates = np.where(
-            np.isfinite(p)
-        )[0]
-
-        if len(candidates) == 0:
+        if len(valid) == 0:
             continue
-
-        idx = candidates[
-            np.argmin(
-                np.abs(
-                    p[candidates]
-                    - target
-                )
-            )
-        ]
-
-        if (
-            abs(
-                p[idx]
-                - target
-            )
-            <= max(
-                8.0,
-                target * 0.015,
-            )
-        ):
-            indices.append(
-                int(idx)
-            )
-
-    return sorted(
-        set(indices)
-    )
+        idx = valid[np.argmin(np.abs(p[valid] - target))]
+        if abs(p[idx] - target) <= max(10.0, target * 0.02):
+            indices.append(int(idx))
+    return sorted(set(indices))
 
 
 def title_text(profile):
-    station = (
-        profile.get("station_name")
-        or "Ljubljana"
-    )
-
-    station_id = (
-        profile.get("station")
-        or 14015
-    )
-
-    date = (
-        profile.get("nominal_date")
-        or ""
-    )
-
-    term = (
-        profile.get("term")
-        or ""
-    )
-
-    launch = (
-        profile.get("launch_time")
-        or ""
-    )
-
-    launch_text = (
-        launch
-        .replace("T", " ")
-        .replace("Z", " UTC")
-    )
+    station = profile.get("station_name") or "Ljubljana"
+    station_id = profile.get("station") or 14015
+    date = profile.get("nominal_date") or ""
+    term = profile.get("term") or ""
+    launch = profile.get("launch_time") or ""
+    launch_text = launch.replace("T", " ").replace("Z", " UTC")
 
     return (
-        (
-            f"{station} "
-            f"({station_id}) · "
-            f"{date} · "
-            f"{term} UTC"
-        ),
-        (
-            f"Launch "
-            f"{launch_text}"
-        ),
+        f"{station} ({station_id}) · {date} · {term} UTC",
+        f"Launch {launch_text}",
     )
 
 
-def output_paths(
-    profile,
-    outdir,
-):
-    nominal = str(
-        profile.get(
-            "nominal_date"
-        )
-        or "unknown-date"
-    )
-
-    term = str(
-        profile.get("term")
-        or "unknown"
-    ).replace(
-        "/",
-        "-",
-    )
-
-    compact = nominal.replace(
-        "-",
-        "",
-    )
+def output_paths(profile, outdir):
+    nominal = str(profile.get("nominal_date") or "unknown-date")
+    term = str(profile.get("term") or "unknown").replace("/", "-")
+    compact = nominal.replace("-", "")
 
     try:
-        yyyy, mm, _ = (
-            nominal.split("-")
-        )
+        yyyy, mm, _ = nominal.split("-")
     except ValueError:
-        yyyy = "unknown"
-        mm = "unknown"
+        yyyy, mm = "unknown", "unknown"
 
-    archive_dir = (
-        Path(outdir)
-        / yyyy
-        / mm
-    )
-
-    archive_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    prefix = (
-        f"{compact}_{term}"
-    )
+    archive_dir = Path(outdir) / yyyy / mm
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    prefix = f"{compact}_{term}"
 
     return {
-        "latest_skewt":
-            Path(outdir)
-            / "latest_skewt.png",
-
-        "latest_hodograph":
-            Path(outdir)
-            / "latest_hodograph.png",
-
-        "archive_skewt":
-            archive_dir
-            / f"{prefix}_skewt.png",
-
-        "archive_hodograph":
-            archive_dir
-            / f"{prefix}_hodograph.png",
-
-        "manifest":
-            Path(outdir)
-            / "latest_products.json",
+        "latest_skewt": Path(outdir) / "latest_skewt.png",
+        "latest_skewt_zoom": Path(outdir) / "latest_skewt_zoom.png",
+        "latest_thetae": Path(outdir) / "latest_thetae.png",
+        "latest_hodograph": Path(outdir) / "latest_hodograph.png",
+        "archive_skewt": archive_dir / f"{prefix}_skewt.png",
+        "archive_skewt_zoom": archive_dir / f"{prefix}_skewt_zoom.png",
+        "archive_thetae": archive_dir / f"{prefix}_thetae.png",
+        "archive_hodograph": archive_dir / f"{prefix}_hodograph.png",
+        "manifest": Path(outdir) / "latest_products.json",
     }
 
 
-def safe_param(
-    dct,
-    *keys,
-):
-    node = dct
-
-    for key in keys:
-        if not isinstance(
-            node,
-            dict,
-        ):
-            return None
-
-        node = node.get(key)
-
-    return node
+def format_height_m(value):
+    if not valid_number(value):
+        return ""
+    return f"{int(round(float(value)))} m"
 
 
-# ---------------------------------------------------------------------
-# SKEW-T
-# ---------------------------------------------------------------------
+def add_height_axis(ax, p, z, pressure_ticks, side="right"):
+    tick_positions = []
+    tick_labels = []
+    for lev in pressure_ticks:
+        valid = np.where(np.isfinite(p) & np.isfinite(z))[0]
+        if len(valid) == 0:
+            continue
+        idx = valid[np.argmin(np.abs(p[valid] - lev))]
+        tick_positions.append(lev)
+        tick_labels.append(format_height_m(z[idx]))
 
-def render_skewt(
-    profile,
-    destination,
-):
-    (
-        rows,
-        p,
-        z,
-        t,
-        td,
-        ws,
-        wd,
-    ) = profile_arrays(
-        profile
-    )
+    twin = ax.twinx()
+    twin.set_ylim(ax.get_ylim())
+    twin.set_yticks(tick_positions)
+    twin.set_yticklabels(tick_labels, color=MUTED, fontsize=8)
+    twin.tick_params(length=0, colors=MUTED)
+    twin.set_ylabel("Height", fontsize=9, color=MUTED)
+    if side == "right":
+        twin.yaxis.set_label_position("right")
+        twin.yaxis.tick_right()
+    for spine in twin.spines.values():
+        spine.set_visible(False)
+    return twin
 
-    p_q = (
-        p
-        * units.hPa
-    )
 
-    t_q = (
-        t
-        * units.degC
-    )
-
-    td_q = (
-        td
-        * units.degC
-    )
-
-    fig = plt.figure(
-        figsize=(
-            8.7,
-            9.8,
-        ),
-        dpi=DPI,
-        facecolor=BG,
-    )
-
-    skew = SkewT(
-        fig,
-        rotation=45,
-        rect=(
-            0.08,
-            0.08,
-            0.77,
-            0.84,
-        ),
-    )
-
-    ax = skew.ax
-
-    ax.set_facecolor(
-        BG
-    )
-
-    skew.plot(
-        p_q,
-        t_q,
-        color=TEMP,
-        linewidth=2.6,
-        label="Temperature",
-    )
-
-    finite_td = (
-        np.isfinite(td)
-    )
-
-    if finite_td.sum() >= 2:
-        skew.plot(
-            p_q[finite_td],
-            td_q[finite_td],
-            color=DEW,
-            linewidth=2.4,
-            label="Dew point",
-        )
-
-    # Surface parcel profile.
-    try:
-        if finite_td[0]:
-            parcel = (
-                mpcalc
-                .parcel_profile(
-                    p_q,
-                    t_q[0],
-                    td_q[0],
-                )
-                .to("degC")
-            )
-
-            skew.plot(
-                p_q,
-                parcel,
-                color=PARCEL,
-                linewidth=1.6,
+def plot_isotherms(ax, xmin=-50, xmax=45, step=10):
+    for temp_c in range(xmin, xmax + 1, step):
+        if temp_c == 0:
+            ax.axvline(
+                temp_c,
+                color="#6b7280",
+                linewidth=1.1,
                 linestyle="--",
                 alpha=0.9,
-                label="Surface parcel",
+                zorder=0,
+            )
+        else:
+            ax.axvline(
+                temp_c,
+                color="#c8ced8",
+                linewidth=0.55,
+                linestyle="-",
+                alpha=0.65,
+                zorder=0,
             )
 
-    except Exception as exc:
-        print(
-            "Skew-T parcel warning:",
-            exc,
-        )
 
-    # Thermodynamic background.
+def inversion_layers(profile):
+    inv = safe_param(profile, "parameters", "inversions") or {}
+    if isinstance(inv, dict):
+        return inv.get("layers", []) or []
+    return []
+
+
+def shade_inversions(ax, layers):
+    for layer in layers:
+        base_p = layer.get("base_pressure_hpa")
+        top_p = layer.get("top_pressure_hpa")
+        if not (valid_number(base_p) and valid_number(top_p)):
+            continue
+        ax.axhspan(float(top_p), float(base_p), color=INV, alpha=0.13, zorder=0)
+
+
+def make_mu_parcel(p, t, td):
+    mask = np.isfinite(p) & np.isfinite(t) & np.isfinite(td)
+    if mask.sum() < 6:
+        return None
+
+    pp = p[mask] * units.hPa
+    tt = t[mask] * units.degC
+    ttd = td[mask] * units.degC
+
     try:
-        skew.plot_dry_adiabats(
-            linewidth=0.55,
-            alpha=0.35,
-            color="#b9a994",
+        mu_p, mu_t, mu_td, _ = mpcalc.most_unstable_parcel(pp, tt, ttd, depth=300 * units.hPa)
+        start_idx = int(np.argmin(np.abs(pp.magnitude - mu_p.magnitude)))
+        parcel_prof = mpcalc.parcel_profile(pp[start_idx:], mu_t, mu_td).to("degC")
+
+        mucape, mucin = mpcalc.cape_cin(
+            pp[start_idx:],
+            tt[start_idx:],
+            ttd[start_idx:],
+            parcel_prof,
         )
 
-        skew.plot_moist_adiabats(
-            linewidth=0.55,
-            alpha=0.30,
-            color="#92b7ad",
-        )
-
-        skew.plot_mixing_lines(
-            linewidth=0.5,
-            alpha=0.28,
-            color="#7da6b5",
-        )
-
+        return {
+            "pp": pp,
+            "tt": tt,
+            "ttd": ttd,
+            "start_idx": start_idx,
+            "mu_p": mu_p,
+            "mu_t": mu_t,
+            "mu_td": mu_td,
+            "parcel_prof": parcel_prof,
+            "mucape": mucape,
+            "mucin": mucin,
+        }
     except Exception as exc:
-        print(
-            "Skew-T background warning:",
-            exc,
-        )
+        print("Most-unstable parcel warning:", exc)
+        return None
 
-    # 0 °C reference.
+
+def style_main_axes(ax):
+    ax.set_facecolor(BG)
+    ax.tick_params(labelsize=9, colors=TEXT)
+    for spine in ax.spines.values():
+        spine.set_color("#b7bec9")
+        spine.set_linewidth(0.8)
+
+
+# ---------------------------------------------------------------------
+# SKEW-T FULL
+# ---------------------------------------------------------------------
+
+def render_skewt(profile, destination):
+    rows, p, z, t, td, ws, wd, theta, thetae = profile_arrays(profile)
+
+    p_q = p * units.hPa
+    t_q = t * units.degC
+    td_q = td * units.degC
+
+    fig = plt.figure(figsize=(8.7, 10.0), dpi=DPI, facecolor=BG)
+    skew = SkewT(fig, rotation=45, rect=(0.08, 0.08, 0.77, 0.84))
+    ax = skew.ax
+    style_main_axes(ax)
+
+    plot_isotherms(ax, -50, 45, 10)
+    shade_inversions(ax, inversion_layers(profile))
+
+    skew.plot(p_q, t_q, color=TEMP, linewidth=2.5, label="Temperature")
+    finite_td = np.isfinite(td)
+    if finite_td.sum() >= 2:
+        skew.plot(p_q[finite_td], td_q[finite_td], color=DEW, linewidth=2.3, label="Dew point")
+
     try:
-        skew.ax.axvline(
-            0,
-            color="#89919f",
-            linewidth=0.9,
-            linestyle="--",
-            alpha=0.8,
-        )
-    except Exception:
-        pass
+        skew.plot_dry_adiabats(linewidth=0.55, alpha=0.35, color="#b9a994")
+        skew.plot_moist_adiabats(linewidth=0.55, alpha=0.30, color="#92b7ad")
+        skew.plot_mixing_lines(linewidth=0.50, alpha=0.28, color="#7da6b5")
+    except Exception as exc:
+        print("Skew-T background warning:", exc)
 
-    # Wind barbs.
-    u, v = (
-        wind_components_knots(
-            ws,
-            wd,
-        )
-    )
+    mu = make_mu_parcel(p, t, td)
+    if mu is not None:
+        pp_sub = mu["pp"][mu["start_idx"]:]
+        tt_sub = mu["tt"][mu["start_idx"]:]
+        parcel_prof = mu["parcel_prof"]
+        skew.plot(pp_sub, parcel_prof, color=PARCEL, linewidth=1.7, linestyle="--", label="MU parcel")
+        try:
+            skew.shade_cape(pp_sub, tt_sub, parcel_prof, alpha=0.20, color=CAPE)
+        except Exception as exc:
+            print("CAPE shading warning:", exc)
+        try:
+            skew.shade_cin(pp_sub, tt_sub, parcel_prof, mu["ttd"][mu["start_idx"]:], alpha=0.10, color=CIN)
+        except Exception:
+            pass
 
-    barb_targets = [
-        1000,
-        950,
-        900,
-        850,
-        800,
-        750,
-        700,
-        650,
-        600,
-        550,
-        500,
-        450,
-        400,
-        350,
-        300,
-        250,
-        200,
-        150,
-        100,
-    ]
-
-    barb_idx = [
-        i
-        for i
-        in nearest_indices_for_pressures(
-            p,
-            barb_targets,
-        )
-        if (
-            np.isfinite(u[i])
-            and np.isfinite(v[i])
-        )
-    ]
-
+    u, v = wind_components_knots(ws, wd)
+    barb_targets = [1000, 950, 900, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 250, 200, 150, 100]
+    barb_idx = [i for i in nearest_indices_for_pressures(p, barb_targets) if np.isfinite(u[i]) and np.isfinite(v[i])]
     if barb_idx:
         try:
             skew.plot_barbs(
                 p_q[barb_idx],
-
-                u[barb_idx]
-                * units.knots,
-
-                v[barb_idx]
-                * units.knots,
-
+                u[barb_idx] * units.knots,
+                v[barb_idx] * units.knots,
                 xloc=1.035,
                 length=5.7,
                 linewidth=0.7,
                 color=WIND,
             )
-
         except TypeError:
+            skew.plot_barbs(p_q[barb_idx], u[barb_idx] * units.knots, v[barb_idx] * units.knots, xloc=1.035)
+
+    for level in (850, 700, 500, 300):
+        ax.axhline(level, color=GRID, linewidth=0.75, linestyle=":", zorder=0)
+
+    ax.set_ylim(1000, 100)
+    ax.set_xlim(-45, 40)
+    ax.grid(False)
+    ax.set_xlabel("Temperature (°C)", fontsize=10, color=TEXT)
+    ax.set_ylabel("Pressure (hPa)", fontsize=10, color=TEXT)
+    add_height_axis(ax, p, z, [1000, 925, 850, 700, 500, 400, 300, 250, 200])
+
+    main_title, subtitle = title_text(profile)
+    fig.text(0.08, 0.965, "Skew-T log-p", ha="left", va="top", fontsize=15, fontweight="bold", color=TEXT)
+    fig.text(0.08, 0.94, main_title, ha="left", va="top", fontsize=10.5, color=TEXT)
+    fig.text(0.08, 0.918, subtitle, ha="left", va="top", fontsize=8.7, color=MUTED)
+
+    if mu is not None:
+        mucape = mu["mucape"].to("joule / kilogram").magnitude if hasattr(mu["mucape"], "to") else float(mu["mucape"])
+        mucin = mu["mucin"].to("joule / kilogram").magnitude if hasattr(mu["mucin"], "to") else float(mu["mucin"])
+        mu_text = (
+            f"MUCAPE {mucape:.0f} J/kg\n"
+            f"MUCIN {mucin:.0f} J/kg\n"
+            f"MU parcel {mu['mu_p'].magnitude:.0f} hPa"
+        )
+        fig.text(0.80, 0.94, mu_text, ha="right", va="top", fontsize=8.5, color=TEXT)
+
+    handles, labels = ax.get_legend_handles_labels()
+    if handles:
+        ax.legend(handles, labels, loc="upper left", frameon=False, fontsize=8.5)
+
+    fig.text(0.89, 0.50, "Wind (kt)", rotation=90, ha="center", va="center", fontsize=8.5, color=MUTED)
+
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(destination, dpi=DPI, bbox_inches="tight", facecolor=BG, pad_inches=0.18)
+    plt.close(fig)
+
+
+# ---------------------------------------------------------------------
+# SKEW-T LOW-LEVEL ZOOM
+# ---------------------------------------------------------------------
+
+def render_skewt_zoom(profile, destination, p_bottom=1000, p_top=700):
+    rows, p, z, t, td, ws, wd, theta, thetae = profile_arrays(profile)
+
+    mask = np.isfinite(p) & np.isfinite(t) & (p <= p_bottom) & (p >= p_top)
+    td_mask = np.isfinite(td) & (p <= p_bottom) & (p >= p_top)
+    if mask.sum() < 6:
+        raise ValueError("Too few valid levels for low-level skew-T zoom.")
+
+    t_zoom = t[mask]
+    td_zoom = td[td_mask] if td_mask.sum() else np.array([])
+
+    xmin = math.floor((np.nanmin(np.concatenate([t_zoom, td_zoom[~np.isnan(td_zoom)]]) if td_mask.sum() else t_zoom) - 2) / 5.0) * 5
+    xmax = math.ceil((np.nanmax(np.concatenate([t_zoom, td_zoom[~np.isnan(td_zoom)]]) if td_mask.sum() else t_zoom) + 2) / 5.0) * 5
+    xmin = min(xmin, -5)
+    xmax = max(xmax, 20)
+
+    p_q = p * units.hPa
+    t_q = t * units.degC
+    td_q = td * units.degC
+
+    fig = plt.figure(figsize=(8.0, 6.0), dpi=DPI, facecolor=BG)
+    skew = SkewT(fig, rotation=45, rect=(0.08, 0.12, 0.74, 0.78))
+    ax = skew.ax
+    style_main_axes(ax)
+
+    plot_isotherms(ax, int(xmin) - 10, int(xmax) + 10, 5)
+    shade_inversions(ax, inversion_layers(profile))
+
+    fullmask = (p <= p_bottom) & (p >= p_top)
+    skew.plot(p_q[fullmask], t_q[fullmask], color=TEMP, linewidth=2.4, label="Temperature")
+    if td_mask.sum() >= 2:
+        skew.plot(p_q[td_mask], td_q[td_mask], color=DEW, linewidth=2.2, label="Dew point")
+
+    mu = make_mu_parcel(p, t, td)
+    if mu is not None:
+        pp_sub = mu["pp"][mu["start_idx"]:]
+        tt_sub = mu["tt"][mu["start_idx"]:]
+        ttd_sub = mu["ttd"][mu["start_idx"]:]
+        parcel_prof = mu["parcel_prof"]
+        keep = (pp_sub.magnitude <= p_bottom) & (pp_sub.magnitude >= p_top)
+        if keep.sum() >= 2:
+            skew.plot(pp_sub[keep], parcel_prof[keep], color=PARCEL, linewidth=1.6, linestyle="--", label="MU parcel")
+            try:
+                skew.shade_cape(pp_sub[keep], tt_sub[keep], parcel_prof[keep], alpha=0.22, color=CAPE)
+            except Exception:
+                pass
+            try:
+                skew.shade_cin(pp_sub[keep], tt_sub[keep], parcel_prof[keep], ttd_sub[keep], alpha=0.10, color=CIN)
+            except Exception:
+                pass
+
+    u, v = wind_components_knots(ws, wd)
+    barb_targets = [1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 725, 700]
+    barb_idx = [i for i in nearest_indices_for_pressures(p, barb_targets) if np.isfinite(u[i]) and np.isfinite(v[i]) and p[i] >= p_top and p[i] <= p_bottom]
+    if barb_idx:
+        try:
             skew.plot_barbs(
                 p_q[barb_idx],
-
-                u[barb_idx]
-                * units.knots,
-
-                v[barb_idx]
-                * units.knots,
-
-                xloc=1.035,
+                u[barb_idx] * units.knots,
+                v[barb_idx] * units.knots,
+                xloc=1.03,
+                length=5.2,
+                linewidth=0.7,
+                color=WIND,
             )
+        except TypeError:
+            skew.plot_barbs(p_q[barb_idx], u[barb_idx] * units.knots, v[barb_idx] * units.knots, xloc=1.03)
 
-    # Existing inversion diagnostics.
-    inversions = (
-        safe_param(
-            profile,
-            "parameters",
-            "inversions",
-        )
-        or {}
-    )
+    for level in (1000, 950, 900, 850, 800, 750, 700):
+        ax.axhline(level, color=GRID, linewidth=0.65, linestyle="--", zorder=0)
 
-    if isinstance(
-        inversions,
-        dict,
-    ):
-        layers = (
-            inversions.get(
-                "layers",
-                [],
-            )
-        )
-    else:
-        layers = []
-
-    for layer in layers:
-        base_p = (
-            layer.get(
-                "base_pressure_hpa"
-            )
-        )
-
-        top_p = (
-            layer.get(
-                "top_pressure_hpa"
-            )
-        )
-
-        if not (
-            valid_number(base_p)
-            and valid_number(top_p)
-        ):
-            continue
-
-        ax.axhspan(
-            float(top_p),
-            float(base_p),
-            color=INV,
-            alpha=0.14,
-            zorder=0,
-        )
-
-    # Standard pressure references.
-    for level in (
-        850,
-        700,
-        500,
-        300,
-    ):
-        ax.axhline(
-            level,
-            color=GRID,
-            linewidth=0.7,
-            linestyle=":",
-            zorder=0,
-        )
-
-    ax.set_ylim(
-        1000,
-        100,
-    )
-
-    ax.set_xlim(
-        -45,
-        40,
-    )
-
+    ax.set_ylim(p_bottom, p_top)
+    ax.set_xlim(xmin, xmax)
     ax.grid(False)
+    ax.set_xlabel("Temperature (°C)", fontsize=10, color=TEXT)
+    ax.set_ylabel("Pressure (hPa)", fontsize=10, color=TEXT)
+    add_height_axis(ax, p, z, [1000, 950, 900, 850, 800, 750, 700])
 
-    ax.tick_params(
-        labelsize=9,
-        colors=TEXT,
-    )
+    main_title, subtitle = title_text(profile)
+    fig.text(0.08, 0.965, "Low-level profile", ha="left", va="top", fontsize=15, fontweight="bold", color=TEXT)
+    fig.text(0.08, 0.94, main_title, ha="left", va="top", fontsize=10.2, color=TEXT)
+    fig.text(0.08, 0.918, f"{subtitle} · Zoom {p_bottom}–{p_top} hPa", ha="left", va="top", fontsize=8.6, color=MUTED)
+    fig.text(0.89, 0.50, "Wind (kt)", rotation=90, ha="center", va="center", fontsize=8.3, color=MUTED)
 
-    ax.set_xlabel(
-        "Temperature (°C)",
-        fontsize=10,
-        color=TEXT,
-    )
-
-    ax.set_ylabel(
-        "Pressure (hPa)",
-        fontsize=10,
-        color=TEXT,
-    )
-
-    for spine in (
-        ax.spines.values()
-    ):
-        spine.set_color(
-            "#b7bec9"
-        )
-
-        spine.set_linewidth(
-            0.8
-        )
-
-    main_title, subtitle = (
-        title_text(profile)
-    )
-
-    fig.text(
-        0.08,
-        0.965,
-        "Skew-T log-p",
-        ha="left",
-        va="top",
-        fontsize=15,
-        fontweight="bold",
-        color=TEXT,
-    )
-
-    fig.text(
-        0.08,
-        0.94,
-        main_title,
-        ha="left",
-        va="top",
-        fontsize=10.5,
-        color=TEXT,
-    )
-
-    fig.text(
-        0.08,
-        0.918,
-        subtitle,
-        ha="left",
-        va="top",
-        fontsize=8.7,
-        color=MUTED,
-    )
-
-    handles, labels = (
-        ax.get_legend_handles_labels()
-    )
-
+    handles, labels = ax.get_legend_handles_labels()
     if handles:
-        ax.legend(
-            handles,
-            labels,
-            loc="upper left",
-            frameon=False,
-            fontsize=8.5,
-        )
+        ax.legend(handles, labels, loc="lower left", frameon=False, fontsize=8.2)
 
-    fig.text(
-        0.89,
-        0.50,
-        "Wind (kt)",
-        rotation=90,
-        ha="center",
-        va="center",
-        fontsize=8.5,
-        color=MUTED,
-    )
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(destination, dpi=DPI, bbox_inches="tight", facecolor=BG, pad_inches=0.16)
+    plt.close(fig)
 
-    destination = Path(
-        destination
-    )
 
-    destination.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+# ---------------------------------------------------------------------
+# THETAE PROFILE
+# ---------------------------------------------------------------------
 
-    fig.savefig(
-        destination,
-        dpi=DPI,
-        bbox_inches="tight",
-        facecolor=BG,
-        pad_inches=0.18,
-    )
+def render_thetae(profile, destination, p_bottom=1000, p_top=300):
+    rows, p, z, t, td, ws, wd, theta, thetae = profile_arrays(profile)
 
+    mask = (p <= p_bottom) & (p >= p_top) & np.isfinite(theta) & np.isfinite(thetae)
+    if mask.sum() < 6:
+        raise ValueError("Too few valid levels for theta-e profile.")
+
+    p2 = p[mask]
+    z2 = z[mask]
+    theta2 = theta[mask]
+    thetae2 = thetae[mask]
+
+    xmin = math.floor((np.nanmin(np.concatenate([theta2, thetae2])) - 3) / 5.0) * 5
+    xmax = math.ceil((np.nanmax(np.concatenate([theta2, thetae2])) + 3) / 5.0) * 5
+
+    fig, ax = plt.subplots(figsize=(6.6, 8.2), dpi=DPI, facecolor=BG)
+    style_main_axes(ax)
+
+    for lev in [1000, 925, 850, 700, 600, 500, 400, 300]:
+        ax.axhline(lev, color=GRID, linewidth=0.7, linestyle="--", zorder=0)
+
+    for x in range(int(xmin), int(xmax) + 1, 5):
+        ax.axvline(x, color="#e6eaf0", linewidth=0.6, zorder=0)
+
+    shade_inversions(ax, inversion_layers(profile))
+
+    ax.plot(thetae2, p2, color=THETAE, linewidth=2.5, label="θe")
+    ax.plot(theta2, p2, color=THETA, linewidth=2.1, label="θ")
+
+    idx_min = int(np.nanargmin(thetae2))
+    idx_max = int(np.nanargmax(thetae2))
+    ax.scatter([thetae2[idx_min]], [p2[idx_min]], s=26, color=THETAE, zorder=5)
+    ax.scatter([thetae2[idx_max]], [p2[idx_max]], s=26, color=THETAE, zorder=5)
+    ax.annotate("θe min", (thetae2[idx_min], p2[idx_min]), xytext=(6, -10), textcoords="offset points", fontsize=8, color=THETAE)
+    ax.annotate("θe max", (thetae2[idx_max], p2[idx_max]), xytext=(6, -10), textcoords="offset points", fontsize=8, color=THETAE)
+
+    ax.set_ylim(p_bottom, p_top)
+    ax.set_xlim(xmin, xmax)
+    ax.set_xlabel("Potential temperature (K)", fontsize=10, color=TEXT)
+    ax.set_ylabel("Pressure (hPa)", fontsize=10, color=TEXT)
+    add_height_axis(ax, p2, z2, [1000, 925, 850, 700, 600, 500, 400, 300])
+
+    main_title, subtitle = title_text(profile)
+    fig.text(0.11, 0.965, "Equivalent potential temperature", ha="left", va="top", fontsize=14.5, fontweight="bold", color=TEXT)
+    fig.text(0.11, 0.94, main_title, ha="left", va="top", fontsize=10.2, color=TEXT)
+    fig.text(0.11, 0.918, subtitle, ha="left", va="top", fontsize=8.6, color=MUTED)
+
+    ax.legend(loc="upper left", frameon=False, fontsize=8.7)
+
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(destination, dpi=DPI, bbox_inches="tight", facecolor=BG, pad_inches=0.16)
     plt.close(fig)
 
 
@@ -795,506 +579,101 @@ def render_skewt(
 # HODOGRAPH
 # ---------------------------------------------------------------------
 
-def render_hodograph(
-    profile,
-    destination,
-):
-    (
-        rows,
-        p,
-        z,
-        t,
-        td,
-        ws,
-        wd,
-    ) = profile_arrays(
-        profile
-    )
+def render_hodograph(profile, destination):
+    rows, p, z, t, td, ws, wd, theta, thetae = profile_arrays(profile)
+    u, v = wind_components_knots(ws, wd)
 
-    u, v = (
-        wind_components_knots(
-            ws,
-            wd,
-        )
-    )
-
-    surface_z = (
-        np.nanmin(z)
-    )
-
-    agl_km = (
-        z
-        - surface_z
-    ) / 1000.0
-
-    mask = (
-        np.isfinite(u)
-        & np.isfinite(v)
-        & np.isfinite(agl_km)
-        & (agl_km >= 0)
-        & (agl_km <= 12.0)
-    )
-
+    surface_z = np.nanmin(z)
+    agl_km = (z - surface_z) / 1000.0
+    mask = np.isfinite(u) & np.isfinite(v) & np.isfinite(agl_km) & (agl_km >= 0) & (agl_km <= 12.0)
     if mask.sum() < 3:
-        raise ValueError(
-            "Too few valid wind "
-            "levels for hodograph."
-        )
+        raise ValueError("Too few valid wind levels for hodograph.")
 
     u2 = u[mask]
     v2 = v[mask]
     z2 = agl_km[mask]
 
-    # Reduce very dense profile.
     if len(u2) > 300:
-        keep = np.unique(
-            np.linspace(
-                0,
-                len(u2) - 1,
-                300,
-            ).astype(int)
-        )
+        keep = np.unique(np.linspace(0, len(u2) - 1, 300).astype(int))
+        u2, v2, z2 = u2[keep], v2[keep], z2[keep]
 
-        u2 = u2[keep]
-        v2 = v2[keep]
-        z2 = z2[keep]
+    max_component = float(np.nanmax(np.abs(np.concatenate([u2, v2]))))
+    component_range = max(30.0, math.ceil((max_component + 7.0) / 10.0) * 10.0)
 
-    max_component = float(
-        np.nanmax(
-            np.abs(
-                np.concatenate(
-                    [
-                        u2,
-                        v2,
-                    ]
-                )
-            )
-        )
-    )
+    fig = plt.figure(figsize=(7.4, 7.4), dpi=DPI, facecolor=BG)
+    ax = fig.add_axes((0.11, 0.12, 0.78, 0.78))
+    style_main_axes(ax)
 
-    component_range = max(
-        30.0,
-        math.ceil(
-            (
-                max_component
-                + 7.0
-            )
-            / 10.0
-        )
-        * 10.0,
-    )
-
-    fig = plt.figure(
-        figsize=(
-            7.4,
-            7.4,
-        ),
-        dpi=DPI,
-        facecolor=BG,
-    )
-
-    ax = fig.add_axes(
-        (
-            0.11,
-            0.12,
-            0.78,
-            0.78,
-        )
-    )
-
-    ax.set_facecolor(
-        BG
-    )
-
-    h = Hodograph(
-        ax,
-        component_range=
-        component_range,
-    )
-
-    h.add_grid(
-        increment=10,
-        color=GRID,
-        linewidth=0.7,
-        alpha=0.9,
-    )
+    h = Hodograph(ax, component_range=component_range)
+    h.add_grid(increment=10, color=GRID, linewidth=0.7, alpha=0.9)
 
     layer_specs = [
-        (
-            0.0,
-            1.0,
-            "#214f9b",
-            3.1,
-            "0–1 km",
-        ),
-        (
-            1.0,
-            3.0,
-            "#2a8b72",
-            2.8,
-            "1–3 km",
-        ),
-        (
-            3.0,
-            6.0,
-            "#c68a26",
-            2.6,
-            "3–6 km",
-        ),
-        (
-            6.0,
-            12.1,
-            "#7a8290",
-            2.2,
-            "6–12 km",
-        ),
+        (0.0, 1.0, "#214f9b", 3.1, "0–1 km"),
+        (1.0, 3.0, "#2a8b72", 2.8, "1–3 km"),
+        (3.0, 6.0, "#c68a26", 2.6, "3–6 km"),
+        (6.0, 12.1, "#7a8290", 2.2, "6–12 km"),
     ]
-
-    for (
-        zmin,
-        zmax,
-        color,
-        lw,
-        label,
-    ) in layer_specs:
-
-        lm = (
-            (z2 >= zmin)
-            & (z2 <= zmax)
-        )
-
+    for zmin, zmax, color, lw, label in layer_specs:
+        lm = (z2 >= zmin) & (z2 <= zmax)
         if lm.sum() >= 2:
-            ax.plot(
-                u2[lm],
-                v2[lm],
-                color=color,
-                linewidth=lw,
-                solid_capstyle="round",
-                label=label,
-            )
+            ax.plot(u2[lm], v2[lm], color=color, linewidth=lw, solid_capstyle="round", label=label)
 
-    # Mark height levels.
-    for level_km in (
-        1,
-        3,
-        6,
-        9,
-        12,
-    ):
-        idx = int(
-            np.argmin(
-                np.abs(
-                    z2
-                    - level_km
-                )
-            )
-        )
+    for level_km in (1, 3, 6, 9, 12):
+        idx = int(np.argmin(np.abs(z2 - level_km)))
+        if abs(z2[idx] - level_km) <= 0.5:
+            ax.scatter([u2[idx]], [v2[idx]], s=27, color=TEXT, zorder=5)
+            ax.annotate(f"{level_km} km", (u2[idx], v2[idx]), xytext=(5, 5), textcoords="offset points", fontsize=8, color=TEXT)
 
-        if (
-            abs(
-                z2[idx]
-                - level_km
-            )
-            <= 0.5
-        ):
-            ax.scatter(
-                [u2[idx]],
-                [v2[idx]],
-                s=27,
-                color=TEXT,
-                zorder=5,
-            )
-
-            ax.annotate(
-                f"{level_km} km",
-                (
-                    u2[idx],
-                    v2[idx],
-                ),
-                xytext=(
-                    5,
-                    5,
-                ),
-                textcoords=
-                    "offset points",
-                fontsize=8,
-                color=TEXT,
-            )
-
-    metpy = (
-        safe_param(
-            profile,
-            "parameters",
-            "metpy",
-        )
-        or {}
-    )
-
-    # Bunkers RM / LM.
-    bunkers = (
-        metpy.get(
-            "bunkers",
-            {},
-        )
-        if isinstance(
-            metpy,
-            dict,
-        )
-        else {}
-    )
-
+    metpy = safe_param(profile, "parameters", "metpy") or {}
+    bunkers = metpy.get("bunkers", {}) if isinstance(metpy, dict) else {}
     markers = [
-        (
-            "RM",
-            bunkers.get(
-                "right_mover"
-            ),
-            TEMP,
-        ),
-        (
-            "LM",
-            bunkers.get(
-                "left_mover"
-            ),
-            DEW,
-        ),
+        ("RM", bunkers.get("right_mover"), TEMP),
+        ("LM", bunkers.get("left_mover"), DEW),
     ]
-
-    for (
-        label,
-        item,
-        color,
-    ) in markers:
-
-        if not isinstance(
-            item,
-            dict,
-        ):
+    for label, item, color in markers:
+        if not isinstance(item, dict):
             continue
-
-        if valid_number(
-            item.get("u_kt")
-        ):
-            uu = item.get("u_kt")
-        else:
-            uu = item.get("u_ms")
-
-        if valid_number(
-            item.get("v_kt")
-        ):
-            vv = item.get("v_kt")
-        else:
-            vv = item.get("v_ms")
-
-        if not (
-            valid_number(uu)
-            and valid_number(vv)
-        ):
+        uu = item.get("u_kt") if valid_number(item.get("u_kt")) else item.get("u_ms")
+        vv = item.get("v_kt") if valid_number(item.get("v_kt")) else item.get("v_ms")
+        if not (valid_number(uu) and valid_number(vv)):
             continue
-
         uu = float(uu)
         vv = float(vv)
-
         if item.get("u_kt") is None:
             uu *= 1.94384449
-
         if item.get("v_kt") is None:
             vv *= 1.94384449
+        ax.scatter([uu], [vv], marker="x", s=65, linewidths=2, color=color, zorder=7)
+        ax.annotate(label, (uu, vv), xytext=(6, -11), textcoords="offset points", fontsize=8.5, fontweight="bold", color=color)
 
-        ax.scatter(
-            [uu],
-            [vv],
-            marker="x",
-            s=65,
-            linewidths=2,
-            color=color,
-            zorder=7,
-        )
+    ax.axhline(0, color="#9aa2ae", linewidth=0.8)
+    ax.axvline(0, color="#9aa2ae", linewidth=0.8)
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xlabel("u wind (kt)", color=TEXT, fontsize=10)
+    ax.set_ylabel("v wind (kt)", color=TEXT, fontsize=10)
 
-        ax.annotate(
-            label,
-            (
-                uu,
-                vv,
-            ),
-            xytext=(
-                6,
-                -11,
-            ),
-            textcoords=
-                "offset points",
-            fontsize=8.5,
-            fontweight="bold",
-            color=color,
-        )
+    main_title, subtitle = title_text(profile)
+    fig.text(0.08, 0.965, "Hodograph", ha="left", va="top", fontsize=15, fontweight="bold", color=TEXT)
+    fig.text(0.08, 0.938, main_title, ha="left", va="top", fontsize=10.5, color=TEXT)
+    fig.text(0.08, 0.916, subtitle, ha="left", va="top", fontsize=8.6, color=MUTED)
 
-    ax.axhline(
-        0,
-        color="#9aa2ae",
-        linewidth=0.8,
-    )
+    ax.legend(loc="upper right", frameon=False, fontsize=8.5)
 
-    ax.axvline(
-        0,
-        color="#9aa2ae",
-        linewidth=0.8,
-    )
-
-    ax.set_aspect(
-        "equal",
-        adjustable="box",
-    )
-
-    ax.set_xlabel(
-        "u wind (kt)",
-        color=TEXT,
-        fontsize=10,
-    )
-
-    ax.set_ylabel(
-        "v wind (kt)",
-        color=TEXT,
-        fontsize=10,
-    )
-
-    ax.tick_params(
-        colors=TEXT,
-        labelsize=9,
-    )
-
-    for spine in (
-        ax.spines.values()
-    ):
-        spine.set_color(
-            "#b7bec9"
-        )
-
-        spine.set_linewidth(
-            0.8
-        )
-
-    main_title, subtitle = (
-        title_text(profile)
-    )
-
-    fig.text(
-        0.08,
-        0.965,
-        "Hodograph",
-        ha="left",
-        va="top",
-        fontsize=15,
-        fontweight="bold",
-        color=TEXT,
-    )
-
-    fig.text(
-        0.08,
-        0.938,
-        main_title,
-        ha="left",
-        va="top",
-        fontsize=10.5,
-        color=TEXT,
-    )
-
-    ax.legend(
-        loc="upper right",
-        frameon=False,
-        fontsize=8.5,
-    )
-
-    # Compact diagnostics footer.
-    srh = (
-        metpy.get(
-            "srh",
-            {},
-        )
-        if isinstance(
-            metpy,
-            dict,
-        )
-        else {}
-    )
-
+    srh = metpy.get("srh", {}) if isinstance(metpy, dict) else {}
     footer = []
-
-    s06 = (
-        metpy.get(
-            "shear_0_6km_ms"
-        )
-        if isinstance(
-            metpy,
-            dict,
-        )
-        else None
-    )
-
+    s06 = metpy.get("shear_0_6km_ms") if isinstance(metpy, dict) else None
     if valid_number(s06):
-        footer.append(
-            (
-                "0–6 km shear "
-                f"{float(s06):.1f} m/s"
-            )
-        )
-
-    if isinstance(
-        srh,
-        dict,
-    ):
-        srh3 = srh.get(
-            "0_3km_right_mover"
-        )
-
-        if (
-            isinstance(
-                srh3,
-                dict,
-            )
-            and valid_number(
-                srh3.get(
-                    "total_m2s2"
-                )
-            )
-        ):
-            footer.append(
-                (
-                    "0–3 km SRH "
-                    f"{float(srh3['total_m2s2']):.0f} "
-                    "m²/s²"
-                )
-            )
-
+        footer.append(f"0–6 km shear {float(s06):.1f} m/s")
+    if isinstance(srh, dict):
+        srh3 = srh.get("0_3km_right_mover")
+        if isinstance(srh3, dict) and valid_number(srh3.get("total_m2s2")):
+            footer.append(f"0–3 km SRH {float(srh3['total_m2s2']):.0f} m²/s²")
     if footer:
-        fig.text(
-            0.5,
-            0.035,
-            "   ·   ".join(
-                footer
-            ),
-            ha="center",
-            va="center",
-            fontsize=8.5,
-            color=MUTED,
-        )
+        fig.text(0.5, 0.035, "   ·   ".join(footer), ha="center", va="center", fontsize=8.5, color=MUTED)
 
-    destination = Path(
-        destination
-    )
-
-    destination.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    fig.savefig(
-        destination,
-        dpi=DPI,
-        bbox_inches="tight",
-        facecolor=BG,
-        pad_inches=0.18,
-    )
-
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(destination, dpi=DPI, bbox_inches="tight", facecolor=BG, pad_inches=0.18)
     plt.close(fig)
 
 
@@ -1302,201 +681,58 @@ def render_hodograph(
 # MAIN
 # ---------------------------------------------------------------------
 
-def render_all(
-    profile,
-    outdir="diagnostics",
-):
-    outdir = Path(
-        outdir
-    )
+def render_all(profile, outdir="diagnostics"):
+    outdir = Path(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    paths = output_paths(profile, outdir)
 
-    outdir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+    render_skewt(profile, paths["archive_skewt"])
+    render_skewt_zoom(profile, paths["archive_skewt_zoom"])
+    render_thetae(profile, paths["archive_thetae"])
+    render_hodograph(profile, paths["archive_hodograph"])
 
-    paths = output_paths(
-        profile,
-        outdir,
-    )
-
-    render_skewt(
-        profile,
-        paths[
-            "archive_skewt"
-        ],
-    )
-
-    render_hodograph(
-        profile,
-        paths[
-            "archive_hodograph"
-        ],
-    )
-
-    shutil.copy2(
-        paths[
-            "archive_skewt"
-        ],
-        paths[
-            "latest_skewt"
-        ],
-    )
-
-    shutil.copy2(
-        paths[
-            "archive_hodograph"
-        ],
-        paths[
-            "latest_hodograph"
-        ],
-    )
+    shutil.copy2(paths["archive_skewt"], paths["latest_skewt"])
+    shutil.copy2(paths["archive_skewt_zoom"], paths["latest_skewt_zoom"])
+    shutil.copy2(paths["archive_thetae"], paths["latest_thetae"])
+    shutil.copy2(paths["archive_hodograph"], paths["latest_hodograph"])
 
     manifest = {
-        "station":
-            profile.get(
-                "station"
-            ),
-
-        "station_name":
-            profile.get(
-                "station_name"
-            ),
-
-        "nominal_date":
-            profile.get(
-                "nominal_date"
-            ),
-
-        "term":
-            profile.get(
-                "term"
-            ),
-
-        "launch_time":
-            profile.get(
-                "launch_time"
-            ),
-
-        "processed_at":
-            profile.get(
-                "processed_at"
-            ),
-
-        "skewt":
-            str(
-                paths[
-                    "latest_skewt"
-                ]
-            ).replace(
-                os.sep,
-                "/",
-            ),
-
-        "hodograph":
-            str(
-                paths[
-                    "latest_hodograph"
-                ]
-            ).replace(
-                os.sep,
-                "/",
-            ),
-
-        "archive_skewt":
-            str(
-                paths[
-                    "archive_skewt"
-                ]
-            ).replace(
-                os.sep,
-                "/",
-            ),
-
-        "archive_hodograph":
-            str(
-                paths[
-                    "archive_hodograph"
-                ]
-            ).replace(
-                os.sep,
-                "/",
-            ),
+        "station": profile.get("station"),
+        "station_name": profile.get("station_name"),
+        "nominal_date": profile.get("nominal_date"),
+        "term": profile.get("term"),
+        "launch_time": profile.get("launch_time"),
+        "processed_at": profile.get("processed_at"),
+        "skewt": str(paths["latest_skewt"]).replace(os.sep, "/"),
+        "skewt_zoom": str(paths["latest_skewt_zoom"]).replace(os.sep, "/"),
+        "thetae": str(paths["latest_thetae"]).replace(os.sep, "/"),
+        "hodograph": str(paths["latest_hodograph"]).replace(os.sep, "/"),
+        "archive_skewt": str(paths["archive_skewt"]).replace(os.sep, "/"),
+        "archive_skewt_zoom": str(paths["archive_skewt_zoom"]).replace(os.sep, "/"),
+        "archive_thetae": str(paths["archive_thetae"]).replace(os.sep, "/"),
+        "archive_hodograph": str(paths["archive_hodograph"]).replace(os.sep, "/"),
     }
 
-    with open(
-        paths["manifest"],
-        "w",
-        encoding="utf-8",
-    ) as f:
-        json.dump(
-            manifest,
-            f,
-            ensure_ascii=False,
-            indent=2,
-        )
+    with open(paths["manifest"], "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
 
-    print(
-        "Rendered:",
-        paths[
-            "latest_skewt"
-        ],
-    )
-
-    print(
-        "Rendered:",
-        paths[
-            "latest_hodograph"
-        ],
-    )
-
-    print(
-        "Manifest:",
-        paths[
-            "manifest"
-        ],
-    )
+    print("Rendered:", paths["latest_skewt"])
+    print("Rendered:", paths["latest_skewt_zoom"])
+    print("Rendered:", paths["latest_thetae"])
+    print("Rendered:", paths["latest_hodograph"])
+    print("Manifest:", paths["manifest"])
 
     return paths
 
 
 def main():
-    parser = (
-        argparse.ArgumentParser(
-            description=(
-                "Render static LJLM "
-                "Skew-T and hodograph "
-                "PNG products."
-            )
-        )
-    )
-
-    parser.add_argument(
-        "--input",
-        default=
-            "data/latest.json",
-        help=(
-            "Processed LJLM "
-            "sounding JSON."
-        ),
-    )
-
-    parser.add_argument(
-        "--outdir",
-        default="diagnostics",
-        help="Output directory.",
-    )
-
+    parser = argparse.ArgumentParser(description="Render static LJLM sounding graphics.")
+    parser.add_argument("--input", default="data/latest.json", help="Processed LJLM sounding JSON.")
+    parser.add_argument("--outdir", default="diagnostics", help="Output directory.")
     args = parser.parse_args()
 
-    profile = load_profile(
-        args.input
-    )
-
-    render_all(
-        profile,
-        args.outdir,
-    )
+    profile = load_profile(args.input)
+    render_all(profile, args.outdir)
 
 
 if __name__ == "__main__":
