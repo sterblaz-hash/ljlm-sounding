@@ -2,15 +2,15 @@
   "station": 14015,
   "station_name": "Ljubljana",
   "nominal_date": "2026-09-26",
-  "term": "00",
-  "launch_time": "2026-09-25T23:30:00Z",
-  "processed_at": "2026-09-26T01:57:43.574490Z",
+  "term": "12",
+  "launch_time": "2026-09-26T11:30:00Z",
+  "processed_at": "2026-09-26T12:58:45.208397Z",
   "skewt": "diagnostics/latest_skewt.png",
   "skewt_zoom": "diagnostics/latest_skewt_zoom.png",
   "thetae": "diagnostics/latest_thetae.png",
   "hodograph": "diagnostics/latest_hodograph.png",
-  "archive_skewt": "diagnostics/2026/09/20260926_00_skewt.png",
-  "archive_skewt_zoom": "diagnostics/2026/09/20260926_00_skewt_zoom.png",
-  "archive_thetae": "diagnostics/2026/09/20260926_00_thetae.png",
-  "archive_hodograph": "diagnostics/2026/09/20260926_00_hodograph.png"
+  "archive_skewt": "diagnostics/2026/09/20260926_12_skewt.png",
+  "archive_skewt_zoom": "diagnostics/2026/09/20260926_12_skewt_zoom.png",
+  "archive_thetae": "diagnostics/2026/09/20260926_12_thetae.png",
+  "archive_hodograph": "diagnostics/2026/09/20260926_12_hodograph.png"
 }
