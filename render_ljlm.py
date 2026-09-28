@@ -332,14 +332,14 @@ def _dynamic_lowlevel_temp_limits(t: np.ndarray, td: np.ndarray):
 
 
 def _lowlevel_barb_pressures(surface_p: float, top_p: float = 700.0):
-    """Dense low-level wind sampling, about every 10 hPa."""
+    """Very dense low-level wind sampling, about every 5 hPa."""
     result = [surface_p]
-    p = math.floor(surface_p / 10.0) * 10.0
+    p = math.floor(surface_p / 5.0) * 5.0
     while p >= top_p:
-        if p < surface_p - 0.5:
+        if p < surface_p - 0.25:
             result.append(p)
-        p -= 10.0
-    if not any(abs(x - top_p) < 1.0 for x in result):
+        p -= 5.0
+    if not any(abs(x - top_p) < 0.6 for x in result):
         result.append(float(top_p))
     return sorted(set(round(x, 2) for x in result), reverse=True)
 
@@ -446,12 +446,12 @@ def render_skewt(data: dict, output: Path):
     td = td_values * units.degC
 
     # More breathing room at the top and right than in v1.
-    fig = plt.figure(figsize=(8.6, 7.6), dpi=170)
+    fig = plt.figure(figsize=(8.3, 8.0), dpi=170)
     fig.subplots_adjust(
         left=0.075,
         right=0.77,
-        top=0.835,
-        bottom=0.11,
+        top=0.88,
+        bottom=0.10,
     )
     skew = SkewT(fig, rotation=45)
     ax = skew.ax
@@ -559,15 +559,11 @@ def render_skewt(data: dict, output: Path):
                 clip_on=False,
             )
 
-    temp_candidates = np.concatenate([
-        profile.t_c[visible][np.isfinite(profile.t_c[visible])],
-        profile.td_c[visible][np.isfinite(profile.td_c[visible])],
-    ])
-    if temp_candidates.size:
-        xmin = math.floor((np.nanmin(temp_candidates) - 7) / 5.0) * 5.0
-        xmax = math.ceil((np.nanmax(temp_candidates) + 8) / 5.0) * 5.0
-    else:
-        xmin, xmax = -40, 35
+    # IMPORTANT: on a Skew-T the x-axis is a skewed coordinate.  It should
+    # not be expanded to encompass the coldest upper-air dew point.  Doing
+    # that (e.g. to -100 C) forces MetPy's fixed Skew-T aspect to compress
+    # the plotting box vertically.  Keep a conventional operational window.
+    xmin, xmax = -40.0, 40.0
 
     ax.set_ylim(p_bottom, p_top)
     ax.set_xlim(xmin, xmax)
@@ -582,19 +578,19 @@ def render_skewt(data: dict, output: Path):
 
     # Figure-level headings prevent title/legend/subtitle collisions.
     fig.text(
-        0.075, 0.975, "Operational Skew-T",
+        0.075, 0.982, "Operational Skew-T",
         ha="left", va="top",
         fontsize=15, fontweight="semibold", color=INK,
     )
     fig.text(
-        0.075, 0.940,
+        0.075, 0.952,
         f"{station} ({station_id})  ·  {nominal}  ·  launch {launch}",
         ha="left", va="top",
         fontsize=9.6, color=MUTED,
     )
-    fig.text(0.805, 0.875, "Wind", ha="left", va="top",
+    fig.text(0.805, 0.906, "Wind", ha="left", va="top",
              fontsize=9.0, color=MUTED)
-    fig.text(0.895, 0.875, "Height AGL", ha="left", va="top",
+    fig.text(0.895, 0.906, "Height AGL", ha="left", va="top",
              fontsize=9.0, color=MUTED)
 
     handles, labels = ax.get_legend_handles_labels()
@@ -602,7 +598,7 @@ def render_skewt(data: dict, output: Path):
         leg = fig.legend(
             handles, labels,
             loc="upper left",
-            bbox_to_anchor=(0.31, 0.895),
+            bbox_to_anchor=(0.30, 0.922),
             frameon=False,
             ncol=3, fontsize=8.7,
             handlelength=2.4, columnspacing=1.0,
@@ -707,7 +703,7 @@ def render_lowlevel(data: dict, output: Path):
             xbarb, np.asarray(wind_targets)[good],
             (ui[good] * units("m/s")).to("knots").magnitude,
             (vi[good] * units("m/s")).to("knots").magnitude,
-            length=4.25, linewidth=0.56, color=INK,
+            length=3.7, linewidth=0.48, color=INK,
             pivot="middle",
         )
 
