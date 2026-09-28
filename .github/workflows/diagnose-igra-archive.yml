@@ -1,14 +1,15 @@
-name: Diagnose IGRA archive
+name: QC IGRA outliers
 
 on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  diagnose:
+  qc:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -19,28 +20,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Run IGRA diagnostic
+      - name: Install dependencies
         run: |
-          python diagnose_igra_archive.py
+          python -m pip install --upgrade pip
+          python -m pip install --retries 10 --timeout 60 -r requirements.txt
 
-      - name: Show diagnostic files
-        run: |
-          echo "=== diagnostics ==="
-          ls -lh diagnostics
-          echo
-          echo "=== yearly resolution ==="
-          cat diagnostics/igra_resolution_by_year.csv
-
-      - name: Commit diagnostics
-        run: |
-          if git diff --quiet -- diagnostics; then
-            echo "No diagnostic changes to commit."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add diagnostics
-          git commit -m "Add IGRA archive resolution diagnostics"
-          git push
+      - name: Inspect IGRA outliers
+        run: python inspect_igra_outliers.py
