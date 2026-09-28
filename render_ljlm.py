@@ -430,6 +430,43 @@ def _robust_thetae_negative_layers(z_km: np.ndarray, thetae_k: np.ndarray):
             merged.append([base, top])
     return merged
 
+
+def _lowlevel_x_config(t: np.ndarray, td: np.ndarray):
+    """Choose single vs broken x-axis for the low-level profile."""
+    t_vals = t[np.isfinite(t)]
+    td_vals = td[np.isfinite(td)]
+    vals = np.concatenate([t_vals, td_vals]) if td_vals.size else t_vals
+
+    if vals.size == 0:
+        return {"mode": "single", "xlim": (-20.0, 20.0)}
+
+    full_min = math.floor((float(np.nanmin(vals)) - 1.5) / 2.5) * 2.5
+    full_max = math.ceil((float(np.nanmax(vals)) + 1.5) / 2.5) * 2.5
+
+    if td_vals.size == 0 or t_vals.size == 0:
+        return {"mode": "single", "xlim": (full_min, full_max)}
+
+    temp_min = float(np.nanmin(t_vals))
+    td_min = float(np.nanmin(td_vals))
+
+    # If dew point extends much colder than temperature, use a broken axis:
+    # left panel = cold Td tail, right panel = main thermo structure.
+    if td_min < temp_min - 6.0:
+        right_min = math.floor((temp_min - 2.0) / 2.5) * 2.5
+        right_max = full_max
+        left_min = full_min
+        left_max = min(right_min - 2.5, math.ceil((temp_min - 3.0) / 2.5) * 2.5)
+
+        if left_max - left_min >= 5 and right_max - right_min >= 10:
+            return {
+                "mode": "broken",
+                "left": (left_min, left_max),
+                "right": (right_min, right_max),
+            }
+
+    return {"mode": "single", "xlim": (full_min, full_max)}
+
+
 # -----------------------------------------------------------------------------
 # RENDERERS
 # -----------------------------------------------------------------------------
@@ -538,8 +575,8 @@ def render_skewt(data: dict, output: Path):
             (ui[good] * units("m/s")).to("knots"),
             (vi[good] * units("m/s")).to("knots"),
             xloc=1.045,
-            sizes={"emptybarb": 0.07, "spacing": 0.17, "height": 0.32},
-            linewidth=0.70,
+            sizes={"emptybarb": 0.06, "spacing": 0.15, "height": 0.28},
+            linewidth=0.62,
             color=INK,
         )
 
@@ -638,6 +675,7 @@ def render_skewt(data: dict, output: Path):
     plt.close(fig)
 
 
+
 def render_lowlevel(data: dict, output: Path):
     profile = _clean_profile(data.get("levels", []))
     surface_p, p_bottom, _ = _plot_pressure_bounds(profile)
@@ -648,50 +686,71 @@ def render_lowlevel(data: dict, output: Path):
     t = profile.t_c[visible]
     td = profile.td_c[visible]
 
-    # Three truly separate columns:
-    # thermodynamic profile | wind | height
-    fig = plt.figure(figsize=(7.9, 7.1), dpi=170)
-    ax = fig.add_axes([0.10, 0.10, 0.60, 0.76])
-    ax_wind = fig.add_axes([0.715, 0.10, 0.085, 0.76], sharey=ax)
-    ax_height = fig.add_axes([0.815, 0.10, 0.14, 0.76], sharey=ax)
+    xcfg = _lowlevel_x_config(t, td)
+    broken = xcfg["mode"] == "broken"
 
-    ax.set_facecolor(BG)
-    ax_wind.set_facecolor(BG)
-    ax_height.set_facecolor(BG)
+    fig = plt.figure(figsize=(8.3, 7.2), dpi=170)
 
-    for layer in _inversion_layers(data):
-        bp = layer.get("base_pressure_hpa")
-        tp = layer.get("top_pressure_hpa")
-        if _finite(bp) and _finite(tp):
-            bp, tp = float(bp), float(tp)
-            if tp <= p_bottom and bp >= p_top:
-                ax.axhspan(
-                    tp, bp,
-                    facecolor=INV_FILL, edgecolor="none",
-                    alpha=0.06, zorder=0,
-                )
+    if broken:
+        ax_left = fig.add_axes([0.08, 0.10, 0.18, 0.78])
+        ax_right = fig.add_axes([0.29, 0.10, 0.42, 0.78], sharey=ax_left)
+        thermo_axes = (ax_left, ax_right)
+        ax_wind = fig.add_axes([0.735, 0.10, 0.08, 0.78], sharey=ax_left)
+        ax_height = fig.add_axes([0.83, 0.10, 0.12, 0.78], sharey=ax_left)
+    else:
+        ax_left = None
+        ax_right = fig.add_axes([0.10, 0.10, 0.60, 0.78])
+        thermo_axes = (ax_right,)
+        ax_wind = fig.add_axes([0.72, 0.10, 0.08, 0.78], sharey=ax_right)
+        ax_height = fig.add_axes([0.82, 0.10, 0.12, 0.78], sharey=ax_right)
 
-    ax.plot(t, p, color=TEMP, linewidth=2.35, label="Temperature")
-    td_mask = np.isfinite(td)
-    if td_mask.any():
-        ax.plot(td[td_mask], p[td_mask], color=DEW,
-                linewidth=2.15, label="Dew point")
+    for ax in thermo_axes + (ax_wind, ax_height):
+        ax.set_facecolor(BG)
 
-    # Dynamic thermodynamic range only from observed T/Td.
-    xmin, xmax = _dynamic_lowlevel_temp_limits(t, td)
-    ax.set_xlim(xmin, xmax)
+    for ax in thermo_axes:
+        for layer in _inversion_layers(data):
+            bp = layer.get("base_pressure_hpa")
+            tp = layer.get("top_pressure_hpa")
+            if _finite(bp) and _finite(tp):
+                bp, tp = float(bp), float(tp)
+                if tp <= p_bottom and bp >= p_top:
+                    ax.axhspan(tp, bp, facecolor=INV_FILL, edgecolor="none",
+                               alpha=0.06, zorder=0)
+
+        ax.plot(t, p, color=TEMP, linewidth=2.35, label="Temperature")
+        td_mask = np.isfinite(td)
+        if td_mask.any():
+            ax.plot(td[td_mask], p[td_mask], color=DEW, linewidth=2.15, label="Dew point")
+
+    if broken:
+        ax_left.set_xlim(*xcfg["left"])
+        ax_right.set_xlim(*xcfg["right"])
+
+        ax_left.spines["right"].set_visible(False)
+        ax_right.spines["left"].set_visible(False)
+        ax_right.tick_params(labelleft=False, left=False)
+
+        d = 0.008
+        kwargs = dict(transform=ax_left.transAxes, color=MUTED, clip_on=False, lw=1.0)
+        ax_left.plot((1 - d, 1 + d), (-d, +d), **kwargs)
+        ax_left.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)
+
+        kwargs = dict(transform=ax_right.transAxes, color=MUTED, clip_on=False, lw=1.0)
+        ax_right.plot((-d, +d), (-d, +d), **kwargs)
+        ax_right.plot((-d, +d), (1 - d, 1 + d), **kwargs)
+    else:
+        ax_right.set_xlim(*xcfg["xlim"])
 
     major_pressures = [
         x for x in (1000, 950, 925, 900, 850, 800, 750, 700)
         if p_top <= x <= p_bottom
     ]
-    for lev in major_pressures:
-        ax.axhline(
-            lev, color=GRID_MAJOR, lw=0.72,
-            ls=(0, (4, 4)), zorder=0
-        )
+    for ax in thermo_axes:
+        for lev in major_pressures:
+            ax.axhline(lev, color=GRID_MAJOR, lw=0.72, ls=(0, (4, 4)), zorder=0)
+        ax.grid(True, axis="x", color=GRID, linewidth=0.5, alpha=0.85)
+        ax.set_ylim(p_bottom, p_top)
 
-    # Dense wind barbs every ~25 hPa.
     u_ms, v_ms = _wind_components(profile)
     wind_targets = _lowlevel_barb_pressures(surface_p, p_top)
     ui = _interp_logp(profile.p_hpa, u_ms, wind_targets)
@@ -703,75 +762,58 @@ def render_lowlevel(data: dict, output: Path):
             xbarb, np.asarray(wind_targets)[good],
             (ui[good] * units("m/s")).to("knots").magnitude,
             (vi[good] * units("m/s")).to("knots").magnitude,
-            length=3.7, linewidth=0.48, color=INK,
-            pivot="middle",
+            length=3.7, linewidth=0.48, color=INK, pivot="middle",
         )
 
-    # Height labels every 50 hPa, plus 925 hPa.
-    height_targets = [
-        x for x in (950, 925, 900, 850, 800, 750, 700)
-        if p_top <= x <= surface_p
-    ]
+    height_targets = [x for x in (950, 925, 900, 850, 800, 750, 700) if p_top <= x <= surface_p]
     heights_agl = _pressure_to_agl_km(profile, height_targets)
     for lev, hgt in zip(height_targets, heights_agl):
         if _finite(hgt):
-            ax_height.text(
-                0.02, lev, f"{hgt:.2f} km",
-                ha="left", va="center",
-                fontsize=8.3, color=MUTED,
-            )
+            ax_height.text(0.02, lev, f"{hgt:.2f} km", ha="left", va="center",
+                           fontsize=8.3, color=MUTED)
 
-    # Same vertical extent on all columns.
-    for a in (ax, ax_wind, ax_height):
-        a.set_ylim(p_bottom, p_top)
+    if broken:
+        ax_left.set_ylabel("Pressure (hPa)")
+        ax_left.set_yticks(major_pressures)
+        ax_right.set_xlabel("")
+        ax_left.set_xlabel("")
+        legend_ax = ax_left
+    else:
+        ax_right.set_ylabel("Pressure (hPa)")
+        ax_right.set_yticks(major_pressures)
+        ax_right.set_xlabel("Temperature / dew point (°C)")
+        legend_ax = ax_right
 
-    ax.set_xlabel("Temperature / dew point (°C)")
-    ax.set_ylabel("Pressure (hPa)")
-    ax.set_yticks(major_pressures)
-    ax.grid(True, axis="x", color=GRID, linewidth=0.5, alpha=0.85)
+    legend = legend_ax.legend(loc="upper left", frameon=False, fontsize=8.8)
+    for txt in legend.get_texts():
+        txt.set_color(MUTED)
 
-    # Clean auxiliary columns.
     for a in (ax_wind, ax_height):
+        a.set_ylim(p_bottom, p_top)
         a.set_xlim(0, 1)
-        a.tick_params(
-            left=False, labelleft=False,
-            bottom=False, labelbottom=False,
-            right=False, labelright=False,
-        )
+        a.tick_params(left=False, labelleft=False, bottom=False, labelbottom=False,
+                      right=False, labelright=False)
         for spine in a.spines.values():
             spine.set_visible(False)
 
-    # Subtle divider between thermo and wind columns.
     ax_wind.axvline(0.03, color=GRID_MAJOR, lw=0.7)
 
     station = data.get("station_name", "Ljubljana")
     station_id = data.get("station", 14015)
     nominal = _nominal_title(data)
 
-    fig.text(
-        0.10, 0.965,
-        "Low-level thermodynamic profile · surface–700 hPa",
-        ha="left", va="top",
-        fontsize=14.5, fontweight="semibold", color=INK,
-    )
-    fig.text(
-        0.10, 0.930,
-        f"{station} ({station_id})  ·  {nominal}",
-        ha="left", va="top",
-        fontsize=9.5, color=MUTED,
-    )
-    fig.text(0.728, 0.930, "Wind (kt)", ha="left", va="top",
+    fig.text(0.08, 0.965, "Low-level thermodynamic profile · surface–700 hPa",
+             ha="left", va="top", fontsize=14.5, fontweight="semibold", color=INK)
+    fig.text(0.08, 0.930, f"{station} ({station_id})  ·  {nominal}",
+             ha="left", va="top", fontsize=9.5, color=MUTED)
+    fig.text(0.742, 0.930, "Wind (kt)", ha="left", va="top",
              fontsize=9.0, color=MUTED)
-    fig.text(0.823, 0.930, "Height AGL", ha="left", va="top",
+    fig.text(0.832, 0.930, "Height AGL", ha="left", va="top",
              fontsize=9.0, color=MUTED)
 
-    legend = ax.legend(
-        loc="upper left",
-        frameon=False,
-        fontsize=8.8,
-    )
-    for txt in legend.get_texts():
-        txt.set_color(MUTED)
+    if broken:
+        fig.text(0.39, 0.06, "Temperature / dew point (°C)",
+                 ha="center", va="top", fontsize=10, color=INK)
 
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
