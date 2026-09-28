@@ -870,7 +870,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-09-27T11:30:00Z",
       "profile_level_count": 1772,
-      "scanned_at": "2026-09-28T09:02:13.931127Z"
+      "scanned_at": "2026-09-28T09:18:02.857278Z"
     },
     "Z__C_EDZW_20260927123310_bda01%2Ctemp_bufr_999999_999999__MW_955.bin": {
       "contains_ljlm": false,
@@ -892,7 +892,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-09-27T11:30:00Z",
       "profile_level_count": 2211,
-      "scanned_at": "2026-09-28T09:02:08.705595Z"
+      "scanned_at": "2026-09-28T09:17:59.056645Z"
     },
     "Z__C_EDZW_20260927124604_bda01%2Ctemp_bufr_999999_999999__MW_960.bin": {
       "contains_ljlm": false,
@@ -1290,7 +1290,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-09-27T23:30:00Z",
       "profile_level_count": 1749,
-      "scanned_at": "2026-09-28T09:02:02.596197Z"
+      "scanned_at": "2026-09-28T09:17:53.908786Z"
     },
     "Z__C_EDZW_20260928003001_bda01%2Ctemp_bufr_999999_999999__MW_059.bin": {
       "contains_ljlm": false,
@@ -1320,7 +1320,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-09-27T23:30:00Z",
       "profile_level_count": 2271,
-      "scanned_at": "2026-09-28T09:01:55.622384Z"
+      "scanned_at": "2026-09-28T09:17:48.638217Z"
     },
     "Z__C_EDZW_20260928004716_bda01%2Ctemp_bufr_999999_999999__MW_066.bin": {
       "contains_ljlm": false,
@@ -1625,8 +1625,16 @@
     "Z__C_EDZW_20260928081930_bda01%2Ctemp_bufr_999999_999999__MW_141.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-09-28T08:44:08.506586Z"
+    },
+    "Z__C_EDZW_20260928085720_bda01%2Ctemp_bufr_999999_999999__MW_142.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-09-28T09:17:43.630736Z"
+    },
+    "Z__C_EDZW_20260928090803_bda01%2Ctemp_bufr_999999_999999__MW_143.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-09-28T09:17:42.692769Z"
     }
   },
-  "updated_at": "2026-09-28T09:02:13.931423Z",
+  "updated_at": "2026-09-28T09:18:02.857659Z",
   "version": 1
 }
