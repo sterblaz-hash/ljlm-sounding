@@ -1,0 +1,74 @@
+name: Test ICON-D2 sounding sources
+
+on:
+  workflow_dispatch:
+    inputs:
+      lead_hours:
+        description: "Forecast lead in hours (0 is best for the first source test)"
+        required: true
+        default: "0"
+      top_hpa:
+        description: "Top of DWD native profile in hPa"
+        required: true
+        default: "150"
+
+permissions:
+  contents: read
+
+jobs:
+  test-sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Open-Meteo vs DWD-native test
+        run: |
+          python test_icon_d2_sources.py \
+            --obs data/latest.json \
+            --lead "${{ inputs.lead_hours }}" \
+            --top-hpa "${{ inputs.top_hpa }}" \
+            --output-dir test/icon_d2_sources
+
+      - name: Show comparison summary
+        if: always()
+        run: |
+          if [ -f test/icon_d2_sources/source_comparison.json ]; then
+            python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("test/icon_d2_sources/source_comparison.json")
+          d = json.loads(p.read_text())
+          print(json.dumps({
+              "run_time": d.get("run_time"),
+              "valid_time": d.get("valid_time"),
+              "lead_hours": d.get("lead_hours"),
+              "vertical_resolution": d.get("vertical_resolution"),
+              "source_timing": d.get("source_timing"),
+              "rmse_standard_levels": d.get("rmse_standard_levels"),
+              "synoptic": d.get("synoptic"),
+          }, indent=2))
+          PY
+          fi
+
+      - name: Upload test outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: icon-d2-source-test
+          path: test/icon_d2_sources/
+          if-no-files-found: warn
+          retention-days: 14
