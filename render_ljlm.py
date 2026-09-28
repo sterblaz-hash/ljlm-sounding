@@ -258,8 +258,14 @@ def _latest_paths(diagnostics_root: Path):
 def _plot_pressure_bounds(profile: Profile):
     surface_p = float(np.nanmax(profile.p_hpa))
     p_bottom = min(1050.0, math.ceil(surface_p / 10.0) * 10.0)
+
+    # Use the conventional 100 hPa top when the ascent reaches it.
     min_p = float(np.nanmin(profile.p_hpa))
-    p_top = max(200.0, math.floor(min_p / 25.0) * 25.0)
+    if min_p <= 100.0:
+        p_top = 100.0
+    else:
+        p_top = max(100.0, math.floor(min_p / 25.0) * 25.0)
+
     return surface_p, p_bottom, p_top
 
 
@@ -323,6 +329,19 @@ def _dynamic_lowlevel_temp_limits(t: np.ndarray, td: np.ndarray):
         xmax = math.ceil((mid + 7.5) / 2.5) * 2.5
 
     return xmin, xmax
+
+
+def _lowlevel_barb_pressures(surface_p: float, top_p: float = 700.0):
+    """Very dense low-level wind sampling, about every 20 hPa."""
+    result = [surface_p]
+    p = math.floor(surface_p / 20.0) * 20.0
+    while p >= top_p:
+        if p < surface_p - 1.0:
+            result.append(p)
+        p -= 20.0
+    if not any(abs(x - top_p) < 2.0 for x in result):
+        result.append(float(top_p))
+    return sorted(set(round(x, 2) for x in result), reverse=True)
 
 
 def _dense_barb_pressures(surface_p: float, top_p: float):
@@ -427,8 +446,8 @@ def render_skewt(data: dict, output: Path):
     td = td_values * units.degC
 
     # More breathing room at the top and right than in v1.
-    fig = plt.figure(figsize=(8.4, 7.6), dpi=170)
-    skew = SkewT(fig, rotation=45, rect=(0.08, 0.13, 0.68, 0.72))
+    fig = plt.figure(figsize=(8.4, 8.2), dpi=170)
+    skew = SkewT(fig, rotation=45, rect=(0.08, 0.105, 0.70, 0.77))
     ax = skew.ax
     ax.set_facecolor(BG)
 
@@ -494,7 +513,7 @@ def render_skewt(data: dict, output: Path):
     except Exception as exc:
         print("Skew-T parcel warning:", exc)
 
-    for level in (925, 850, 700, 500, 300, 200):
+    for level in (925, 850, 700, 500, 300, 200, 150, 100):
         if p_top <= level <= p_bottom:
             ax.axhline(
                 level, color=GRID_MAJOR, lw=0.7,
@@ -520,7 +539,7 @@ def render_skewt(data: dict, output: Path):
 
     # Height labels: independent column, not mixed with wind.
     height_targets = [
-        x for x in (925, 850, 700, 500, 300, 200)
+        x for x in (925, 850, 700, 500, 300, 200, 150, 100)
         if p_top <= x <= p_bottom
     ]
     heights_agl = _pressure_to_agl_km(profile, height_targets)
@@ -557,19 +576,19 @@ def render_skewt(data: dict, output: Path):
 
     # Figure-level headings prevent title/legend/subtitle collisions.
     fig.text(
-        0.08, 0.965, "Operational Skew-T",
+        0.08, 0.975, "Operational Skew-T",
         ha="left", va="top",
         fontsize=15, fontweight="semibold", color=INK,
     )
     fig.text(
-        0.08, 0.930,
+        0.08, 0.945,
         f"{station} ({station_id})  ·  {nominal}  ·  launch {launch}",
         ha="left", va="top",
         fontsize=9.6, color=MUTED,
     )
-    fig.text(0.785, 0.930, "Wind", ha="left", va="top",
+    fig.text(0.805, 0.905, "Wind", ha="left", va="top",
              fontsize=9.0, color=MUTED)
-    fig.text(0.885, 0.930, "Height AGL", ha="left", va="top",
+    fig.text(0.895, 0.905, "Height AGL", ha="left", va="top",
              fontsize=9.0, color=MUTED)
 
     handles, labels = ax.get_legend_handles_labels()
@@ -577,7 +596,7 @@ def render_skewt(data: dict, output: Path):
         leg = fig.legend(
             handles, labels,
             loc="upper left",
-            bbox_to_anchor=(0.34, 0.943),
+            bbox_to_anchor=(0.30, 0.916),
             frameon=False,
             ncol=3, fontsize=8.7,
             handlelength=2.4, columnspacing=1.0,
@@ -606,7 +625,7 @@ def render_skewt(data: dict, output: Path):
         )
     if footer:
         fig.text(
-            0.08, 0.045, "   ·   ".join(footer),
+            0.08, 0.035, "   ·   ".join(footer),
             ha="left", va="bottom",
             fontsize=8.7, color=MUTED,
         )
@@ -672,7 +691,7 @@ def render_lowlevel(data: dict, output: Path):
 
     # Dense wind barbs every ~25 hPa.
     u_ms, v_ms = _wind_components(profile)
-    wind_targets = _dense_barb_pressures(surface_p, p_top)
+    wind_targets = _lowlevel_barb_pressures(surface_p, p_top)
     ui = _interp_logp(profile.p_hpa, u_ms, wind_targets)
     vi = _interp_logp(profile.p_hpa, v_ms, wind_targets)
     good = np.isfinite(ui) & np.isfinite(vi)
@@ -682,7 +701,7 @@ def render_lowlevel(data: dict, output: Path):
             xbarb, np.asarray(wind_targets)[good],
             (ui[good] * units("m/s")).to("knots").magnitude,
             (vi[good] * units("m/s")).to("knots").magnitude,
-            length=5.0, linewidth=0.68, color=INK,
+            length=4.6, linewidth=0.62, color=INK,
             pivot="middle",
         )
 
