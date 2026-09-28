@@ -1,19 +1,25 @@
-name: QC IGRA outliers
+name: Build IGRA historical archive
 
 on:
   workflow_dispatch: {}
 
+concurrency:
+  group: build-igra-historical-archive
+  cancel-in-progress: false
+
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  qc:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -25,5 +31,93 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --retries 10 --timeout 60 -r requirements.txt
 
-      - name: Inspect IGRA outliers
-        run: python inspect_igra_outliers.py
+      - name: Build historical IGRA archive
+        run: |
+          python build_igra_archive.py
+
+      - name: Validate archive
+        run: |
+          python - <<'PY'
+          import gzip
+          import json
+          from pathlib import Path
+
+          s = Path("historical/igra_1996_2025_summary.json")
+          p = Path("historical/igra_1996_2025_profiles.json.gz")
+          r = Path("historical/igra_build_report.json")
+          c = Path("climatology/daily_climatology.json")
+
+          assert s.exists(), "summary missing"
+          assert p.exists(), "profiles archive missing"
+          assert r.exists(), "build report missing"
+          assert c.exists(), "climatology missing"
+
+          summary = json.loads(s.read_text(encoding="utf-8"))
+          report = json.loads(r.read_text(encoding="utf-8"))
+          climatology = json.loads(c.read_text(encoding="utf-8"))
+
+          with gzip.open(p, "rt", encoding="utf-8") as f:
+              profiles = json.load(f)
+
+          n1 = summary["profile_count"]
+          n2 = len(summary["profiles"])
+          n3 = len(profiles["profiles"])
+
+          print("Summary profiles:", n1)
+          print("Summary array:", n2)
+          print("Detailed profiles:", n3)
+          print("Resolution classes:", report.get("resolution_classes"))
+          print("Errors:", report.get("errors"))
+          print("Error types:", report.get("error_types", {}))
+          print("QC counts:", report.get("qc_counts", {}))
+          print("Climatology schema:", climatology.get("schema_version"))
+
+          assert n1 == n2 == n3
+          assert n1 > 9000
+          assert report.get("errors") == 0
+
+          first = summary["profiles"][0]
+          assert first["source"]["dataset"] == "NOAA IGRA v2"
+          assert "resolution" in first
+          assert "standard_levels" in first
+          assert "observed_stable_layers" in first["parameters"]
+
+          assert climatology.get("schema_version") in {
+              "ljlm-daily-climatology-v2",
+              "ljlm-daily-climatology-v3",
+          }
+          assert len(climatology.get("days", [])) == 365
+
+          print("Validation OK")
+          PY
+
+      - name: Commit historical archive and climatology
+        shell: bash
+        run: |
+          set -e
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Stage FIRST. `git diff` alone does not see brand-new untracked files.
+          git add -A climatology
+
+          # Force-add the generated historical archive too, including .json.gz
+          # in case a repository-wide *.gz rule is present in .gitignore.
+          git add -f \
+            historical/igra_1996_2025_summary.json \
+            historical/igra_1996_2025_profiles.json.gz \
+            historical/igra_build_report.json
+
+          echo "=== Staged files ==="
+          git status --short
+
+          if git diff --cached --quiet; then
+            echo "No historical archive or climatology changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Build 1996-2025 IGRA historical archive and climatology"
+
+          git pull --rebase --autostash origin main
+          git push origin HEAD:main
