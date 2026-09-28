@@ -37,6 +37,7 @@ import os
 import re
 import statistics
 import urllib.request
+import warnings
 import zipfile
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
@@ -523,38 +524,138 @@ def calc_shear(levels, depth_m):
 
 
 def calc_ivt(levels):
-    rows = []
-    for l in levels:
-        if all(finite(l.get(k)) for k in
-               ("pressure_hpa", "temperature_c", "dewpoint_c", "wind_speed_ms", "wind_direction_deg")):
-            p = float(l["pressure_hpa"])
-            if 300 <= p <= 1050:
-                u, v = uv_from_speed_dir(l["wind_speed_ms"], l["wind_direction_deg"])
-                try:
-                    q = float(
-                        specific_humidity_from_dewpoint(
-                            p * units.hPa, float(l["dewpoint_c"]) * units.degC
-                        ).to("dimensionless").m
-                    )
-                    rows.append((p, q, u, v))
-                except Exception:
-                    pass
-    rows.sort(reverse=True)
-    if len(rows) < 4:
-        return {"magnitude_kg_m_s": None, "status": "insufficient_points"}
-    pmax, pmin = rows[0][0], rows[-1][0]
-    if pmax < 850 or pmin > 400:
-        return {"magnitude_kg_m_s": None, "status": "insufficient_vertical_coverage"}
+    """
+    Integrated vapour transport magnitude/components.
 
-    p_pa = np.array([r[0] * 100.0 for r in rows])
-    qu = np.array([r[1] * r[2] for r in rows])
-    qv = np.array([r[1] * r[3] for r in rows])
-    # Pressure decreases with index; integrate in increasing pressure and divide by g.
-    iu = float(np.trapezoid(qu[::-1], p_pa[::-1]) / G)
-    iv = float(np.trapezoid(qv[::-1], p_pa[::-1]) / G)
+    Historical IGRA often reports thermodynamic and wind significant levels
+    separately.  Requiring Td and wind on the SAME raw level discards most
+    otherwise usable profiles, so we use valid dew-point pressure levels as
+    the integration grid and interpolate vector wind (u/v) to those pressures.
+
+    IVT = 1/g * integral(q * V dp)
+    """
+
+    samples = []
+
+    # Thermodynamic pressure levels form the integration grid.
+    for l in levels:
+        if not (
+            finite(l.get("pressure_hpa"))
+            and finite(l.get("dewpoint_c"))
+        ):
+            continue
+
+        p = float(l["pressure_hpa"])
+
+        if not (300 <= p <= 1050):
+            continue
+
+        uv = wind_at_pressure(
+            levels,
+            p,
+            max_gap_hpa=250,
+        )
+
+        if not uv:
+            continue
+
+        u, v = uv
+
+        try:
+            q = float(
+                specific_humidity_from_dewpoint(
+                    p * units.hPa,
+                    float(l["dewpoint_c"]) * units.degC,
+                ).to("dimensionless").m
+            )
+        except Exception:
+            continue
+
+        if not all(map(math.isfinite, (p, q, u, v))):
+            continue
+
+        samples.append((p, q, float(u), float(v)))
+
+    if len(samples) < 4:
+        return {
+            "magnitude_kg_m_s": None,
+            "status": "insufficient_points",
+        }
+
+    # Remove duplicate pressure levels.
+    by_pressure = {}
+    for p, q, u, v in samples:
+        by_pressure[round(p, 2)] = (p, q, u, v)
+
+    rows = list(by_pressure.values())
+    rows.sort(reverse=True)
+
+    if len(rows) < 4:
+        return {
+            "magnitude_kg_m_s": None,
+            "status": "insufficient_points",
+        }
+
+    pmax, pmin = rows[0][0], rows[-1][0]
+
+    # Conservative coverage criterion.
+    if pmax < 850 or pmin > 400:
+        return {
+            "magnitude_kg_m_s": None,
+            "status": "insufficient_vertical_coverage",
+        }
+
+    p_pa = np.array(
+        [r[0] * 100.0 for r in rows],
+        dtype=float,
+    )
+    qu = np.array(
+        [r[1] * r[2] for r in rows],
+        dtype=float,
+    )
+    qv = np.array(
+        [r[1] * r[3] for r in rows],
+        dtype=float,
+    )
+
+    try:
+        # Pressure decreases with index. Reverse to integrate over increasing p.
+        # np.trapezoid exists in NumPy >=2; np.trapz is required by NumPy 1.26.
+        integrate = getattr(np, "trapezoid", np.trapz)
+
+        iu = float(
+            integrate(qu[::-1], p_pa[::-1]) / G
+        )
+        iv = float(
+            integrate(qv[::-1], p_pa[::-1]) / G
+        )
+    except Exception as e:
+        return {
+            "magnitude_kg_m_s": None,
+            "status": f"error:{type(e).__name__}",
+        }
+
     mag = math.hypot(iu, iv)
-    # Direction TOWARD which moisture is transported, consistent with current sounding output.
-    toward = (math.degrees(math.atan2(iu, iv)) + 360) % 360
+
+    if not math.isfinite(mag):
+        return {
+            "magnitude_kg_m_s": None,
+            "status": "non_finite_result",
+        }
+
+    # Very broad physical sanity check only.
+    if mag < 0 or mag > 3000:
+        return {
+            "magnitude_kg_m_s": None,
+            "status": "out_of_range",
+        }
+
+    # Direction TOWARD which moisture is transported.
+    toward = (
+        math.degrees(math.atan2(iu, iv))
+        + 360
+    ) % 360
+
     return {
         "u_kg_m_s": round(iu, 2),
         "v_kg_m_s": round(iv, 2),
@@ -562,6 +663,7 @@ def calc_ivt(levels):
         "toward_direction_deg": round(toward, 1),
         "bottom_pressure_hpa": round(pmax, 1),
         "top_pressure_hpa": round(pmin, 1),
+        "integration_points": len(rows),
         "status": "ok",
     }
 
@@ -604,46 +706,117 @@ def cape_qc(rows):
 def calc_convective(levels):
     rows = thermo_arrays(levels)
     good, status = cape_qc(rows)
+
     out = {
         "qc_status": status,
-        "sbcape_jkg": None, "sbcin_jkg": None,
-        "mlcape_jkg": None, "mlcin_jkg": None,
-        "mucape_jkg": None, "mucin_jkg": None,
+        "sbcape_jkg": None,
+        "sbcin_jkg": None,
+        "mlcape_jkg": None,
+        "mlcin_jkg": None,
+        "mucape_jkg": None,
+        "mucin_jkg": None,
         "lifted_index_c": None,
     }
+
     if not good:
         return out
 
     try:
-        p = np.array([r["pressure_hpa"] for r in rows]) * units.hPa
-        t = np.array([r["temperature_c"] for r in rows]) * units.degC
-        td = np.array([r["dewpoint_c"] for r in rows]) * units.degC
+        p = np.array(
+            [r["pressure_hpa"] for r in rows]
+        ) * units.hPa
 
-        sbcape, sbcin = surface_based_cape_cin(p, t, td)
-        mlcape, mlcin = mixed_layer_cape_cin(p, t, td, depth=100 * units.hPa)
-        mucape, mucin = most_unstable_cape_cin(p, t, td, depth=300 * units.hPa)
+        t = np.array(
+            [r["temperature_c"] for r in rows]
+        ) * units.degC
+
+        td = np.array(
+            [r["dewpoint_c"] for r in rows]
+        ) * units.degC
+
+        # Sparse historical IGRA profiles can trigger harmless MetPy
+        # "Interpolation point out of data bounds" warnings.  The profile-level
+        # QC above remains authoritative; suppress only the warning spam.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Interpolation point out of data bounds encountered",
+                category=UserWarning,
+            )
+
+            sbcape, sbcin = surface_based_cape_cin(
+                p, t, td
+            )
+
+            mlcape, mlcin = mixed_layer_cape_cin(
+                p,
+                t,
+                td,
+                depth=100 * units.hPa,
+            )
+
+            mucape, mucin = most_unstable_cape_cin(
+                p,
+                t,
+                td,
+                depth=300 * units.hPa,
+            )
+
+            prof = parcel_profile(
+                p,
+                t[0],
+                td[0],
+            )
+
+            li = lifted_index(
+                p,
+                t,
+                prof,
+            )
 
         def capeval(q):
-            v = float(q.to("joule / kilogram").m)
-            return round(max(0.0, v), 2)
+            v = float(
+                q.to("joule / kilogram").m
+            )
+            return round(
+                max(0.0, v),
+                2,
+            )
 
         def cinval(q):
-            return round(float(q.to("joule / kilogram").m), 2)
+            return round(
+                float(
+                    q.to("joule / kilogram").m
+                ),
+                2,
+            )
 
         out.update({
-            "sbcape_jkg": capeval(sbcape), "sbcin_jkg": cinval(sbcin),
-            "mlcape_jkg": capeval(mlcape), "mlcin_jkg": cinval(mlcin),
-            "mucape_jkg": capeval(mucape), "mucin_jkg": cinval(mucin),
+            "sbcape_jkg": capeval(sbcape),
+            "sbcin_jkg": cinval(sbcin),
+            "mlcape_jkg": capeval(mlcape),
+            "mlcin_jkg": cinval(mlcin),
+            "mucape_jkg": capeval(mucape),
+            "mucin_jkg": cinval(mucin),
         })
 
-        # Classical surface-parcel LI at 500 hPa. MetPy returns array-like quantity.
-        prof = parcel_profile(p, t[0], td[0])
-        li = lifted_index(p, t, prof)
-        liv = np.asarray(li.to("delta_degC").m).reshape(-1)
+        liv = np.asarray(
+            li.to("delta_degC").m
+        ).reshape(-1)
+
         if len(liv) and np.isfinite(liv[0]):
-            out["lifted_index_c"] = round(float(liv[0]), 2)
+            out["lifted_index_c"] = round(
+                float(liv[0]),
+                2,
+            )
+
+        out["qc_status"] = "ok"
+
     except Exception as e:
-        out["qc_status"] = f"error:{type(e).__name__}"
+        out["qc_status"] = (
+            f"error:{type(e).__name__}"
+        )
+
     return out
 
 
@@ -671,7 +844,7 @@ def build_profile(p, idx):
     pid = f"IGRA_{nominal:%Y%m%d_%H}_{idx:05d}"
 
     return {
-        "schema_version": "igra-historical-v2",
+        "schema_version": "igra-historical-v3",
         "profile_id": pid,
         "station": {
             "wmo": "14015",
@@ -842,7 +1015,7 @@ def build_climatology(records):
                 days[i]["parameters"][field][f"p{q}_smoothed"] = val
 
     return {
-        "schema_version": "ljlm-daily-climatology-v2",
+        "schema_version": "ljlm-daily-climatology-v3",
         "station": {"wmo": "14015", "igra_id": STATION_ID, "name": "Ljubljana/Bežigrad"},
         "period": f"{START_YEAR}-{END_YEAR}",
         "method": {
@@ -891,7 +1064,7 @@ def main():
             print(f"Processed {idx}/{len(parsed)}")
 
     summary_doc = {
-        "schema_version": "igra-historical-summary-v2",
+        "schema_version": "igra-historical-summary-v3",
         "station": {"wmo": "14015", "igra_id": STATION_ID, "name": "Ljubljana/Bežigrad"},
         "period": f"{START_YEAR}-{END_YEAR}",
         "profile_count": len(summaries),
@@ -905,7 +1078,7 @@ def main():
 
     with gzip.open(PROFILES_PATH, "wt", encoding="utf-8", compresslevel=6) as f:
         json.dump({
-            "schema_version": "igra-historical-profiles-v2",
+            "schema_version": "igra-historical-profiles-v3",
             "profile_count": len(full_profiles),
             "profiles": full_profiles,
         }, f, ensure_ascii=False, separators=(",", ":"))
@@ -914,9 +1087,15 @@ def main():
     with open(CLIM_PATH, "w", encoding="utf-8") as f:
         json.dump(climatology, f, ensure_ascii=False, separators=(",", ":"))
 
+    error_types = Counter(
+        item["error"].split(":", 1)[0]
+        for item in errors
+    )
+
     report = {
         "built": len(full_profiles),
         "errors": len(errors),
+        "error_types": dict(error_types),
         "error_details": errors[:100],
         "duplicates_removed": duplicates,
         "resolution_classes": dict(resolution),
@@ -942,6 +1121,7 @@ def main():
     print("=" * 72)
     print("Built:", len(full_profiles))
     print("Errors:", len(errors))
+    print("Error types:", dict(error_types))
     print("Resolution classes:", dict(resolution))
     print("QC counts:", report["qc_counts"])
     print(f"Summary:     {SUMMARY_PATH} ({SUMMARY_PATH.stat().st_size/1024/1024:.2f} MB)")
