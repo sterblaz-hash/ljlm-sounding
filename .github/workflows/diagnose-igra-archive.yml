@@ -1,4 +1,4 @@
-name: QC IGRA outliers
+name: Diagnose IGRA archive
 
 on:
   workflow_dispatch: {}
