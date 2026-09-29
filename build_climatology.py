@@ -59,6 +59,7 @@ PARAMETERS = [
     "shear_0_1km_ms",
     "shear_0_3km_ms",
     "shear_0_6km_ms",
+    "shear_sfc_700_ms",
     "z500_m",
     "thickness_1000_500_m",
     "thickness_925_500_m",
@@ -91,6 +92,7 @@ PARAMETER_METADATA = {
     "shear_0_1km_ms": {"label": "Bulk shear 0–1 km", "unit": "m/s"},
     "shear_0_3km_ms": {"label": "Bulk shear 0–3 km", "unit": "m/s"},
     "shear_0_6km_ms": {"label": "Bulk shear 0–6 km", "unit": "m/s"},
+    "shear_sfc_700_ms": {"label": "Bulk shear surface–700 hPa", "unit": "m/s"},
     "z500_m": {"label": "Z500", "unit": "m"},
     "thickness_1000_500_m": {"label": "1000–500 hPa thickness", "unit": "m"},
     "thickness_925_500_m": {"label": "925–500 hPa thickness", "unit": "m"},
@@ -823,6 +825,63 @@ def bulk_shear(levels, depth_m):
     return shear
 
 
+
+def surface_to_pressure_shear(levels, target_pressure):
+    """
+    Vector bulk shear from the lowest valid wind level to a pressure surface.
+
+    The lowest valid wind observation is accepted only when it lies within
+    500 m of the sounding base. The top wind is obtained by u/v interpolation
+    in log-pressure coordinates using the same pressure-gap QC as the
+    standard-level wind diagnostics.
+    """
+
+    wind_rows = [
+        x for x in levels
+        if valid_number(x.get("height_m"))
+        and valid_number(x.get("pressure_hpa"))
+        and valid_number(x.get("u_ms"))
+        and valid_number(x.get("v_ms"))
+    ]
+
+    if len(wind_rows) < 2:
+        return None
+
+    wind_rows.sort(key=lambda x: x["height_m"])
+
+    surface = wind_rows[0]
+    surface_z = float(surface["height_m"])
+
+    all_heights = [
+        float(x["height_m"])
+        for x in levels
+        if valid_number(x.get("height_m"))
+    ]
+
+    if all_heights and surface_z - min(all_heights) > 500:
+        return None
+
+    surface_pressure = float(surface["pressure_hpa"])
+    if surface_pressure <= float(target_pressure):
+        return None
+
+    u_top = interpolate_pressure(levels, "u_ms", target_pressure)
+    v_top = interpolate_pressure(levels, "v_ms", target_pressure)
+
+    if u_top is None or v_top is None:
+        return None
+
+    du = float(u_top) - float(surface["u_ms"])
+    dv = float(v_top) - float(surface["v_ms"])
+
+    shear = math.hypot(du, dv)
+
+    if not math.isfinite(shear) or shear < 0 or shear > 120:
+        return None
+
+    return shear
+
+
 def calculate_ivt(levels):
     """
     IVT magnitude:
@@ -1042,6 +1101,13 @@ def calculate_profile_parameters(profile):
     result["shear_0_1km_ms"] = bulk_shear(levels, 1000)
     result["shear_0_3km_ms"] = bulk_shear(levels, 3000)
     result["shear_0_6km_ms"] = bulk_shear(levels, 6000)
+
+    # Robust historical lower-tropospheric analogue.
+    # Kept separate from true 0–3 km AGL shear.
+    result["shear_sfc_700_ms"] = surface_to_pressure_shear(
+        levels,
+        700,
+    )
 
     # Synoptic / thickness
     result["z500_m"] = geopotential_height_at_pressure(levels, 500)
@@ -1389,6 +1455,73 @@ def print_qc(records):
                 maximum["date"],
             )
 
+    # Primerjava strogega 0–3 km AGL striga z robustnejšim
+    # surface–700 hPa strigom.
+    shear_pairs = [
+        (
+            float(r["shear_0_3km_ms"]),
+            float(r["shear_sfc_700_ms"]),
+        )
+        for r in records
+        if valid_number(r.get("shear_0_3km_ms"))
+        and valid_number(r.get("shear_sfc_700_ms"))
+    ]
+
+    print()
+    print("=" * 72)
+    print("SHEAR QC COMPARISON")
+    print("=" * 72)
+
+    n_03 = sum(
+        1 for r in records
+        if valid_number(r.get("shear_0_3km_ms"))
+    )
+    n_sfc700 = sum(
+        1 for r in records
+        if valid_number(r.get("shear_sfc_700_ms"))
+    )
+
+    print("  0–3 km valid:", n_03)
+    print("  surface–700 hPa valid:", n_sfc700)
+    print("  overlap:", len(shear_pairs))
+
+    if shear_pairs:
+        arr = np.asarray(shear_pairs, dtype=float)
+        differences = arr[:, 1] - arr[:, 0]
+
+        print(
+            "  mean(sfc–700 minus 0–3 km):",
+            round(float(np.mean(differences)), 2),
+            "m/s",
+        )
+        print(
+            "  median difference:",
+            round(float(np.median(differences)), 2),
+            "m/s",
+        )
+
+        p10, p50, p90 = np.percentile(differences, [10, 50, 90])
+        print(
+            "  difference P10/P50/P90:",
+            round(float(p10), 2),
+            "/",
+            round(float(p50), 2),
+            "/",
+            round(float(p90), 2),
+            "m/s",
+        )
+
+        if (
+            len(shear_pairs) >= 2
+            and np.std(arr[:, 0]) > 0
+            and np.std(arr[:, 1]) > 0
+        ):
+            correlation = np.corrcoef(arr[:, 0], arr[:, 1])[0, 1]
+            print(
+                "  correlation:",
+                round(float(correlation), 3),
+            )
+
     # Poseben MUCAPE pregled.
     cape = np.asarray(
         [
@@ -1521,7 +1654,9 @@ def main():
             ),
             "shear_method": (
                 "Vector bulk shear from the lowest valid wind level to "
-                "1, 3 and 6 km AGL using linear interpolation in height."
+                "1, 3 and 6 km AGL using linear interpolation in height. "
+                "Surface–700 hPa shear is stored separately and uses "
+                "log-pressure interpolation of u/v at 700 hPa."
             ),
             "ivt_method": (
                 "Magnitude of 1/g integral(q*V dp), using IGRA dewpoint levels "
