@@ -22962,7 +22962,7 @@
   "source": "DWD Open Data BUFR",
   "source_file": "Z__C_EDZW_20260929123511_bda01,temp_bufr_999999_999999__MW_372.bin",
   "retrieved_at": "2026-09-29T13:05:16.077256Z",
-  "processed_at": "2026-09-29T13:18:25.611304Z",
+  "processed_at": "2026-09-29T13:47:32.334545Z",
   "term": "12",
   "nominal_date": "2026-09-29",
   "sounding_classification": {
@@ -23025,6 +23025,446 @@
         "cape_corrections": []
       },
       "pwat_mm": 16.83,
+      "moisture_transport": {
+        "humidity_profile": {
+          "surface": {
+            "pressure_hpa": 991.5,
+            "height_m": 299.0,
+            "specific_humidity_gkg": 8.03,
+            "mixing_ratio_gkg": 8.1,
+            "method": "lowest_common_profile_level"
+          },
+          "925": {
+            "pressure_hpa": 925.0,
+            "specific_humidity_gkg": 7.57,
+            "mixing_ratio_gkg": 7.63,
+            "method": "log_pressure_interpolation"
+          },
+          "850": {
+            "pressure_hpa": 850.0,
+            "specific_humidity_gkg": 3.89,
+            "mixing_ratio_gkg": 3.9,
+            "method": "measured"
+          },
+          "700": {
+            "pressure_hpa": 700.0,
+            "specific_humidity_gkg": 0.24,
+            "mixing_ratio_gkg": 0.24,
+            "method": "measured"
+          },
+          "surface_to_925": {
+            "delta_q_925_minus_surface_gkg": -0.46,
+            "delta_mixing_ratio_925_minus_surface_gkg": -0.47
+          }
+        },
+        "point_moisture_transport": {
+          "925": {
+            "pressure_hpa": 925.0,
+            "specific_humidity_gkg": 7.57,
+            "wind_speed_ms": 2.35,
+            "wind_u_ms": -2.25,
+            "wind_v_ms": 0.67,
+            "qv_magnitude_kgkg_ms": 0.01778,
+            "qv_u_kgkg_ms": -0.01704,
+            "qv_v_kgkg_ms": 0.00508,
+            "qv_magnitude_gkg_ms": 17.78,
+            "qv_u_gkg_ms": -17.04,
+            "qv_v_gkg_ms": 5.08,
+            "transport_to_direction_deg": 286.6,
+            "method": "log_pressure_interpolation"
+          },
+          "850": {
+            "pressure_hpa": 850.0,
+            "specific_humidity_gkg": 3.89,
+            "wind_speed_ms": 4.4,
+            "wind_u_ms": -1.86,
+            "wind_v_ms": 3.99,
+            "qv_magnitude_kgkg_ms": 0.0171,
+            "qv_u_kgkg_ms": -0.00723,
+            "qv_v_kgkg_ms": 0.0155,
+            "qv_magnitude_gkg_ms": 17.1,
+            "qv_u_gkg_ms": -7.23,
+            "qv_v_gkg_ms": 15.5,
+            "transport_to_direction_deg": 335.0,
+            "method": "measured"
+          },
+          "700": {
+            "pressure_hpa": 700.0,
+            "specific_humidity_gkg": 0.24,
+            "wind_speed_ms": 1.6,
+            "wind_u_ms": -0.39,
+            "wind_v_ms": -1.55,
+            "qv_magnitude_kgkg_ms": 0.00038,
+            "qv_u_kgkg_ms": -9e-05,
+            "qv_v_kgkg_ms": -0.00037,
+            "qv_magnitude_gkg_ms": 0.38,
+            "qv_u_gkg_ms": -0.09,
+            "qv_v_gkg_ms": -0.37,
+            "transport_to_direction_deg": 194.0,
+            "method": "measured"
+          }
+        },
+        "moisture_transport_850": {
+          "pressure_hpa": 850.0,
+          "specific_humidity_gkg": 3.89,
+          "wind_speed_ms": 4.4,
+          "wind_u_ms": -1.86,
+          "wind_v_ms": 3.99,
+          "qv_magnitude_kgkg_ms": 0.0171,
+          "qv_u_kgkg_ms": -0.00723,
+          "qv_v_kgkg_ms": 0.0155,
+          "qv_magnitude_gkg_ms": 17.1,
+          "qv_u_gkg_ms": -7.23,
+          "qv_v_gkg_ms": 15.5,
+          "transport_to_direction_deg": 335.0,
+          "method": "measured"
+        },
+        "ivt": {
+          "available": true,
+          "bottom_pressure_hpa": 991.5,
+          "top_pressure_hpa": 300.0,
+          "magnitude_kg_m1_s1": 20.6,
+          "u_kg_m1_s1": -19.0,
+          "v_kg_m1_s1": 8.0,
+          "transport_to_direction_deg": 292.7,
+          "sample_count": 983,
+          "max_pressure_gap_hpa": 3.7,
+          "integration": "pressure_coordinate_trapezoidal",
+          "formula": "IVT=(1/g)*integral(q*V dp)",
+          "layer": "lowest_common_level_to_300hpa"
+        },
+        "layer_ivt": {
+          "surface_850": {
+            "available": true,
+            "bottom_pressure_hpa": 991.5,
+            "top_pressure_hpa": 850.0,
+            "magnitude_kg_m1_s1": 23.4,
+            "u_kg_m1_s1": -21.3,
+            "v_kg_m1_s1": 9.6,
+            "transport_to_direction_deg": 294.3,
+            "sample_count": 103,
+            "max_pressure_gap_hpa": 3.7,
+            "integration": "pressure_coordinate_trapezoidal",
+            "formula": "IVT=(1/g)*integral(q*V dp)"
+          },
+          "surface_700": {
+            "available": true,
+            "bottom_pressure_hpa": 991.5,
+            "top_pressure_hpa": 700.0,
+            "magnitude_kg_m1_s1": 21.2,
+            "u_kg_m1_s1": -17.0,
+            "v_kg_m1_s1": 12.7,
+            "transport_to_direction_deg": 306.9,
+            "sample_count": 264,
+            "max_pressure_gap_hpa": 3.7,
+            "integration": "pressure_coordinate_trapezoidal",
+            "formula": "IVT=(1/g)*integral(q*V dp)"
+          },
+          "850_700": {
+            "available": true,
+            "bottom_pressure_hpa": 850.0,
+            "top_pressure_hpa": 700.0,
+            "magnitude_kg_m1_s1": 5.3,
+            "u_kg_m1_s1": 4.4,
+            "v_kg_m1_s1": 3.1,
+            "transport_to_direction_deg": 54.7,
+            "sample_count": 162,
+            "max_pressure_gap_hpa": 1.7,
+            "integration": "pressure_coordinate_trapezoidal",
+            "formula": "IVT=(1/g)*integral(q*V dp)"
+          },
+          "700_500": {
+            "available": true,
+            "bottom_pressure_hpa": 700.0,
+            "top_pressure_hpa": 500.0,
+            "magnitude_kg_m1_s1": 3.2,
+            "u_kg_m1_s1": -1.6,
+            "v_kg_m1_s1": -2.8,
+            "transport_to_direction_deg": 209.1,
+            "sample_count": 274,
+            "max_pressure_gap_hpa": 1.2,
+            "integration": "pressure_coordinate_trapezoidal",
+            "formula": "IVT=(1/g)*integral(q*V dp)"
+          }
+        },
+        "orographic_cross_barrier": {
+          "available": true,
+          "version": 1,
+          "vector_convention": "u positive east, v positive north; azimuth clockwise from north; positive signed_cross_barrier means transport toward the barrier",
+          "interpretation": "upslope is max(0, signed cross-barrier transport). This is a moisture-transport diagnostic, not a direct rainfall forecast.",
+          "barriers": {
+            "dinaric_west": {
+              "label": "Dinaric barrier – Trnovski gozd / Nanos / Snežnik",
+              "upslope_normal_azimuth_deg": 45.0,
+              "method": "literature_based_v1",
+              "ivt": {
+                "total": {
+                  "signed_cross_barrier_kg_m1_s1": -7.8,
+                  "upslope_kg_m1_s1": 0.0,
+                  "signed_fraction": -0.378,
+                  "upslope_fraction": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 112.2
+                },
+                "surface_850": {
+                  "signed_cross_barrier_kg_m1_s1": -8.3,
+                  "upslope_kg_m1_s1": 0.0,
+                  "signed_fraction": -0.354,
+                  "upslope_fraction": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 110.7
+                },
+                "surface_700": {
+                  "signed_cross_barrier_kg_m1_s1": -3.0,
+                  "upslope_kg_m1_s1": 0.0,
+                  "signed_fraction": -0.143,
+                  "upslope_fraction": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 98.2
+                },
+                "850_700": {
+                  "signed_cross_barrier_kg_m1_s1": 5.3,
+                  "upslope_kg_m1_s1": 5.3,
+                  "signed_fraction": 1.001,
+                  "upslope_fraction": 1.001,
+                  "upslope_fraction_pct": 100.1,
+                  "angle_to_upslope_normal_deg": 0.0
+                },
+                "700_500": {
+                  "signed_cross_barrier_kg_m1_s1": -3.1,
+                  "upslope_kg_m1_s1": 0.0,
+                  "signed_fraction": -0.972,
+                  "upslope_fraction": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 166.5
+                }
+              },
+              "point_moisture_flux": {
+                "925": {
+                  "signed_cross_barrier_gkg_ms": -8.46,
+                  "upslope_gkg_ms": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 118.4
+                },
+                "850": {
+                  "signed_cross_barrier_gkg_ms": 5.85,
+                  "upslope_gkg_ms": 5.85,
+                  "upslope_fraction_pct": 34.2,
+                  "angle_to_upslope_normal_deg": 70.0
+                },
+                "700": {
+                  "signed_cross_barrier_gkg_ms": -0.33,
+                  "upslope_gkg_ms": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 148.9
+                }
+              }
+            },
+            "julian_south": {
+              "label": "Southern Julian Alps – Tolmin / Bohinj sector",
+              "upslope_normal_azimuth_deg": 45.0,
+              "method": "literature_based_v1",
+              "ivt": {
+                "total": {
+                  "signed_cross_barrier_kg_m1_s1": -7.8,
+                  "upslope_kg_m1_s1": 0.0,
+                  "signed_fraction": -0.378,
+                  "upslope_fraction": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 112.2
+                },
+                "surface_850": {
+                  "signed_cross_barrier_kg_m1_s1": -8.3,
+                  "upslope_kg_m1_s1": 0.0,
+                  "signed_fraction": -0.354,
+                  "upslope_fraction": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 110.7
+                },
+                "surface_700": {
+                  "signed_cross_barrier_kg_m1_s1": -3.0,
+                  "upslope_kg_m1_s1": 0.0,
+                  "signed_fraction": -0.143,
+                  "upslope_fraction": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 98.2
+                },
+                "850_700": {
+                  "signed_cross_barrier_kg_m1_s1": 5.3,
+                  "upslope_kg_m1_s1": 5.3,
+                  "signed_fraction": 1.001,
+                  "upslope_fraction": 1.001,
+                  "upslope_fraction_pct": 100.1,
+                  "angle_to_upslope_normal_deg": 0.0
+                },
+                "700_500": {
+                  "signed_cross_barrier_kg_m1_s1": -3.1,
+                  "upslope_kg_m1_s1": 0.0,
+                  "signed_fraction": -0.972,
+                  "upslope_fraction": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 166.5
+                }
+              },
+              "point_moisture_flux": {
+                "925": {
+                  "signed_cross_barrier_gkg_ms": -8.46,
+                  "upslope_gkg_ms": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 118.4
+                },
+                "850": {
+                  "signed_cross_barrier_gkg_ms": 5.85,
+                  "upslope_gkg_ms": 5.85,
+                  "upslope_fraction_pct": 34.2,
+                  "angle_to_upslope_normal_deg": 70.0
+                },
+                "700": {
+                  "signed_cross_barrier_gkg_ms": -0.33,
+                  "upslope_gkg_ms": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 148.9
+                }
+              }
+            },
+            "julian_central": {
+              "label": "Central Julian Alps",
+              "upslope_normal_azimuth_deg": 10.0,
+              "method": "literature_based_v1",
+              "ivt": {
+                "total": {
+                  "signed_cross_barrier_kg_m1_s1": 4.6,
+                  "upslope_kg_m1_s1": 4.6,
+                  "signed_fraction": 0.222,
+                  "upslope_fraction": 0.222,
+                  "upslope_fraction_pct": 22.2,
+                  "angle_to_upslope_normal_deg": 77.2
+                },
+                "surface_850": {
+                  "signed_cross_barrier_kg_m1_s1": 5.8,
+                  "upslope_kg_m1_s1": 5.8,
+                  "signed_fraction": 0.246,
+                  "upslope_fraction": 0.246,
+                  "upslope_fraction_pct": 24.6,
+                  "angle_to_upslope_normal_deg": 75.8
+                },
+                "surface_700": {
+                  "signed_cross_barrier_kg_m1_s1": 9.6,
+                  "upslope_kg_m1_s1": 9.6,
+                  "signed_fraction": 0.451,
+                  "upslope_fraction": 0.451,
+                  "upslope_fraction_pct": 45.1,
+                  "angle_to_upslope_normal_deg": 63.2
+                },
+                "850_700": {
+                  "signed_cross_barrier_kg_m1_s1": 3.8,
+                  "upslope_kg_m1_s1": 3.8,
+                  "signed_fraction": 0.72,
+                  "upslope_fraction": 0.72,
+                  "upslope_fraction_pct": 72.0,
+                  "angle_to_upslope_normal_deg": 43.9
+                },
+                "700_500": {
+                  "signed_cross_barrier_kg_m1_s1": -3.0,
+                  "upslope_kg_m1_s1": 0.0,
+                  "signed_fraction": -0.949,
+                  "upslope_fraction": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 161.5
+                }
+              },
+              "point_moisture_flux": {
+                "925": {
+                  "signed_cross_barrier_gkg_ms": 2.04,
+                  "upslope_gkg_ms": 2.04,
+                  "upslope_fraction_pct": 11.5,
+                  "angle_to_upslope_normal_deg": 83.4
+                },
+                "850": {
+                  "signed_cross_barrier_gkg_ms": 14.01,
+                  "upslope_gkg_ms": 14.01,
+                  "upslope_fraction_pct": 81.9,
+                  "angle_to_upslope_normal_deg": 35.0
+                },
+                "700": {
+                  "signed_cross_barrier_gkg_ms": -0.38,
+                  "upslope_gkg_ms": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 180.0
+                }
+              }
+            },
+            "kamnik_savinja": {
+              "label": "Kamnik–Savinja Alps",
+              "upslope_normal_azimuth_deg": 0.0,
+              "method": "literature_based_v1",
+              "ivt": {
+                "total": {
+                  "signed_cross_barrier_kg_m1_s1": 8.0,
+                  "upslope_kg_m1_s1": 8.0,
+                  "signed_fraction": 0.388,
+                  "upslope_fraction": 0.388,
+                  "upslope_fraction_pct": 38.8,
+                  "angle_to_upslope_normal_deg": 67.1
+                },
+                "surface_850": {
+                  "signed_cross_barrier_kg_m1_s1": 9.6,
+                  "upslope_kg_m1_s1": 9.6,
+                  "signed_fraction": 0.41,
+                  "upslope_fraction": 0.41,
+                  "upslope_fraction_pct": 41.0,
+                  "angle_to_upslope_normal_deg": 65.8
+                },
+                "surface_700": {
+                  "signed_cross_barrier_kg_m1_s1": 12.7,
+                  "upslope_kg_m1_s1": 12.7,
+                  "signed_fraction": 0.599,
+                  "upslope_fraction": 0.599,
+                  "upslope_fraction_pct": 59.9,
+                  "angle_to_upslope_normal_deg": 53.2
+                },
+                "850_700": {
+                  "signed_cross_barrier_kg_m1_s1": 3.1,
+                  "upslope_kg_m1_s1": 3.1,
+                  "signed_fraction": 0.585,
+                  "upslope_fraction": 0.585,
+                  "upslope_fraction_pct": 58.5,
+                  "angle_to_upslope_normal_deg": 54.2
+                },
+                "700_500": {
+                  "signed_cross_barrier_kg_m1_s1": -2.8,
+                  "upslope_kg_m1_s1": 0.0,
+                  "signed_fraction": -0.875,
+                  "upslope_fraction": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 151.0
+                }
+              },
+              "point_moisture_flux": {
+                "925": {
+                  "signed_cross_barrier_gkg_ms": 5.08,
+                  "upslope_gkg_ms": 5.08,
+                  "upslope_fraction_pct": 28.6,
+                  "angle_to_upslope_normal_deg": 73.4
+                },
+                "850": {
+                  "signed_cross_barrier_gkg_ms": 15.5,
+                  "upslope_gkg_ms": 15.5,
+                  "upslope_fraction_pct": 90.6,
+                  "angle_to_upslope_normal_deg": 25.0
+                },
+                "700": {
+                  "signed_cross_barrier_gkg_ms": -0.37,
+                  "upslope_gkg_ms": 0.0,
+                  "upslope_fraction_pct": 0.0,
+                  "angle_to_upslope_normal_deg": 166.8
+                }
+              }
+            }
+          }
+        },
+        "available": true
+      },
       "lcl_pressure_hpa": 821.48,
       "lcl_temperature_c": 7.78,
       "lcl_height_msl_m": 1885.0,
@@ -23323,6 +23763,78 @@
           "fraction_gt_100": 0.1293,
           "fraction_gt_500": 0.0308,
           "fraction_gt_1000": 0.0037
+        },
+        "q_surface_gkg": {
+          "value": 8.03,
+          "percentile": 56.2,
+          "n": 728,
+          "p10": 5.47,
+          "p50": 7.83,
+          "p90": 10.32,
+          "p95": 10.99,
+          "p99": 11.99,
+          "historical_min": 0.32,
+          "historical_min_date": "2018-09-17",
+          "historical_max": 13.28,
+          "historical_max_date": "2022-09-15",
+          "fraction_gt_0": null,
+          "fraction_gt_100": null,
+          "fraction_gt_500": null,
+          "fraction_gt_1000": null
+        },
+        "q925_gkg": {
+          "value": 7.57,
+          "percentile": 55.9,
+          "n": 726,
+          "p10": 4.79,
+          "p50": 7.36,
+          "p90": 10.01,
+          "p95": 10.55,
+          "p99": 11.62,
+          "historical_min": 0.73,
+          "historical_min_date": "2011-09-17",
+          "historical_max": 13.54,
+          "historical_max_date": "2015-09-17",
+          "fraction_gt_0": null,
+          "fraction_gt_100": null,
+          "fraction_gt_500": null,
+          "fraction_gt_1000": null
+        },
+        "q850_gkg": {
+          "value": 3.89,
+          "percentile": 13.9,
+          "n": 728,
+          "p10": 3.58,
+          "p50": 6.04,
+          "p90": 8.53,
+          "p95": 9.16,
+          "p99": 10.18,
+          "historical_min": 0.87,
+          "historical_min_date": "2018-09-27",
+          "historical_max": 11.61,
+          "historical_max_date": "2015-09-18",
+          "fraction_gt_0": null,
+          "fraction_gt_100": null,
+          "fraction_gt_500": null,
+          "fraction_gt_1000": null
+        },
+        "ivt_kg_m_s": {
+          "value": 20.6,
+          "percentile": 2.7,
+          "n": 518,
+          "p10": 38.52,
+          "p50": 107.92,
+          "p90": 315.55,
+          "p95": 369.11,
+          "p99": 521.85,
+          "historical_min": 2.53,
+          "historical_min_date": "2022-09-17",
+          "historical_max": 696.1,
+          "historical_max_date": "2024-09-27",
+          "fraction_gt_0": null,
+          "fraction_gt_100": null,
+          "fraction_gt_500": null,
+          "fraction_gt_1000": null
         },
         "wind_speed_925_ms": {
           "value": 2.35,
@@ -23697,6 +24209,34 @@
             "delta": -2.86,
             "unit": "m/s"
           },
+          "q_surface_gkg": {
+            "label": "q surface",
+            "current": 8.03,
+            "previous": 7.56,
+            "delta": 0.47,
+            "unit": "g/kg"
+          },
+          "q925_gkg": {
+            "label": "q925",
+            "current": 7.57,
+            "previous": 7.71,
+            "delta": -0.14,
+            "unit": "g/kg"
+          },
+          "q850_gkg": {
+            "label": "q850",
+            "current": 3.89,
+            "previous": 5.02,
+            "delta": -1.13,
+            "unit": "g/kg"
+          },
+          "ivt_kg_m1_s1": {
+            "label": "IVT",
+            "current": 20.6,
+            "previous": 57.8,
+            "delta": -37.2,
+            "unit": "kg m-1 s-1"
+          },
           "lapse_rate_850_500_c_per_km": {
             "label": "Lapse rate 850-500",
             "current": 5.8,
@@ -23724,6 +24264,13 @@
             "previous": 4950.8,
             "delta": -0.3,
             "unit": "m"
+          },
+          "ivt_surface_700_kg_m1_s1": {
+            "label": "IVT surface-700 hPa",
+            "current": 21.2,
+            "previous": 38.7,
+            "delta": -17.5,
+            "unit": "kg m-1 s-1"
           }
         },
         "requested_nominal_date": "2026-09-29",
