@@ -175,6 +175,7 @@ def parse_level(line):
         pressure_raw = int(line[9:15])
         height_raw = int(line[16:21])
         temperature_raw = int(line[22:27])
+        relative_humidity_raw = int(line[28:33])
         dewpoint_dep_raw = int(line[34:39])
         wind_direction_raw = int(line[40:45])
         wind_speed_raw = int(line[46:51])
@@ -185,6 +186,8 @@ def parse_level(line):
     height = None
     temperature = None
     dewpoint = None
+    relative_humidity = None
+    dewpoint_depression = None
     wind_direction = None
     wind_speed = None
     u_ms = None
@@ -200,10 +203,17 @@ def parse_level(line):
         temperature = temperature_raw / 10.0
 
     if (
+        not _missing_int(relative_humidity_raw)
+        and 0 <= relative_humidity_raw <= 1000
+    ):
+        relative_humidity = relative_humidity_raw / 10.0
+
+    if (
         temperature is not None
         and not _missing_int(dewpoint_dep_raw)
     ):
-        dewpoint = temperature - dewpoint_dep_raw / 10.0
+        dewpoint_depression = dewpoint_dep_raw / 10.0
+        dewpoint = temperature - dewpoint_depression
 
     if (
         not _missing_int(wind_direction_raw)
@@ -231,6 +241,8 @@ def parse_level(line):
         "height_m": height,
         "temperature_c": temperature,
         "dewpoint_c": dewpoint,
+        "dewpoint_depression_c": dewpoint_depression,
+        "relative_humidity_pct": relative_humidity,
         "wind_direction_deg": wind_direction,
         "wind_speed_ms": wind_speed,
         "u_ms": u_ms,
@@ -1276,6 +1288,227 @@ def extreme_dates(pool, parameter):
 
 
 # ============================================================
+# DIAGNOSTIKA EKSTREMOV
+# ============================================================
+
+EXTREME_QC_DATES = {
+    date(2018, 12, 22): "MUCAPE maximum candidate",
+    date(2009, 10, 3): "q925 maximum candidate",
+}
+
+
+def rh_from_temperature_dewpoint(temperature_c, dewpoint_c):
+    if not valid_number(temperature_c) or not valid_number(dewpoint_c):
+        return None
+
+    try:
+        rh = mpcalc.relative_humidity_from_dewpoint(
+            float(temperature_c) * units.degC,
+            float(dewpoint_c) * units.degC,
+        )
+        value = float(rh.to("percent").magnitude)
+
+        if not math.isfinite(value):
+            return None
+
+        return value
+    except Exception:
+        return None
+
+
+def common_thermo_rows(levels):
+    rows = [
+        x for x in levels
+        if valid_number(x.get("pressure_hpa"))
+        and valid_number(x.get("temperature_c"))
+        and valid_number(x.get("dewpoint_c"))
+    ]
+    rows.sort(key=lambda x: x["pressure_hpa"], reverse=True)
+
+    unique = []
+    seen = set()
+
+    for row in rows:
+        key = round(float(row["pressure_hpa"]), 2)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(row)
+
+    return unique
+
+
+def profile_thermo_qc(levels):
+    rows = common_thermo_rows(levels)
+
+    if not rows:
+        return {
+            "common_thermo_levels": 0,
+        }
+
+    below_300 = [
+        x for x in rows
+        if float(x["pressure_hpa"]) >= 300.0
+    ]
+
+    gaps = []
+    for a, b in zip(below_300[:-1], below_300[1:]):
+        gaps.append(
+            float(a["pressure_hpa"]) - float(b["pressure_hpa"])
+        )
+
+    td_above_t = [
+        x for x in rows
+        if float(x["dewpoint_c"]) > float(x["temperature_c"]) + 0.3
+    ]
+
+    rh_mismatches = []
+    for row in rows:
+        reported = row.get("relative_humidity_pct")
+        calculated = rh_from_temperature_dewpoint(
+            row.get("temperature_c"),
+            row.get("dewpoint_c"),
+        )
+
+        if (
+            valid_number(reported)
+            and valid_number(calculated)
+        ):
+            difference = float(calculated) - float(reported)
+            if abs(difference) >= 10.0:
+                rh_mismatches.append({
+                    "pressure_hpa": row["pressure_hpa"],
+                    "reported_rh_pct": float(reported),
+                    "calculated_rh_pct": float(calculated),
+                    "difference_pct_points": difference,
+                })
+
+    return {
+        "common_thermo_levels": len(rows),
+        "bottom_pressure_hpa": round(float(rows[0]["pressure_hpa"]), 2),
+        "top_pressure_hpa": round(float(rows[-1]["pressure_hpa"]), 2),
+        "max_pressure_gap_to_300_hpa": (
+            round(max(gaps), 1) if gaps else None
+        ),
+        "dewpoint_above_temperature_count": len(td_above_t),
+        "rh_mismatch_count_ge_10pp": len(rh_mismatches),
+        "rh_mismatches": rh_mismatches[:10],
+    }
+
+
+def print_extreme_rankings(calculated, top_n=10):
+    print()
+    print("=" * 72)
+    print("EXTREME RANKINGS")
+    print("=" * 72)
+
+    for parameter, label in [
+        ("mucape_jkg", "MUCAPE"),
+        ("q925_gkg", "q925"),
+    ]:
+        valid = [
+            r for r in calculated
+            if valid_number(r.get(parameter))
+        ]
+        valid.sort(
+            key=lambda r: float(r[parameter]),
+            reverse=True,
+        )
+
+        print()
+        print(f"Top {min(top_n, len(valid))} {label} profiles:")
+
+        for rank, record in enumerate(valid[:top_n], start=1):
+            print(
+                f"  {rank:2d}.",
+                record["date"],
+                f"{record['hour']:02d} UTC",
+                "=",
+                round(float(record[parameter]), 2),
+            )
+
+
+def print_extreme_profile_details(profiles):
+    print()
+    print("=" * 72)
+    print("EXTREME PROFILE DETAILS")
+    print("=" * 72)
+
+    selected = [
+        p for p in profiles
+        if p["date"] in EXTREME_QC_DATES
+    ]
+
+    for profile in selected:
+        label = EXTREME_QC_DATES[profile["date"]]
+        parameters = calculate_profile_parameters(profile)
+        qc = profile_thermo_qc(profile["levels"])
+
+        print()
+        print("-" * 72)
+        print(
+            profile["date"],
+            f"{profile['hour']:02d} UTC",
+            "|",
+            label,
+        )
+        print("-" * 72)
+
+        print("MUCAPE:", parameters.get("mucape_jkg"), "J/kg")
+        print("q surface:", parameters.get("q_surface_gkg"), "g/kg")
+        print("q925:", parameters.get("q925_gkg"), "g/kg")
+        print("q850:", parameters.get("q850_gkg"), "g/kg")
+        print("PWAT:", parameters.get("pwat_mm"), "mm")
+        print("T850:", parameters.get("t850"), "°C")
+        print("T700:", parameters.get("t700"), "°C")
+        print("T500:", parameters.get("t500"), "°C")
+        print("Thermo QC:", qc)
+
+        print()
+        print(
+            " p(hPa)   z(m)     T(C)    Td(C)   DPDP(C)"
+            "   RHrep(%)  RHcalc(%)  dRH(pp)"
+        )
+
+        rows = [
+            x for x in profile["levels"]
+            if valid_number(x.get("pressure_hpa"))
+            and float(x["pressure_hpa"]) >= 500.0
+            and valid_number(x.get("temperature_c"))
+        ]
+        rows.sort(key=lambda x: x["pressure_hpa"], reverse=True)
+
+        for row in rows:
+            rh_calc = rh_from_temperature_dewpoint(
+                row.get("temperature_c"),
+                row.get("dewpoint_c"),
+            )
+
+            rh_rep = row.get("relative_humidity_pct")
+            drh = (
+                rh_calc - rh_rep
+                if valid_number(rh_calc) and valid_number(rh_rep)
+                else None
+            )
+
+            def fnum(value, width=8, decimals=1):
+                if not valid_number(value):
+                    return " " * (width - 4) + "None"
+                return f"{float(value):{width}.{decimals}f}"
+
+            print(
+                fnum(row.get("pressure_hpa"), 8, 1),
+                fnum(row.get("height_m"), 7, 0),
+                fnum(row.get("temperature_c"), 8, 1),
+                fnum(row.get("dewpoint_c"), 8, 1),
+                fnum(row.get("dewpoint_depression_c"), 9, 1),
+                fnum(rh_rep, 10, 1),
+                fnum(rh_calc, 10, 1),
+                fnum(drh, 8, 1),
+            )
+
+
+# ============================================================
 # DNEVNA KLIMATOLOGIJA
 # ============================================================
 
@@ -1594,6 +1827,9 @@ def main():
         calculated.append(
             calculate_profile_parameters(profile)
         )
+
+    print_extreme_rankings(calculated)
+    print_extreme_profile_details(profiles)
 
     daily = deduplicate_daily(calculated)
 
