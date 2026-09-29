@@ -1334,18 +1334,16 @@ def thermodynamic_profile_qc(levels):
     """
     Conservative gross-error screen for historical IGRA P/T/Td profiles.
 
-    A profile is rejected for thermodynamic/climatological parameters only
-    when temperature contains an implausibly large adjacent-level jump:
+    Hard rejection applies only from the sounding bottom to 300 hPa.
 
-      * >= 12 C across <= 30 hPa, or
-      * >= 20 C across <= 75 hPa.
+    Criteria:
+      * adjacent temperature jump >= 12 C across <= 30 hPa
+      * adjacent temperature jump >= 20 C across <= 75 hPa
+      * compact warm/cold spike-reversal within <= 75 hPa, with
+        >= 12 C change on both sides
 
-    Wind-only and geopotential/thickness diagnostics are retained even when
-    this thermodynamic screen fails.
-
-    Dewpoint jumps are reported as warnings but are not, by themselves,
-    used for hard rejection because real moisture discontinuities can be
-    much sharper than temperature gradients.
+    Upper-level (<300 hPa) temperature jumps are logged only.
+    Dewpoint jumps are warnings only and are restricted to >=500 hPa.
     """
 
     rows = [
@@ -1353,16 +1351,10 @@ def thermodynamic_profile_qc(levels):
         if valid_number(x.get("pressure_hpa"))
         and valid_number(x.get("temperature_c"))
     ]
+    rows.sort(key=lambda x: float(x["pressure_hpa"]), reverse=True)
 
-    rows.sort(
-        key=lambda x: float(x["pressure_hpa"]),
-        reverse=True,
-    )
-
-    # Deduplicate pressure.
     unique = []
     seen = set()
-
     for row in rows:
         key = round(float(row["pressure_hpa"]), 2)
         if key in seen:
@@ -1372,6 +1364,7 @@ def thermodynamic_profile_qc(levels):
 
     hard_reasons = []
     warnings = []
+    upper_level_anomalies = []
 
     for lower, upper in zip(unique[:-1], unique[1:]):
         p1 = float(lower["pressure_hpa"])
@@ -1383,25 +1376,21 @@ def thermodynamic_profile_qc(levels):
         dt = t2 - t1
         abs_dt = abs(dt)
 
-        hard = False
         threshold = None
 
         if (
             dp <= THERMO_QC_TIGHT_GAP_HPA
             and abs_dt >= THERMO_QC_TIGHT_GAP_TEMP_JUMP_C
         ):
-            hard = True
             threshold = "tight_gap"
-
         elif (
             dp <= THERMO_QC_BROAD_GAP_HPA
             and abs_dt >= THERMO_QC_BROAD_GAP_TEMP_JUMP_C
         ):
-            hard = True
             threshold = "broad_gap"
 
-        if hard:
-            hard_reasons.append({
+        if threshold is not None:
+            event = {
                 "type": "temperature_jump",
                 "threshold": threshold,
                 "p1_hpa": round(p1, 1),
@@ -1410,16 +1399,24 @@ def thermodynamic_profile_qc(levels):
                 "t1_c": round(t1, 1),
                 "t2_c": round(t2, 1),
                 "delta_t_c": round(dt, 1),
-            })
+            }
+
+            if min(p1, p2) >= 300.0:
+                hard_reasons.append(event)
+            else:
+                upper_level_anomalies.append(event)
 
         td1 = lower.get("dewpoint_c")
         td2 = upper.get("dewpoint_c")
 
-        if valid_number(td1) and valid_number(td2):
+        if (
+            min(p1, p2) >= 500.0
+            and valid_number(td1)
+            and valid_number(td2)
+        ):
             dtd = float(td2) - float(td1)
 
-            # Warning only: useful for investigating moisture artefacts.
-            if dp <= 30.0 and abs(dtd) >= 12.0:
+            if dp <= 30.0 and abs(dtd) >= 15.0:
                 warnings.append({
                     "type": "dewpoint_jump_warning",
                     "p1_hpa": round(p1, 1),
@@ -1430,10 +1427,87 @@ def thermodynamic_profile_qc(levels):
                     "delta_td_c": round(dtd, 1),
                 })
 
+    tropospheric = [
+        row for row in unique
+        if float(row["pressure_hpa"]) >= 300.0
+    ]
+
+    spike_events = []
+
+    for i in range(len(tropospheric) - 2):
+        p_i = float(tropospheric[i]["pressure_hpa"])
+        t_i = float(tropospheric[i]["temperature_c"])
+
+        for k in range(i + 2, len(tropospheric)):
+            p_k = float(tropospheric[k]["pressure_hpa"])
+            total_dp = p_i - p_k
+
+            if total_dp > THERMO_QC_BROAD_GAP_HPA:
+                break
+
+            t_k = float(tropospheric[k]["temperature_c"])
+
+            for j in range(i + 1, k):
+                p_j = float(tropospheric[j]["pressure_hpa"])
+                t_j = float(tropospheric[j]["temperature_c"])
+
+                rise_then_fall = (
+                    (t_j - t_i) >= 12.0
+                    and (t_j - t_k) >= 12.0
+                )
+                fall_then_rise = (
+                    (t_i - t_j) >= 12.0
+                    and (t_k - t_j) >= 12.0
+                )
+
+                if not (rise_then_fall or fall_then_rise):
+                    continue
+
+                spike_events.append({
+                    "type": (
+                        "warm_spike_reversal"
+                        if rise_then_fall
+                        else "cold_spike_reversal"
+                    ),
+                    "p_bottom_hpa": round(p_i, 1),
+                    "p_peak_hpa": round(p_j, 1),
+                    "p_top_hpa": round(p_k, 1),
+                    "total_delta_p_hpa": round(total_dp, 1),
+                    "t_bottom_c": round(t_i, 1),
+                    "t_peak_c": round(t_j, 1),
+                    "t_top_c": round(t_k, 1),
+                    "first_leg_delta_t_c": round(t_j - t_i, 1),
+                    "second_leg_delta_t_c": round(t_k - t_j, 1),
+                })
+
+    if spike_events:
+        spike_events.sort(
+            key=lambda e: (
+                e["total_delta_p_hpa"],
+                -max(
+                    abs(e["first_leg_delta_t_c"]),
+                    abs(e["second_leg_delta_t_c"]),
+                ),
+            )
+        )
+
+        compact = []
+        used_peaks = set()
+
+        for event in spike_events:
+            peak = event["p_peak_hpa"]
+            if peak in used_peaks:
+                continue
+            used_peaks.add(peak)
+            compact.append(event)
+
+        hard_reasons.extend(compact[:10])
+
     return {
         "passed": len(hard_reasons) == 0,
         "hard_reasons": hard_reasons,
         "warnings": warnings,
+        "upper_level_anomalies": upper_level_anomalies,
     }
 
 
@@ -1560,13 +1634,23 @@ def print_thermodynamic_qc_summary(calculated):
         and r["_thermo_qc"].get("warnings")
     ]
 
+    upper_anomaly_profiles = [
+        r for r in calculated
+        if isinstance(r.get("_thermo_qc"), dict)
+        and r["_thermo_qc"].get("upper_level_anomalies")
+    ]
+
     print()
     print("=" * 72)
     print("THERMODYNAMIC GROSS-ERROR QC")
     print("=" * 72)
     print("  profiles checked:", len(calculated))
-    print("  hard-failed profiles:", len(failed))
-    print("  profiles with dewpoint warnings:", len(warned))
+    print("  hard-failed tropospheric profiles:", len(failed))
+    print("  profiles with lower/mid-level dewpoint warnings:", len(warned))
+    print(
+        "  profiles with upper-level-only temperature anomalies:",
+        len(upper_anomaly_profiles),
+    )
 
     if failed:
         print()
@@ -2098,11 +2182,13 @@ def main():
                 "Profile must begin within 50 hPa of sounding bottom and reach 300 hPa."
             ),
             "thermodynamic_gross_error_qc": (
-                "Thermodynamic and moisture-derived parameters are excluded when "
-                "adjacent temperature levels show >=12 C jump across <=30 hPa or "
-                ">=20 C jump across <=75 hPa. Wind and reported geopotential-height "
-                "diagnostics are retained. Large dewpoint jumps are logged as warnings "
-                "but are not hard-rejection criteria."
+                "Thermodynamic and moisture-derived parameters are excluded only for "
+                "gross tropospheric errors at or below 300 hPa: adjacent temperature "
+                "jumps >=12 C across <=30 hPa, >=20 C across <=75 hPa, or a compact "
+                "warm/cold spike-reversal with >=12 C change on both sides within "
+                "<=75 hPa. Upper-level-only anomalies are logged but do not invalidate "
+                "lower-tropospheric climatology. Wind and reported geopotential-height "
+                "diagnostics are retained. Dewpoint jumps are warning-only."
             ),
             "mucape_distribution_note": (
                 "Because MUCAPE has a large point mass at zero, occurrence fractions "
