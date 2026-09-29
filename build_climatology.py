@@ -75,6 +75,25 @@ PARAMETERS = [
     "mucape_jkg",
 ]
 
+# Thermodynamic/moisture parameters are admitted to the official
+# climatology only from profiles with thermo quality == "good".
+# Suspect values are kept in the processed record for diagnostics,
+# but excluded from percentiles, distributions and min/max records.
+THERMO_CLIMATOLOGY_PARAMETERS = {
+    "t850",
+    "t700",
+    "t500",
+    "pwat_mm",
+    "freezing_level_msl_m",
+    "lapse_rate_850_500_c_per_km",
+    "lapse_rate_700_500_c_per_km",
+    "q_surface_gkg",
+    "q925_gkg",
+    "q850_gkg",
+    "ivt_kg_m_s",
+    "mucape_jkg",
+}
+
 PARAMETER_METADATA = {
     "t850": {"label": "T 850 hPa", "unit": "°C"},
     "t700": {"label": "T 700 hPa", "unit": "°C"},
@@ -1072,6 +1091,7 @@ def calculate_profile_parameters(profile):
         "date": profile["date"],
         "hour": profile["hour"],
         "_thermo_qc": thermo_qc,
+        "_thermo_quality": thermo_qc["quality"],
     }
 
     # --------------------------------------------------------
@@ -1187,6 +1207,13 @@ def deduplicate_daily(records):
     """
     Največ ena reprezentativna vrednost posameznega parametra
     na koledarski dan. Če je profilov več, uporabimo mediano.
+
+    Za termodinamične/moisture parametre v uradno klimatologijo
+    vključimo samo profile s thermo quality == "good".
+
+    Profili "suspect" ostanejo v procesiranih podatkih in QC izpisu,
+    vendar ne vplivajo na percentile, distribucije, min/max ali rekorde.
+    Wind/geopotential/thickness diagnostika ostane neodvisna od thermo QC.
     """
 
     grouped = defaultdict(list)
@@ -1200,9 +1227,17 @@ def deduplicate_daily(records):
         result = {"date": day}
 
         for parameter in PARAMETERS:
+            if parameter in THERMO_CLIMATOLOGY_PARAMETERS:
+                eligible = [
+                    r for r in day_records
+                    if r.get("_thermo_quality", "good") == "good"
+                ]
+            else:
+                eligible = day_records
+
             values = [
                 r[parameter]
-                for r in day_records
+                for r in eligible
                 if valid_number(r.get(parameter))
             ]
 
@@ -1515,8 +1550,16 @@ def thermodynamic_profile_qc(levels):
 
         hard_reasons.extend(compact[:10])
 
+    if hard_reasons:
+        quality = "bad"
+    elif suspect_events:
+        quality = "suspect"
+    else:
+        quality = "good"
+
     return {
-        "passed": len(hard_reasons) == 0,
+        "quality": quality,
+        "passed": quality != "bad",
         "hard_reasons": hard_reasons,
         "suspect_events": suspect_events,
         "warnings": warnings,
@@ -1635,16 +1678,24 @@ def profile_thermo_qc(levels):
 
 
 def print_thermodynamic_qc_summary(calculated):
+    quality_counts = {
+        "good": 0,
+        "suspect": 0,
+        "bad": 0,
+    }
+
+    for record in calculated:
+        quality = record.get("_thermo_quality", "good")
+        quality_counts[quality] = quality_counts.get(quality, 0) + 1
+
     failed = [
         r for r in calculated
-        if isinstance(r.get("_thermo_qc"), dict)
-        and r["_thermo_qc"].get("passed") is False
+        if r.get("_thermo_quality") == "bad"
     ]
 
     suspect = [
         r for r in calculated
-        if isinstance(r.get("_thermo_qc"), dict)
-        and r["_thermo_qc"].get("suspect_events")
+        if r.get("_thermo_quality") == "suspect"
     ]
 
     warned = [
@@ -1664,8 +1715,11 @@ def print_thermodynamic_qc_summary(calculated):
     print("THERMODYNAMIC GROSS-ERROR QC")
     print("=" * 72)
     print("  profiles checked:", len(calculated))
-    print("  hard-failed spike/reversal profiles:", len(failed))
-    print("  suspect strong-jump profiles retained:", len(suspect))
+    print("  quality GOOD:", quality_counts.get("good", 0))
+    print("  quality SUSPECT (retained, excluded from thermo climatology):",
+          quality_counts.get("suspect", 0))
+    print("  quality BAD (thermo values rejected):",
+          quality_counts.get("bad", 0))
     print("  profiles with lower/mid-level dewpoint warnings:", len(warned))
     print(
         "  profiles with upper-level-only temperature anomalies:",
@@ -1674,7 +1728,7 @@ def print_thermodynamic_qc_summary(calculated):
 
     if failed:
         print()
-        print("  Hard-failed profiles:")
+        print("  BAD profiles:")
         for record in failed[:30]:
             reasons = record["_thermo_qc"].get("hard_reasons", [])
             print(
@@ -1686,7 +1740,7 @@ def print_thermodynamic_qc_summary(calculated):
 
     if suspect:
         print()
-        print("  Suspect strong-jump profiles retained:")
+        print("  SUSPECT profiles retained outside official thermo climatology:")
         for record in suspect[:30]:
             events = record["_thermo_qc"].get("suspect_events", [])
             print(
@@ -1700,15 +1754,20 @@ def print_thermodynamic_qc_summary(calculated):
 def print_extreme_rankings(calculated, top_n=10):
     print()
     print("=" * 72)
-    print("EXTREME RANKINGS")
+    print("EXTREME RANKINGS — OFFICIAL GOOD-QUALITY THERMO PROFILES")
     print("=" * 72)
+
+    good_records = [
+        r for r in calculated
+        if r.get("_thermo_quality", "good") == "good"
+    ]
 
     for parameter, label in [
         ("mucape_jkg", "MUCAPE"),
         ("q925_gkg", "q925"),
     ]:
         valid = [
-            r for r in calculated
+            r for r in good_records
             if valid_number(r.get(parameter))
         ]
         valid.sort(
@@ -1726,6 +1785,33 @@ def print_extreme_rankings(calculated, top_n=10):
                 f"{record['hour']:02d} UTC",
                 "=",
                 round(float(record[parameter]), 2),
+            )
+
+    suspect = [
+        r for r in calculated
+        if r.get("_thermo_quality") == "suspect"
+    ]
+
+    print()
+    print("SUSPECT thermo profiles excluded from official climatology:")
+    if not suspect:
+        print("  none")
+    else:
+        for record in suspect:
+            interesting = []
+
+            for parameter in ["t850", "t700", "q925_gkg", "q850_gkg", "mucape_jkg"]:
+                if valid_number(record.get(parameter)):
+                    interesting.append(
+                        f"{parameter}={round(float(record[parameter]), 2)}"
+                    )
+
+            print(
+                " ",
+                record["date"],
+                f"{record['hour']:02d} UTC",
+                "|",
+                ", ".join(interesting) if interesting else "no listed thermo values",
             )
 
 
@@ -2159,6 +2245,20 @@ def main():
             "schema_version": 2,
             "station_id": STATION_ID,
             "station_name": STATION_NAME,
+            "thermodynamic_qc_counts": {
+                "good": sum(
+                    1 for r in calculated
+                    if r.get("_thermo_quality", "good") == "good"
+                ),
+                "suspect": sum(
+                    1 for r in calculated
+                    if r.get("_thermo_quality") == "suspect"
+                ),
+                "bad": sum(
+                    1 for r in calculated
+                    if r.get("_thermo_quality") == "bad"
+                ),
+            },
             "reference_period": f"{START_YEAR}-{END_YEAR}",
             "window_days": WINDOW_DAYS,
             "window_description": f"±{WINDOW_DAYS} calendar days",
@@ -2172,7 +2272,9 @@ def main():
                 "used for exact empirical percentile ranks."
             ),
             "daily_deduplication": (
-                "Median of profiles for the same calendar date."
+                "Median of eligible profiles for the same calendar date. "
+                "Thermodynamic/moisture parameters use only GOOD-quality profiles; "
+                "wind/geopotential/thickness diagnostics remain independent of thermo QC."
             ),
             "historical_time_caveat": (
                 "Most historical Ljubljana soundings were nominally 06 UTC "
@@ -2207,14 +2309,17 @@ def main():
                 "Profile must begin within 50 hPa of sounding bottom and reach 300 hPa."
             ),
             "thermodynamic_gross_error_qc": (
-                "Hard rejection is reserved for compact tropospheric warm/cold "
-                "spike-reversals with >=12 C change on both sides within <=75 hPa. "
-                "Large monotonic temperature jumps are retained as suspect warnings "
-                "because genuine sharp Ljubljana inversions are possible. "
-                "Upper-level-only anomalies are logged but do not invalidate lower-"
-                "tropospheric climatology. Wind and reported geopotential-height "
-                "diagnostics are retained. Dewpoint jumps are warning-only."
+                "Three quality classes are used. GOOD profiles enter official "
+                "thermodynamic climatology. SUSPECT profiles contain large monotonic "
+                "temperature jumps; they are retained for review but excluded from "
+                "thermodynamic percentiles, distributions and extremes because genuine "
+                "sharp Ljubljana inversions are possible and should not be auto-deleted. "
+                "BAD profiles contain compact tropospheric warm/cold spike-reversals "
+                "with >=12 C change on both sides within <=75 hPa; their thermodynamic "
+                "values are rejected. Upper-level-only anomalies are logged. Wind and "
+                "reported geopotential-height diagnostics remain independent of thermo QC."
             ),
+            "thermodynamic_qc_version": "v4-good-suspect-bad",
             "mucape_distribution_note": (
                 "Because MUCAPE has a large point mass at zero, occurrence fractions "
                 "above 0, 100, 500 and 1000 J/kg are stored in addition to percentiles."
