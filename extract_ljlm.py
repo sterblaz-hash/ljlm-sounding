@@ -111,6 +111,28 @@ OROGRAPHIC_BARRIERS = {
 IVT_MAX_INTERNAL_GAP_HPA = 100.0
 
 
+def trapezoid_integral(y_values, x_values):
+    """
+    NumPy-version-independent trapezoidal integral.
+
+    We intentionally do not rely on np.trapezoid / np.trapz because
+    repository environments can differ in NumPy version.
+    """
+    y = np.asarray(y_values, dtype=float)
+    x = np.asarray(x_values, dtype=float)
+
+    if y.size < 2 or x.size < 2 or y.size != x.size:
+        raise ValueError("trapezoid integral requires equal arrays with >=2 points")
+
+    return float(
+        np.sum(
+            0.5
+            * (y[:-1] + y[1:])
+            * (x[1:] - x[:-1])
+        )
+    )
+
+
 # ============================================================
 # PRENOS
 # ============================================================
@@ -2004,11 +2026,11 @@ def calculate_moisture_transport(levels):
         gravity = 9.80665
 
         ivt_u = (
-            -np.trapezoid(q_values * u_values, p_pa)
+            -trapezoid_integral(q_values * u_values, p_pa)
             / gravity
         )
         ivt_v = (
-            -np.trapezoid(q_values * v_values, p_pa)
+            -trapezoid_integral(q_values * v_values, p_pa)
             / gravity
         )
 
@@ -2181,6 +2203,7 @@ def calculate_moisture_transport(levels):
         orographic["barriers"][barrier_key] = barrier_result
 
     result["orographic_cross_barrier"] = orographic
+    result["available"] = True
 
     return result
 
@@ -2370,18 +2393,37 @@ def calculate_metpy_parameters(levels):
 
 
     # Moisture transport / IVT
-    moisture_transport = safe_parameter(
-        "moisture transport / IVT",
-        lambda:
-            calculate_moisture_transport(
-                levels
-            )
-    )
-
-    if moisture_transport is not None:
-        result["moisture_transport"] = (
-            moisture_transport
+    #
+    # Keep an explicit failure object in latest.json if this calculation
+    # raises an exception. This prevents a silent disappearance of the
+    # entire moisture-transport block and makes GitHub Actions debugging easy.
+    try:
+        moisture_transport = calculate_moisture_transport(
+            levels
         )
+
+        if moisture_transport is None:
+            result["moisture_transport"] = {
+                "available": False,
+                "error": "insufficient common p/Td/wind profile"
+            }
+        else:
+            result["moisture_transport"] = moisture_transport
+
+    except Exception as exc:
+        message = (
+            f"{type(exc).__name__}: {exc}"
+        )
+
+        print(
+            "MetPy warning (moisture transport / IVT):",
+            message
+        )
+
+        result["moisture_transport"] = {
+            "available": False,
+            "error": message
+        }
 
     # LCL
     lcl = safe_parameter(
@@ -4692,9 +4734,9 @@ def print_summary(profile):
                 "m2/s2"
             )
 
-    moisture_transport = metpy.get(
-        "moisture_transport",
-        {}
+    moisture_transport = (
+        metpy.get("moisture_transport")
+        or {}
     )
 
     humidity_profile = moisture_transport.get(
