@@ -1332,18 +1332,21 @@ def extreme_dates(pool, parameter):
 
 def thermodynamic_profile_qc(levels):
     """
-    Conservative gross-error screen for historical IGRA P/T/Td profiles.
+    Meteorologically conservative QC for historical IGRA P/T/Td profiles.
 
-    Hard rejection applies only from the sounding bottom to 300 hPa.
+    Philosophy:
+      * Do NOT reject a profile only because it contains a very strong
+        monotonic inversion. Ljubljana can have genuine sharp winter
+        inversions.
+      * HARD rejection is reserved for compact warm/cold spike-reversals
+        that return toward the surrounding temperature within <=75 hPa.
+      * Large adjacent temperature jumps in the troposphere are retained
+        as SUSPECT/WARNING events, not automatic rejection.
+      * Upper-level (<300 hPa) anomalies are logged only.
+      * Dewpoint jumps are warning-only.
 
-    Criteria:
-      * adjacent temperature jump >= 12 C across <= 30 hPa
-      * adjacent temperature jump >= 20 C across <= 75 hPa
-      * compact warm/cold spike-reversal within <= 75 hPa, with
-        >= 12 C change on both sides
-
-    Upper-level (<300 hPa) temperature jumps are logged only.
-    Dewpoint jumps are warnings only and are restricted to >=500 hPa.
+    This keeps real extremes while still removing the obvious short-lived
+    encoding/merge artefacts that contaminated MUCAPE.
     """
 
     rows = [
@@ -1364,8 +1367,13 @@ def thermodynamic_profile_qc(levels):
 
     hard_reasons = []
     warnings = []
+    suspect_events = []
     upper_level_anomalies = []
 
+    # --------------------------------------------------------------
+    # 1) Large adjacent temperature jumps:
+    #    warning/suspect only in troposphere, never hard-fail alone.
+    # --------------------------------------------------------------
     for lower, upper in zip(unique[:-1], unique[1:]):
         p1 = float(lower["pressure_hpa"])
         p2 = float(upper["pressure_hpa"])
@@ -1391,7 +1399,7 @@ def thermodynamic_profile_qc(levels):
 
         if threshold is not None:
             event = {
-                "type": "temperature_jump",
+                "type": "temperature_jump_warning",
                 "threshold": threshold,
                 "p1_hpa": round(p1, 1),
                 "p2_hpa": round(p2, 1),
@@ -1402,10 +1410,11 @@ def thermodynamic_profile_qc(levels):
             }
 
             if min(p1, p2) >= 300.0:
-                hard_reasons.append(event)
+                suspect_events.append(event)
             else:
                 upper_level_anomalies.append(event)
 
+        # Dewpoint warnings only in lower/mid troposphere.
         td1 = lower.get("dewpoint_c")
         td2 = upper.get("dewpoint_c")
 
@@ -1427,6 +1436,9 @@ def thermodynamic_profile_qc(levels):
                     "delta_td_c": round(dtd, 1),
                 })
 
+    # --------------------------------------------------------------
+    # 2) Compact spike/reversal detection = HARD FAIL.
+    # --------------------------------------------------------------
     tropospheric = [
         row for row in unique
         if float(row["pressure_hpa"]) >= 300.0
@@ -1506,6 +1518,7 @@ def thermodynamic_profile_qc(levels):
     return {
         "passed": len(hard_reasons) == 0,
         "hard_reasons": hard_reasons,
+        "suspect_events": suspect_events,
         "warnings": warnings,
         "upper_level_anomalies": upper_level_anomalies,
     }
@@ -1628,6 +1641,12 @@ def print_thermodynamic_qc_summary(calculated):
         and r["_thermo_qc"].get("passed") is False
     ]
 
+    suspect = [
+        r for r in calculated
+        if isinstance(r.get("_thermo_qc"), dict)
+        and r["_thermo_qc"].get("suspect_events")
+    ]
+
     warned = [
         r for r in calculated
         if isinstance(r.get("_thermo_qc"), dict)
@@ -1645,7 +1664,8 @@ def print_thermodynamic_qc_summary(calculated):
     print("THERMODYNAMIC GROSS-ERROR QC")
     print("=" * 72)
     print("  profiles checked:", len(calculated))
-    print("  hard-failed tropospheric profiles:", len(failed))
+    print("  hard-failed spike/reversal profiles:", len(failed))
+    print("  suspect strong-jump profiles retained:", len(suspect))
     print("  profiles with lower/mid-level dewpoint warnings:", len(warned))
     print(
         "  profiles with upper-level-only temperature anomalies:",
@@ -1664,11 +1684,16 @@ def print_thermodynamic_qc_summary(calculated):
                 reasons,
             )
 
-        if len(failed) > 30:
+    if suspect:
+        print()
+        print("  Suspect strong-jump profiles retained:")
+        for record in suspect[:30]:
+            events = record["_thermo_qc"].get("suspect_events", [])
             print(
-                "   ...",
-                len(failed) - 30,
-                "additional hard-failed profiles not shown",
+                "   ",
+                record["date"],
+                f"{record['hour']:02d} UTC",
+                events,
             )
 
 
@@ -2182,12 +2207,12 @@ def main():
                 "Profile must begin within 50 hPa of sounding bottom and reach 300 hPa."
             ),
             "thermodynamic_gross_error_qc": (
-                "Thermodynamic and moisture-derived parameters are excluded only for "
-                "gross tropospheric errors at or below 300 hPa: adjacent temperature "
-                "jumps >=12 C across <=30 hPa, >=20 C across <=75 hPa, or a compact "
-                "warm/cold spike-reversal with >=12 C change on both sides within "
-                "<=75 hPa. Upper-level-only anomalies are logged but do not invalidate "
-                "lower-tropospheric climatology. Wind and reported geopotential-height "
+                "Hard rejection is reserved for compact tropospheric warm/cold "
+                "spike-reversals with >=12 C change on both sides within <=75 hPa. "
+                "Large monotonic temperature jumps are retained as suspect warnings "
+                "because genuine sharp Ljubljana inversions are possible. "
+                "Upper-level-only anomalies are logged but do not invalidate lower-"
+                "tropospheric climatology. Wind and reported geopotential-height "
                 "diagnostics are retained. Dewpoint jumps are warning-only."
             ),
             "mucape_distribution_note": (
