@@ -87,24 +87,33 @@ OROGRAPHIC_BARRIERS = {
     "dinaric_west": {
         "label": "Dinaric barrier – Trnovski gozd / Nanos / Snežnik",
         "upslope_normal_azimuth_deg": 45.0,
-        "method": "literature_based_v1",
+        "representative_barrier_height_msl_m": 1500.0,
+        "orientation_method": "literature_based_v1",
+        "height_method": "provisional_operational_v1",
     },
     "julian_south": {
         "label": "Southern Julian Alps – Tolmin / Bohinj sector",
         "upslope_normal_azimuth_deg": 45.0,
-        "method": "literature_based_v1",
+        "representative_barrier_height_msl_m": 2000.0,
+        "orientation_method": "literature_based_v1",
+        "height_method": "provisional_operational_v1",
     },
     "julian_central": {
         "label": "Central Julian Alps",
         "upslope_normal_azimuth_deg": 10.0,
-        "method": "literature_based_v1",
+        "representative_barrier_height_msl_m": 2500.0,
+        "orientation_method": "literature_based_v1",
+        "height_method": "provisional_operational_v1",
     },
     "kamnik_savinja": {
         "label": "Kamnik–Savinja Alps",
         "upslope_normal_azimuth_deg": 0.0,
-        "method": "literature_based_v1",
+        "representative_barrier_height_msl_m": 2200.0,
+        "orientation_method": "literature_based_v1",
+        "height_method": "provisional_operational_v1",
     },
 }
+
 
 # Maximum pressure gap accepted inside an IVT integration layer.
 # Operational BUFR profiles are normally much denser than this.
@@ -1793,6 +1802,95 @@ def calculate_moisture_transport(levels):
             "method": "log_pressure_interpolation",
         }
 
+    def state_at_height(target_height_msl_m):
+        """
+        Interpolate the moisture/wind state to a geometric height (MSL).
+
+        Pressure is interpolated logarithmically with height.
+        q, mixing ratio and u/v are interpolated linearly between the
+        two surrounding observed levels.
+        """
+        target = float(target_height_msl_m)
+
+        height_rows = [
+            row for row in rows
+            if valid_number(row.get("height_m"))
+        ]
+
+        if len(height_rows) < 2:
+            return None
+
+        height_rows.sort(
+            key=lambda x: float(x["height_m"])
+        )
+
+        # Exact/near-exact radiosonde level.
+        nearest = min(
+            height_rows,
+            key=lambda x: abs(float(x["height_m"]) - target)
+        )
+
+        if abs(float(nearest["height_m"]) - target) <= 1.0:
+            state = moisture_state(nearest)
+            state["height_msl_m"] = target
+            state["method"] = "measured_near_target_height"
+            return state
+
+        lower = None
+        upper = None
+
+        for row in height_rows:
+            z = float(row["height_m"])
+
+            if z < target:
+                if lower is None or z > float(lower["height_m"]):
+                    lower = row
+
+            elif z > target:
+                if upper is None or z < float(upper["height_m"]):
+                    upper = row
+
+        if lower is None or upper is None:
+            return None
+
+        z1 = float(lower["height_m"])
+        z2 = float(upper["height_m"])
+
+        if z2 <= z1:
+            return None
+
+        # Radiosonde profile is normally extremely dense. Reject a
+        # pathological gap rather than invent a long vertical interpolation.
+        if (z2 - z1) > 500.0:
+            return None
+
+        f = (target - z1) / (z2 - z1)
+
+        s1 = moisture_state(lower)
+        s2 = moisture_state(upper)
+
+        p1 = float(s1["pressure_hpa"])
+        p2 = float(s2["pressure_hpa"])
+
+        if p1 <= 0 or p2 <= 0:
+            return None
+
+        log_p = math.log(p1) + f * (math.log(p2) - math.log(p1))
+        pressure_hpa = math.exp(log_p)
+
+        return {
+            "pressure_hpa": pressure_hpa,
+            "height_msl_m": target,
+            "q": s1["q"] + f * (s2["q"] - s1["q"]),
+            "mixing_ratio": (
+                s1["mixing_ratio"]
+                + f * (s2["mixing_ratio"] - s1["mixing_ratio"])
+            ),
+            "u_ms": s1["u_ms"] + f * (s2["u_ms"] - s1["u_ms"]),
+            "v_ms": s1["v_ms"] + f * (s2["v_ms"] - s1["v_ms"]),
+            "method": "height_interpolation_log_pressure",
+        }
+
     def vector_to_direction(u, v):
         return math.degrees(math.atan2(u, v)) % 360.0
 
@@ -2053,6 +2151,66 @@ def calculate_moisture_transport(levels):
             "formula": "IVT=(1/g)*integral(q*V dp)",
         }
 
+    def integrate_ivt_to_height(target_height_msl_m):
+        """
+        Integrate IVT from the lowest common radiosonde level to a
+        representative terrain/barrier height.
+
+        The upper boundary is determined from the observed pressure-height
+        relation in this sounding, so the layer automatically adapts to
+        synoptic pressure/temperature changes.
+        """
+        target_height = float(target_height_msl_m)
+
+        surface_height = rows[0].get("height_m")
+        if not valid_number(surface_height):
+            return {
+                "available": False,
+                "reason": "surface height unavailable",
+                "target_height_msl_m": round(target_height, 0),
+            }
+
+        surface_height = float(surface_height)
+
+        if target_height <= surface_height:
+            return {
+                "available": False,
+                "reason": "target barrier height is not above sounding surface",
+                "surface_height_msl_m": round(surface_height, 0),
+                "target_height_msl_m": round(target_height, 0),
+            }
+
+        top_state = state_at_height(target_height)
+        if top_state is None:
+            return {
+                "available": False,
+                "reason": "height boundary unavailable",
+                "surface_height_msl_m": round(surface_height, 0),
+                "target_height_msl_m": round(target_height, 0),
+            }
+
+        item = integrate_ivt(
+            surface_state["pressure_hpa"],
+            top_state["pressure_hpa"],
+            surface_bottom=True
+        )
+
+        item["surface_height_msl_m"] = round(surface_height, 0)
+        item["target_height_msl_m"] = round(target_height, 0)
+        item["layer_depth_m"] = round(target_height - surface_height, 0)
+        item["top_boundary_method"] = top_state.get("method")
+
+        if item.get("available"):
+            item["top_pressure_hpa"] = round(
+                float(top_state["pressure_hpa"]),
+                1
+            )
+            item["layer"] = (
+                f"lowest_common_level_to_{int(round(target_height))}m_msl"
+            )
+
+        return item
+
     total_ivt = integrate_ivt(
         surface_state["pressure_hpa"],
         300.0,
@@ -2087,13 +2245,17 @@ def calculate_moisture_transport(levels):
 
     orographic = {
         "available": True,
-        "version": 1,
+        "version": 2,
+        "primary_metric": "terrain_capped_ivt",
         "vector_convention": (
             "u positive east, v positive north; azimuth clockwise from north; "
             "positive signed_cross_barrier means transport toward the barrier"
         ),
         "interpretation": (
-            "upslope is max(0, signed cross-barrier transport). "
+            "The primary orographic metric integrates moisture transport from "
+            "the sounding surface to a representative barrier height, then "
+            "projects that IVT onto the barrier-normal upslope direction. "
+            "Generic pressure-layer IVT remains diagnostic context. "
             "This is a moisture-transport diagnostic, not a direct rainfall forecast."
         ),
         "barriers": {},
@@ -2106,15 +2268,77 @@ def calculate_moisture_transport(levels):
 
     for barrier_key, config in OROGRAPHIC_BARRIERS.items():
         beta = float(config["upslope_normal_azimuth_deg"])
+        barrier_height = float(
+            config["representative_barrier_height_msl_m"]
+        )
+
+        terrain_ivt = integrate_ivt_to_height(
+            barrier_height
+        )
 
         barrier_result = {
             "label": config["label"],
             "upslope_normal_azimuth_deg": beta,
-            "method": config["method"],
-            "ivt": {},
+            "representative_barrier_height_msl_m": barrier_height,
+            "orientation_method": config["orientation_method"],
+            "height_method": config["height_method"],
+            "terrain_capped_ivt": None,
+            "diagnostic_pressure_layer_ivt": {},
             "point_moisture_flux": {},
         }
 
+        # Primary, terrain-aware orographic IVT.
+        if (
+            isinstance(terrain_ivt, dict)
+            and terrain_ivt.get("available")
+        ):
+            magnitude = terrain_ivt.get("magnitude_kg_m1_s1")
+            u = terrain_ivt.get("u_kg_m1_s1")
+            v = terrain_ivt.get("v_kg_m1_s1")
+
+            if all(valid_number(x) for x in [magnitude, u, v]):
+                projected = projection_onto_barrier(
+                    float(u),
+                    float(v),
+                    float(magnitude),
+                    beta
+                )
+
+                barrier_result["terrain_capped_ivt"] = {
+                    **terrain_ivt,
+                    "signed_cross_barrier_kg_m1_s1": round(
+                        projected["signed_cross_barrier"],
+                        1
+                    ),
+                    "upslope_kg_m1_s1": round(
+                        projected["upslope"],
+                        1
+                    ),
+                    "signed_fraction": (
+                        round(projected["signed_fraction"], 3)
+                        if projected["signed_fraction"] is not None
+                        else None
+                    ),
+                    "upslope_fraction": (
+                        round(projected["upslope_fraction"], 3)
+                        if projected["upslope_fraction"] is not None
+                        else None
+                    ),
+                    "upslope_fraction_pct": (
+                        round(projected["upslope_fraction"] * 100.0, 1)
+                        if projected["upslope_fraction"] is not None
+                        else None
+                    ),
+                    "angle_to_upslope_normal_deg": (
+                        round(projected["angle_to_upslope_normal_deg"], 1)
+                        if projected["angle_to_upslope_normal_deg"] is not None
+                        else None
+                    ),
+                }
+        else:
+            barrier_result["terrain_capped_ivt"] = terrain_ivt
+
+        # Secondary pressure-layer context.
         for layer_key, item in ivt_vectors.items():
             if not isinstance(item, dict) or not item.get("available"):
                 continue
@@ -2133,7 +2357,7 @@ def calculate_moisture_transport(levels):
                 beta
             )
 
-            barrier_result["ivt"][layer_key] = {
+            barrier_result["diagnostic_pressure_layer_ivt"][layer_key] = {
                 "signed_cross_barrier_kg_m1_s1": round(
                     projected["signed_cross_barrier"],
                     1
@@ -2141,16 +2365,6 @@ def calculate_moisture_transport(levels):
                 "upslope_kg_m1_s1": round(
                     projected["upslope"],
                     1
-                ),
-                "signed_fraction": (
-                    round(projected["signed_fraction"], 3)
-                    if projected["signed_fraction"] is not None
-                    else None
-                ),
-                "upslope_fraction": (
-                    round(projected["upslope_fraction"], 3)
-                    if projected["upslope_fraction"] is not None
-                    else None
                 ),
                 "upslope_fraction_pct": (
                     round(projected["upslope_fraction"] * 100.0, 1)
@@ -2164,6 +2378,7 @@ def calculate_moisture_transport(levels):
                 ),
             }
 
+        # Point pressure-level qV remains useful diagnostic context.
         for pressure_key, item in point_fluxes.items():
             magnitude = item.get("qv_magnitude_gkg_ms")
             u = item.get("qv_u_gkg_ms")
@@ -4922,9 +5137,9 @@ def print_summary(profile):
             if barrier is None:
                 continue
 
-            sfc700 = (
-                barrier.get("ivt", {})
-                .get("surface_700", {})
+            terrain = (
+                barrier.get("terrain_capped_ivt")
+                or {}
             )
             qv850 = (
                 barrier.get("point_moisture_flux", {})
@@ -4935,11 +5150,16 @@ def print_summary(profile):
                 barrier.get("label"),
                 "| normal",
                 barrier.get("upslope_normal_azimuth_deg"),
-                "deg | SFC-700 upslope IVT:",
-                sfc700.get("upslope_kg_m1_s1"),
+                "deg | barrier height:",
+                barrier.get("representative_barrier_height_msl_m"),
+                "m MSL | terrain-capped upslope IVT:",
+                terrain.get("upslope_kg_m1_s1"),
                 "kg m-1 s-1",
+                "| top pressure:",
+                terrain.get("top_pressure_hpa"),
+                "hPa",
                 "| fraction:",
-                sfc700.get("upslope_fraction_pct"),
+                terrain.get("upslope_fraction_pct"),
                 "%",
                 "| 850 qV upslope:",
                 qv850.get("upslope_gkg_ms"),
