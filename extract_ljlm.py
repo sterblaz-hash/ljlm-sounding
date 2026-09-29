@@ -78,6 +78,39 @@ INVERSION_MERGE_GAP_M = 40.0
 INVERSION_MERGE_COOLING_C = 0.15
 
 
+# Orographic moisture-transport sectors, V1.
+# Azimuth = direction TOWARD the mountain barrier (clockwise from true north).
+# The values are literature-based representative orientations for operational
+# use. They are deliberately stored as metadata so a future DEM-based version
+# can refine them without changing the calculation convention.
+OROGRAPHIC_BARRIERS = {
+    "dinaric_west": {
+        "label": "Dinaric barrier – Trnovski gozd / Nanos / Snežnik",
+        "upslope_normal_azimuth_deg": 45.0,
+        "method": "literature_based_v1",
+    },
+    "julian_south": {
+        "label": "Southern Julian Alps – Tolmin / Bohinj sector",
+        "upslope_normal_azimuth_deg": 45.0,
+        "method": "literature_based_v1",
+    },
+    "julian_central": {
+        "label": "Central Julian Alps",
+        "upslope_normal_azimuth_deg": 10.0,
+        "method": "literature_based_v1",
+    },
+    "kamnik_savinja": {
+        "label": "Kamnik–Savinja Alps",
+        "upslope_normal_azimuth_deg": 0.0,
+        "method": "literature_based_v1",
+    },
+}
+
+# Maximum pressure gap accepted inside an IVT integration layer.
+# Operational BUFR profiles are normally much denser than this.
+IVT_MAX_INTERNAL_GAP_HPA = 100.0
+
+
 # ============================================================
 # PRENOS
 # ============================================================
@@ -1514,6 +1547,63 @@ def wind_at_pressure(levels, target):
     }
 
 
+
+def surface_to_pressure_shear(levels, target_pressure):
+    """
+    Vector bulk shear from the lowest valid near-surface wind level to
+    target_pressure. This mirrors the historical sfc–700 hPa climatology
+    as closely as the operational BUFR profile allows.
+    """
+    rows = [
+        x for x in levels
+        if x.get("pressure_hpa") is not None
+        and x.get("height_m") is not None
+        and x.get("wind_speed_ms") is not None
+        and x.get("wind_direction_deg") is not None
+    ]
+
+    if len(rows) < 2:
+        return None
+
+    rows.sort(key=lambda x: x["height_m"])
+    surface = rows[0]
+
+    all_heights = [
+        float(x["height_m"])
+        for x in levels
+        if x.get("height_m") is not None
+    ]
+
+    if (
+        all_heights
+        and float(surface["height_m"]) - min(all_heights) > 500.0
+    ):
+        return None
+
+    if float(surface["pressure_hpa"]) <= float(target_pressure):
+        return None
+
+    speed = float(surface["wind_speed_ms"]) * units("m/s")
+    direction = float(surface["wind_direction_deg"]) * units.degree
+    u_surface, v_surface = mpcalc.wind_components(speed, direction)
+
+    top = wind_at_pressure(levels, float(target_pressure))
+    if top is None:
+        return None
+
+    u0 = float(u_surface.to("m/s").magnitude)
+    v0 = float(v_surface.to("m/s").magnitude)
+    du = float(top["u_ms"]) - u0
+    dv = float(top["v_ms"]) - v0
+
+    magnitude = math.hypot(du, dv)
+
+    if not math.isfinite(magnitude) or magnitude < 0 or magnitude > 120:
+        return None
+
+    return round(magnitude, 2)
+
+
 def vector_speed_direction(u_component, v_component):
     u_ms = quantity_value(u_component, "m/s")
     v_ms = quantity_value(v_component, "m/s")
@@ -1538,13 +1628,25 @@ def vector_speed_direction(u_component, v_component):
 
 def calculate_moisture_transport(levels):
     """
-    Izračuna:
-    - specifično vlago q in q*V na 850 hPa
-    - IVT skozi skupni razpoložljivi sloj od dna profila
-      do 300 hPa.
+    Moisture transport diagnostics.
+
+    Products:
+      * q at surface / 925 / 850 / 700 hPa
+      * point moisture flux q*V at 925 / 850 / 700 hPa
+      * total IVT from the lowest common level to 300 hPa
+      * layer IVT:
+          surface–850 hPa
+          surface–700 hPa
+          850–700 hPa
+          700–500 hPa
+      * cross-barrier / upslope projections for selected Slovenian
+        orographic sectors.
 
     IVT = (1/g) * integral(q * V dp)
-    Enota: kg m-1 s-1.
+    IVT unit: kg m-1 s-1.
+
+    Point qV is additionally published in g kg-1 m s-1 because this
+    is more intuitive for an operational pressure-level diagnostic.
     """
 
     rows = [
@@ -1557,111 +1659,87 @@ def calculate_moisture_transport(levels):
         )
     ]
 
-    if len(rows) < 10:
+    if len(rows) < 4:
         return None
 
     rows.sort(
-        key=lambda x: x["pressure_hpa"],
+        key=lambda x: float(x["pressure_hpa"]),
         reverse=True
     )
 
-    # Odstrani podvojene tlake.
+    # Remove duplicate pressure levels.
     unique_rows = []
     seen = set()
 
     for row in rows:
-        p = float(row["pressure_hpa"])
-
+        p = round(float(row["pressure_hpa"]), 3)
         if p in seen:
             continue
-
         seen.add(p)
         unique_rows.append(row)
 
     rows = unique_rows
-
     result = {}
-
-    # --------------------------------------------------------
-    # SPECIFIČNA VLAGA q IN RAZMERJE MEŠANOSTI r
-    # pri tleh, 925 hPa in 850 hPa
-    # --------------------------------------------------------
 
     def humidity_from_p_td(p_hpa, td_c):
         p_q = float(p_hpa) * units.hPa
         td_q = float(td_c) * units.degC
 
-        vapor_pressure = mpcalc.saturation_vapor_pressure(
-            td_q
-        )
-
-        mixing_ratio = mpcalc.mixing_ratio(
-            vapor_pressure,
-            p_q
-        )
-
+        vapor_pressure = mpcalc.saturation_vapor_pressure(td_q)
+        mixing_ratio = mpcalc.mixing_ratio(vapor_pressure, p_q)
         specific_humidity = (
-            mpcalc.specific_humidity_from_mixing_ratio(
-                mixing_ratio
-            )
+            mpcalc.specific_humidity_from_mixing_ratio(mixing_ratio)
         )
 
         return (
-            float(
-                specific_humidity
-                .to("dimensionless")
-                .magnitude
-            ),
-            float(
-                mixing_ratio
-                .to("dimensionless")
-                .magnitude
-            )
+            float(specific_humidity.to("dimensionless").magnitude),
+            float(mixing_ratio.to("dimensionless").magnitude),
         )
 
-    def humidity_at_pressure(target):
+    def moisture_state(row):
+        p = float(row["pressure_hpa"])
+        q, mixing_ratio = humidity_from_p_td(
+            p,
+            row["dewpoint_c"]
+        )
+
+        speed = float(row["wind_speed_ms"]) * units("m/s")
+        direction = float(row["wind_direction_deg"]) * units.degree
+        u, v = mpcalc.wind_components(speed, direction)
+
+        return {
+            "pressure_hpa": p,
+            "q": q,
+            "mixing_ratio": mixing_ratio,
+            "u_ms": float(u.to("m/s").magnitude),
+            "v_ms": float(v.to("m/s").magnitude),
+            "method": "measured",
+        }
+
+    def state_at_pressure(target):
+        target = float(target)
+
         exact = [
             x for x in rows
-            if abs(
-                float(x["pressure_hpa"]) - target
-            ) <= 0.1
+            if abs(float(x["pressure_hpa"]) - target) <= 0.1
         ]
 
         if exact:
-            q, r = humidity_from_p_td(
-                exact[0]["pressure_hpa"],
-                exact[0]["dewpoint_c"]
-            )
-
-            return {
-                "pressure_hpa": target,
-                "specific_humidity_gkg":
-                    round(q * 1000.0, 2),
-                "mixing_ratio_gkg":
-                    round(r * 1000.0, 2),
-                "method": "measured",
-            }
+            state = moisture_state(exact[0])
+            state["pressure_hpa"] = target
+            return state
 
         above = None
         below = None
 
         for row in rows:
-            p_row = float(row["pressure_hpa"])
+            p = float(row["pressure_hpa"])
 
-            if p_row > target:
-                if (
-                    above is None
-                    or p_row
-                    < float(above["pressure_hpa"])
-                ):
+            if p > target:
+                if above is None or p < float(above["pressure_hpa"]):
                     above = row
-
-            elif p_row < target:
-                if (
-                    below is None
-                    or p_row
-                    > float(below["pressure_hpa"])
-                ):
+            elif p < target:
+                if below is None or p > float(below["pressure_hpa"]):
                     below = row
 
         if above is None or below is None:
@@ -1670,351 +1748,439 @@ def calculate_moisture_transport(levels):
         p1 = float(above["pressure_hpa"])
         p2 = float(below["pressure_hpa"])
 
-        if abs(p1 - p2) > 100:
+        if abs(p1 - p2) > IVT_MAX_INTERNAL_GAP_HPA:
             return None
 
-        q1, r1 = humidity_from_p_td(
-            p1,
-            above["dewpoint_c"]
-        )
-        q2, r2 = humidity_from_p_td(
-            p2,
-            below["dewpoint_c"]
-        )
+        s1 = moisture_state(above)
+        s2 = moisture_state(below)
 
         fraction = (
             math.log(target / p1)
             / math.log(p2 / p1)
         )
 
-        q = q1 + fraction * (q2 - q1)
-        r = r1 + fraction * (r2 - r1)
-
         return {
             "pressure_hpa": target,
-            "specific_humidity_gkg":
-                round(q * 1000.0, 2),
-            "mixing_ratio_gkg":
-                round(r * 1000.0, 2),
-            "method":
-                "log_pressure_interpolation",
+            "q": s1["q"] + fraction * (s2["q"] - s1["q"]),
+            "mixing_ratio": (
+                s1["mixing_ratio"]
+                + fraction * (s2["mixing_ratio"] - s1["mixing_ratio"])
+            ),
+            "u_ms": s1["u_ms"] + fraction * (s2["u_ms"] - s1["u_ms"]),
+            "v_ms": s1["v_ms"] + fraction * (s2["v_ms"] - s1["v_ms"]),
+            "method": "log_pressure_interpolation",
         }
 
-    # "Surface" pomeni najnižji uporaben nivo skupnega
-    # profila p/Td/veter.
-    surface_row = rows[0]
+    def vector_to_direction(u, v):
+        return math.degrees(math.atan2(u, v)) % 360.0
 
-    surface_q, surface_r = humidity_from_p_td(
-        surface_row["pressure_hpa"],
-        surface_row["dewpoint_c"]
-    )
+    def projection_onto_barrier(u, v, magnitude, normal_azimuth_deg):
+        beta = math.radians(float(normal_azimuth_deg))
+        nx = math.sin(beta)   # east component
+        ny = math.cos(beta)   # north component
+
+        signed = float(u) * nx + float(v) * ny
+        upslope = max(0.0, signed)
+
+        if magnitude is None or magnitude <= 0:
+            signed_fraction = None
+            upslope_fraction = None
+            angle_deg = None
+        else:
+            signed_fraction = signed / magnitude
+            upslope_fraction = upslope / magnitude
+            clipped = max(-1.0, min(1.0, signed_fraction))
+            angle_deg = math.degrees(math.acos(clipped))
+
+        return {
+            "signed_cross_barrier": signed,
+            "upslope": upslope,
+            "signed_fraction": signed_fraction,
+            "upslope_fraction": upslope_fraction,
+            "angle_to_upslope_normal_deg": angle_deg,
+        }
+
+    # --------------------------------------------------------
+    # Humidity at selected pressure levels
+    # --------------------------------------------------------
+
+    surface_state = moisture_state(rows[0])
 
     humidity_profile = {
         "surface": {
-            "pressure_hpa":
-                round(
-                    float(
-                        surface_row["pressure_hpa"]
-                    ),
-                    2
-                ),
-            "height_m":
-                surface_row.get("height_m"),
-            "specific_humidity_gkg":
-                round(surface_q * 1000.0, 2),
-            "mixing_ratio_gkg":
-                round(surface_r * 1000.0, 2),
-            "method":
-                "lowest_common_profile_level",
+            "pressure_hpa": round(surface_state["pressure_hpa"], 2),
+            "height_m": rows[0].get("height_m"),
+            "specific_humidity_gkg": round(surface_state["q"] * 1000.0, 2),
+            "mixing_ratio_gkg": round(
+                surface_state["mixing_ratio"] * 1000.0,
+                2
+            ),
+            "method": "lowest_common_profile_level",
         },
-        "925": humidity_at_pressure(925.0),
-        "850": humidity_at_pressure(850.0),
     }
 
-    q_surface = (
-        humidity_profile["surface"]
-        .get("specific_humidity_gkg")
-    )
+    pressure_states = {}
 
+    for target in [925.0, 850.0, 700.0]:
+        state = state_at_pressure(target)
+        pressure_states[str(int(target))] = state
+
+        humidity_profile[str(int(target))] = (
+            {
+                "pressure_hpa": target,
+                "specific_humidity_gkg": round(state["q"] * 1000.0, 2),
+                "mixing_ratio_gkg": round(
+                    state["mixing_ratio"] * 1000.0,
+                    2
+                ),
+                "method": state["method"],
+            }
+            if state is not None
+            else None
+        )
+
+    q_surface = humidity_profile["surface"]["specific_humidity_gkg"]
     q925 = (
         humidity_profile.get("925") or {}
     ).get("specific_humidity_gkg")
 
-    r_surface = (
-        humidity_profile["surface"]
-        .get("mixing_ratio_gkg")
-    )
-
+    r_surface = humidity_profile["surface"]["mixing_ratio_gkg"]
     r925 = (
         humidity_profile.get("925") or {}
     ).get("mixing_ratio_gkg")
 
     humidity_profile["surface_to_925"] = {
-        "delta_q_925_minus_surface_gkg":
+        "delta_q_925_minus_surface_gkg": (
             round(q925 - q_surface, 2)
-            if (
-                q925 is not None
-                and q_surface is not None
-            )
-            else None,
-
-        "delta_mixing_ratio_925_minus_surface_gkg":
+            if q925 is not None and q_surface is not None
+            else None
+        ),
+        "delta_mixing_ratio_925_minus_surface_gkg": (
             round(r925 - r_surface, 2)
-            if (
-                r925 is not None
-                and r_surface is not None
-            )
-            else None,
+            if r925 is not None and r_surface is not None
+            else None
+        ),
     }
 
-    result["humidity_profile"] = (
-        humidity_profile
-    )
+    result["humidity_profile"] = humidity_profile
 
     # --------------------------------------------------------
-    # 850 hPa moisture transport
+    # Point moisture flux q*V at 925 / 850 / 700 hPa
     # --------------------------------------------------------
 
-    def moisture_state(row):
-        p = float(row["pressure_hpa"]) * units.hPa
-        td = float(row["dewpoint_c"]) * units.degC
-        speed = float(row["wind_speed_ms"]) * units("m/s")
-        direction = float(row["wind_direction_deg"]) * units.degree
+    point_fluxes = {}
 
-        vapor_pressure = (
-            mpcalc.saturation_vapor_pressure(
-                td
-            )
-        )
+    for target in [925, 850, 700]:
+        state = pressure_states.get(str(target))
+        if state is None:
+            continue
 
-        mixing_ratio = mpcalc.mixing_ratio(
-            vapor_pressure,
-            p
-        )
+        q = state["q"]
+        u = state["u_ms"]
+        v = state["v_ms"]
+        speed = math.hypot(u, v)
 
-        q = (
-            mpcalc.specific_humidity_from_mixing_ratio(
-                mixing_ratio
-            )
-        )
+        flux_u = q * u
+        flux_v = q * v
+        flux_mag = math.hypot(flux_u, flux_v)
 
-        u, v = mpcalc.wind_components(
-            speed,
-            direction
-        )
+        item = {
+            "pressure_hpa": float(target),
+            "specific_humidity_gkg": round(q * 1000.0, 2),
+            "wind_speed_ms": round(speed, 2),
+            "wind_u_ms": round(u, 2),
+            "wind_v_ms": round(v, 2),
+            "qv_magnitude_kgkg_ms": round(flux_mag, 5),
+            "qv_u_kgkg_ms": round(flux_u, 5),
+            "qv_v_kgkg_ms": round(flux_v, 5),
+            "qv_magnitude_gkg_ms": round(flux_mag * 1000.0, 2),
+            "qv_u_gkg_ms": round(flux_u * 1000.0, 2),
+            "qv_v_gkg_ms": round(flux_v * 1000.0, 2),
+            # Direction TOWARD which moisture is transported.
+            "transport_to_direction_deg": round(
+                vector_to_direction(flux_u, flux_v),
+                1
+            ),
+            "method": state["method"],
+        }
 
-        return (
-            float(q.to("dimensionless").magnitude),
-            float(u.to("m/s").magnitude),
-            float(v.to("m/s").magnitude)
-        )
+        point_fluxes[str(target)] = item
 
-    target = 850.0
-    exact = [
-        x for x in rows
-        if abs(float(x["pressure_hpa"]) - target) <= 0.1
-    ]
+    result["point_moisture_transport"] = point_fluxes
 
-    q850 = u850 = v850 = None
-    method850 = None
+    # Backward-compatible field used by the existing UI/code.
+    result["moisture_transport_850"] = point_fluxes.get("850")
 
-    if exact:
-        q850, u850, v850 = moisture_state(exact[0])
-        method850 = "measured"
+    # --------------------------------------------------------
+    # IVT integration helper
+    # --------------------------------------------------------
 
-    else:
-        above = None
-        below = None
+    def integrate_ivt(bottom_pressure, top_pressure, surface_bottom=False):
+        if surface_bottom:
+            bottom_state = surface_state.copy()
+            bottom = float(bottom_state["pressure_hpa"])
+        else:
+            bottom = float(bottom_pressure)
+            bottom_state = state_at_pressure(bottom)
+
+        top = float(top_pressure)
+        top_state = state_at_pressure(top)
+
+        if bottom_state is None or top_state is None:
+            return {
+                "available": False,
+                "reason": "layer boundary unavailable",
+                "bottom_pressure_hpa": round(bottom, 2),
+                "top_pressure_hpa": round(top, 2),
+            }
+
+        if bottom <= top:
+            return {
+                "available": False,
+                "reason": "bottom pressure is not greater than top pressure",
+                "bottom_pressure_hpa": round(bottom, 2),
+                "top_pressure_hpa": round(top, 2),
+            }
+
+        samples = [bottom_state]
 
         for row in rows:
             p = float(row["pressure_hpa"])
+            if top < p < bottom:
+                try:
+                    samples.append(moisture_state(row))
+                except Exception:
+                    continue
 
-            if p > target:
-                if (
-                    above is None
-                    or p < float(above["pressure_hpa"])
-                ):
-                    above = row
-
-            elif p < target:
-                if (
-                    below is None
-                    or p > float(below["pressure_hpa"])
-                ):
-                    below = row
-
-        if above is not None and below is not None:
-            p1 = float(above["pressure_hpa"])
-            p2 = float(below["pressure_hpa"])
-
-            if abs(p1 - p2) <= 100:
-                q1, u1, v1 = moisture_state(above)
-                q2, u2, v2 = moisture_state(below)
-
-                f = (
-                    math.log(target / p1)
-                    / math.log(p2 / p1)
-                )
-
-                q850 = q1 + f * (q2 - q1)
-                u850 = u1 + f * (u2 - u1)
-                v850 = v1 + f * (v2 - v1)
-                method850 = "log_pressure_interpolation"
-
-    if (
-        q850 is not None
-        and u850 is not None
-        and v850 is not None
-    ):
-        speed850 = math.sqrt(
-            u850 ** 2 + v850 ** 2
+        samples.append(top_state)
+        samples.sort(
+            key=lambda x: float(x["pressure_hpa"]),
+            reverse=True
         )
 
-        flux_u = q850 * u850
-        flux_v = q850 * v850
+        # Remove accidental duplicate boundaries.
+        clean = []
+        seen_p = set()
 
-        flux_mag = math.sqrt(
-            flux_u ** 2 + flux_v ** 2
+        for state in samples:
+            key = round(float(state["pressure_hpa"]), 4)
+            if key in seen_p:
+                continue
+            seen_p.add(key)
+            clean.append(state)
+
+        samples = clean
+
+        if len(samples) < 2:
+            return {
+                "available": False,
+                "reason": "insufficient layer samples",
+                "bottom_pressure_hpa": round(bottom, 2),
+                "top_pressure_hpa": round(top, 2),
+            }
+
+        pressure_hpa = np.asarray(
+            [x["pressure_hpa"] for x in samples],
+            dtype=float
         )
 
-        transport_to_deg = (
-            math.degrees(
-                math.atan2(flux_u, flux_v)
-            ) % 360.0
+        gaps = pressure_hpa[:-1] - pressure_hpa[1:]
+        max_gap = float(np.max(gaps)) if len(gaps) else 0.0
+
+        if max_gap > IVT_MAX_INTERNAL_GAP_HPA:
+            return {
+                "available": False,
+                "reason": "pressure gap exceeds integration QC",
+                "bottom_pressure_hpa": round(bottom, 2),
+                "top_pressure_hpa": round(top, 2),
+                "max_pressure_gap_hpa": round(max_gap, 1),
+            }
+
+        p_pa = pressure_hpa * 100.0
+        q_values = np.asarray([x["q"] for x in samples], dtype=float)
+        u_values = np.asarray([x["u_ms"] for x in samples], dtype=float)
+        v_values = np.asarray([x["v_ms"] for x in samples], dtype=float)
+
+        gravity = 9.80665
+
+        ivt_u = (
+            -np.trapezoid(q_values * u_values, p_pa)
+            / gravity
+        )
+        ivt_v = (
+            -np.trapezoid(q_values * v_values, p_pa)
+            / gravity
         )
 
-        result["moisture_transport_850"] = {
-            "pressure_hpa": 850.0,
-            "specific_humidity_gkg":
-                round(q850 * 1000.0, 2),
+        magnitude = math.hypot(ivt_u, ivt_v)
 
-            "wind_speed_ms":
-                round(speed850, 2),
-
-            "qv_magnitude_kgkg_ms":
-                round(flux_mag, 5),
-
-            "qv_u_kgkg_ms":
-                round(flux_u, 5),
-
-            "qv_v_kgkg_ms":
-                round(flux_v, 5),
-
-            # Smer, KAMOR se vlaga prenaša.
-            "transport_to_direction_deg":
-                round(transport_to_deg, 1),
-
-            "method":
-                method850,
+        return {
+            "available": True,
+            "bottom_pressure_hpa": round(bottom, 2),
+            "top_pressure_hpa": round(top, 2),
+            "magnitude_kg_m1_s1": round(float(magnitude), 1),
+            "u_kg_m1_s1": round(float(ivt_u), 1),
+            "v_kg_m1_s1": round(float(ivt_v), 1),
+            "transport_to_direction_deg": round(
+                vector_to_direction(ivt_u, ivt_v),
+                1
+            ),
+            "sample_count": len(samples),
+            "max_pressure_gap_hpa": round(max_gap, 1),
+            "integration": "pressure_coordinate_trapezoidal",
+            "formula": "IVT=(1/g)*integral(q*V dp)",
         }
 
-    # --------------------------------------------------------
-    # IVT: spodnji razpoložljivi nivo -> 300 hPa
-    # --------------------------------------------------------
-
-    ivt_rows = [
-        row for row in rows
-        if float(row["pressure_hpa"]) >= 300.0
-    ]
-
-    if len(ivt_rows) < 10:
-        result["ivt"] = {
-            "available": False
-        }
-        return result
-
-    # Če ni točno 300 hPa, profil končamo na zadnjem nivoju
-    # tik nad 300 hPa. Pri LJLM je 300 hPa praviloma prisoten.
-    p_pa = []
-    q_values = []
-    u_values = []
-    v_values = []
-
-    for row in ivt_rows:
-        try:
-            q, u_ms, v_ms = moisture_state(row)
-        except Exception:
-            continue
-
-        p_pa.append(
-            float(row["pressure_hpa"]) * 100.0
-        )
-        q_values.append(q)
-        u_values.append(u_ms)
-        v_values.append(v_ms)
-
-    if len(p_pa) < 10:
-        result["ivt"] = {
-            "available": False
-        }
-        return result
-
-    p_pa = np.asarray(p_pa, dtype=float)
-    q_values = np.asarray(q_values, dtype=float)
-    u_values = np.asarray(u_values, dtype=float)
-    v_values = np.asarray(v_values, dtype=float)
-
-    # Profil je urejen od visokega proti nizkemu tlaku.
-    # np.trapezoid bi zato dal negativen integral; obrnemo predznak.
-    gravity = 9.80665
-
-    ivt_u = (
-        -np.trapezoid(
-            q_values * u_values,
-            p_pa
-        )
-        / gravity
+    total_ivt = integrate_ivt(
+        surface_state["pressure_hpa"],
+        300.0,
+        surface_bottom=True
     )
 
-    ivt_v = (
-        -np.trapezoid(
-            q_values * v_values,
-            p_pa
-        )
-        / gravity
-    )
+    if total_ivt.get("available"):
+        total_ivt["layer"] = "lowest_common_level_to_300hpa"
 
-    ivt_mag = math.sqrt(
-        ivt_u ** 2 + ivt_v ** 2
-    )
+    result["ivt"] = total_ivt
 
-    ivt_to_deg = (
-        math.degrees(
-            math.atan2(ivt_u, ivt_v)
-        ) % 360.0
-    )
-
-    result["ivt"] = {
-        "available": True,
-
-        "layer":
-            "lowest_common_level_to_300hpa",
-
-        "bottom_pressure_hpa":
-            round(float(p_pa[0]) / 100.0, 2),
-
-        "top_pressure_hpa":
-            round(float(p_pa[-1]) / 100.0, 2),
-
-        "magnitude_kg_m1_s1":
-            round(float(ivt_mag), 1),
-
-        "u_kg_m1_s1":
-            round(float(ivt_u), 1),
-
-        "v_kg_m1_s1":
-            round(float(ivt_v), 1),
-
-        # Smer, KAMOR je usmerjen IVT.
-        "transport_to_direction_deg":
-            round(float(ivt_to_deg), 1),
-
-        "integration":
-            "pressure_coordinate_trapezoidal",
-
-        "formula":
-            "IVT=(1/g)*integral(q*V dp)",
+    layer_ivt = {
+        "surface_850": integrate_ivt(
+            surface_state["pressure_hpa"],
+            850.0,
+            surface_bottom=True
+        ),
+        "surface_700": integrate_ivt(
+            surface_state["pressure_hpa"],
+            700.0,
+            surface_bottom=True
+        ),
+        "850_700": integrate_ivt(850.0, 700.0),
+        "700_500": integrate_ivt(700.0, 500.0),
     }
+
+    result["layer_ivt"] = layer_ivt
+
+    # --------------------------------------------------------
+    # Cross-barrier / upslope projections
+    # --------------------------------------------------------
+
+    orographic = {
+        "available": True,
+        "version": 1,
+        "vector_convention": (
+            "u positive east, v positive north; azimuth clockwise from north; "
+            "positive signed_cross_barrier means transport toward the barrier"
+        ),
+        "interpretation": (
+            "upslope is max(0, signed cross-barrier transport). "
+            "This is a moisture-transport diagnostic, not a direct rainfall forecast."
+        ),
+        "barriers": {},
+    }
+
+    ivt_vectors = {
+        "total": total_ivt,
+        **layer_ivt,
+    }
+
+    for barrier_key, config in OROGRAPHIC_BARRIERS.items():
+        beta = float(config["upslope_normal_azimuth_deg"])
+
+        barrier_result = {
+            "label": config["label"],
+            "upslope_normal_azimuth_deg": beta,
+            "method": config["method"],
+            "ivt": {},
+            "point_moisture_flux": {},
+        }
+
+        for layer_key, item in ivt_vectors.items():
+            if not isinstance(item, dict) or not item.get("available"):
+                continue
+
+            magnitude = item.get("magnitude_kg_m1_s1")
+            u = item.get("u_kg_m1_s1")
+            v = item.get("v_kg_m1_s1")
+
+            if not all(valid_number(x) for x in [magnitude, u, v]):
+                continue
+
+            projected = projection_onto_barrier(
+                float(u),
+                float(v),
+                float(magnitude),
+                beta
+            )
+
+            barrier_result["ivt"][layer_key] = {
+                "signed_cross_barrier_kg_m1_s1": round(
+                    projected["signed_cross_barrier"],
+                    1
+                ),
+                "upslope_kg_m1_s1": round(
+                    projected["upslope"],
+                    1
+                ),
+                "signed_fraction": (
+                    round(projected["signed_fraction"], 3)
+                    if projected["signed_fraction"] is not None
+                    else None
+                ),
+                "upslope_fraction": (
+                    round(projected["upslope_fraction"], 3)
+                    if projected["upslope_fraction"] is not None
+                    else None
+                ),
+                "upslope_fraction_pct": (
+                    round(projected["upslope_fraction"] * 100.0, 1)
+                    if projected["upslope_fraction"] is not None
+                    else None
+                ),
+                "angle_to_upslope_normal_deg": (
+                    round(projected["angle_to_upslope_normal_deg"], 1)
+                    if projected["angle_to_upslope_normal_deg"] is not None
+                    else None
+                ),
+            }
+
+        for pressure_key, item in point_fluxes.items():
+            magnitude = item.get("qv_magnitude_gkg_ms")
+            u = item.get("qv_u_gkg_ms")
+            v = item.get("qv_v_gkg_ms")
+
+            if not all(valid_number(x) for x in [magnitude, u, v]):
+                continue
+
+            projected = projection_onto_barrier(
+                float(u),
+                float(v),
+                float(magnitude),
+                beta
+            )
+
+            barrier_result["point_moisture_flux"][pressure_key] = {
+                "signed_cross_barrier_gkg_ms": round(
+                    projected["signed_cross_barrier"],
+                    2
+                ),
+                "upslope_gkg_ms": round(
+                    projected["upslope"],
+                    2
+                ),
+                "upslope_fraction_pct": (
+                    round(projected["upslope_fraction"] * 100.0, 1)
+                    if projected["upslope_fraction"] is not None
+                    else None
+                ),
+                "angle_to_upslope_normal_deg": (
+                    round(projected["angle_to_upslope_normal_deg"], 1)
+                    if projected["angle_to_upslope_normal_deg"] is not None
+                    else None
+                ),
+            }
+
+        orographic["barriers"][barrier_key] = barrier_result
+
+    result["orographic_cross_barrier"] = orographic
 
     return result
 
@@ -2602,6 +2768,39 @@ def calculate_metpy_parameters(levels):
         item = wind_at_pressure(levels, pressure_level)
         if item is not None:
             result["standard_winds"][str(pressure_level)] = item
+
+    # Surface-to-700 hPa shear: operational analogue of the robust
+    # historical IGRA shear proxy used in the climatology.
+    result["shear_sfc_700_ms"] = surface_to_pressure_shear(
+        levels,
+        700.0
+    )
+
+    # Reported/interpolated geopotential height diagnostics.
+    z925 = simple_pressure_value(
+        levels,
+        "height_m",
+        925.0
+    )
+    z500 = simple_pressure_value(
+        levels,
+        "height_m",
+        500.0
+    )
+
+    result["z500_m"] = (
+        round(float(z500), 1)
+        if z500 is not None
+        else None
+    )
+
+    result["thickness_925_500_m"] = (
+        round(float(z500) - float(z925), 1)
+        if z500 is not None
+        and z925 is not None
+        and float(z500) > float(z925)
+        else None
+    )
 
     wind = prepare_wind_profile(levels)
 
@@ -3374,6 +3573,10 @@ def climatology_result(
             climatology_parameter
             .get("p90"),
 
+        "p95":
+            climatology_parameter
+            .get("p95"),
+
         "p99":
             climatology_parameter
             .get("p99"),
@@ -3393,6 +3596,22 @@ def climatology_result(
         "historical_max_date":
             climatology_parameter
             .get("max_date"),
+
+        "fraction_gt_0":
+            climatology_parameter
+            .get("fraction_gt_0"),
+
+        "fraction_gt_100":
+            climatology_parameter
+            .get("fraction_gt_100"),
+
+        "fraction_gt_500":
+            climatology_parameter
+            .get("fraction_gt_500"),
+
+        "fraction_gt_1000":
+            climatology_parameter
+            .get("fraction_gt_1000"),
     }
 
     return result
@@ -3426,41 +3645,81 @@ def calculate_climatology_comparison(
     current_values = {}
 
     for pressure in [850, 700, 500]:
-
         item = standard_levels.get(
             f"t{pressure}"
         )
 
-        current_values[
-            f"t{pressure}"
-        ] = (
+        current_values[f"t{pressure}"] = (
             item.get("value")
             if item is not None
             else None
         )
 
-    current_values[
-        "pwat_mm"
-    ] = metpy_parameters.get(
-        "pwat_mm"
-    )
-
-    current_values[
-        "freezing_level_msl_m"
-    ] = metpy_parameters.get(
+    current_values["pwat_mm"] = metpy_parameters.get("pwat_mm")
+    current_values["freezing_level_msl_m"] = metpy_parameters.get(
         "freezing_level_msl_m"
     )
-
-    current_values[
-        "lapse_rate_850_500_c_per_km"
-    ] = metpy_parameters.get(
+    current_values["lapse_rate_850_500_c_per_km"] = metpy_parameters.get(
         "lapse_rate_850_500_c_per_km"
     )
+    current_values["lapse_rate_700_500_c_per_km"] = metpy_parameters.get(
+        "lapse_rate_700_500_c_per_km"
+    )
+    current_values["mucape_jkg"] = metpy_parameters.get("mucape_jkg")
 
-    current_values[
-        "lapse_rate_700_500_c_per_km"
-    ] = metpy_parameters.get(
-        "lapse_rate_700_500_c_per_km"
+    moisture = metpy_parameters.get(
+        "moisture_transport",
+        {}
+    )
+    humidity = moisture.get(
+        "humidity_profile",
+        {}
+    )
+
+    current_values["q_surface_gkg"] = (
+        humidity.get("surface") or {}
+    ).get("specific_humidity_gkg")
+
+    current_values["q925_gkg"] = (
+        humidity.get("925") or {}
+    ).get("specific_humidity_gkg")
+
+    current_values["q850_gkg"] = (
+        humidity.get("850") or {}
+    ).get("specific_humidity_gkg")
+
+    current_values["ivt_kg_m_s"] = (
+        moisture.get("ivt") or {}
+    ).get("magnitude_kg_m1_s1")
+
+    standard_winds = metpy_parameters.get(
+        "standard_winds",
+        {}
+    )
+
+    for pressure in [925, 850, 700, 500, 300]:
+        current_values[f"wind_speed_{pressure}_ms"] = (
+            standard_winds.get(str(pressure)) or {}
+        ).get("speed_ms")
+
+    current_values["shear_0_1km_ms"] = metpy_parameters.get(
+        "shear_0_1km_ms"
+    )
+    current_values["shear_0_3km_ms"] = metpy_parameters.get(
+        "shear_0_3km_ms"
+    )
+    current_values["shear_0_6km_ms"] = metpy_parameters.get(
+        "shear_0_6km_ms"
+    )
+    current_values["shear_sfc_700_ms"] = metpy_parameters.get(
+        "shear_sfc_700_ms"
+    )
+
+    current_values["z500_m"] = metpy_parameters.get(
+        "z500_m"
+    )
+    current_values["thickness_925_500_m"] = metpy_parameters.get(
+        "thickness_925_500_m"
     )
 
     parameters = {}
@@ -3650,6 +3909,29 @@ COMPARISON_PARAMETERS = {
             "lapse_rate_850_500_c_per_km"
         ],
         "degC/km"
+    ),
+    "shear_sfc_700_ms": (
+        "Surface-700 hPa shear",
+        ["parameters", "metpy", "shear_sfc_700_ms"],
+        "m/s"
+    ),
+    "z500_m": (
+        "Z500",
+        ["parameters", "metpy", "z500_m"],
+        "m"
+    ),
+    "thickness_925_500_m": (
+        "925-500 hPa thickness",
+        ["parameters", "metpy", "thickness_925_500_m"],
+        "m"
+    ),
+    "ivt_surface_700_kg_m1_s1": (
+        "IVT surface-700 hPa",
+        [
+            "parameters", "metpy", "moisture_transport",
+            "layer_ivt", "surface_700", "magnitude_kg_m1_s1"
+        ],
+        "kg m-1 s-1"
     ),
 }
 
@@ -4437,7 +4719,7 @@ def print_summary(profile):
         print("--- MOISTURE TRANSPORT ---")
 
     if humidity_profile:
-        for label in ["surface", "925", "850"]:
+        for label in ["surface", "925", "850", "700"]:
             item = humidity_profile.get(label)
             if item is None:
                 continue
@@ -4521,6 +4803,106 @@ def print_summary(profile):
             ),
             "hPa"
         )
+
+
+    layer_ivt = moisture_transport.get(
+        "layer_ivt",
+        {}
+    )
+
+    if layer_ivt:
+        print()
+        print("Layer IVT:")
+
+        for layer_key, label in [
+            ("surface_850", "surface-850"),
+            ("surface_700", "surface-700"),
+            ("850_700", "850-700"),
+            ("700_500", "700-500"),
+        ]:
+            item = layer_ivt.get(layer_key, {})
+            if not item.get("available"):
+                continue
+
+            print(
+                " ",
+                label + ":",
+                item.get("magnitude_kg_m1_s1"),
+                "kg m-1 s-1 | toward",
+                item.get("transport_to_direction_deg"),
+                "deg"
+            )
+
+    point_fluxes = moisture_transport.get(
+        "point_moisture_transport",
+        {}
+    )
+
+    if point_fluxes:
+        print()
+        print("Point moisture flux qV:")
+
+        for pressure_level in ["925", "850", "700"]:
+            item = point_fluxes.get(pressure_level)
+            if item is None:
+                continue
+
+            print(
+                " ",
+                pressure_level + " hPa:",
+                item.get("qv_magnitude_gkg_ms"),
+                "g/kg*m/s | toward",
+                item.get("transport_to_direction_deg"),
+                "deg"
+            )
+
+    orographic = moisture_transport.get(
+        "orographic_cross_barrier",
+        {}
+    )
+
+    barriers = orographic.get(
+        "barriers",
+        {}
+    )
+
+    if barriers:
+        print()
+        print("--- OROGRAPHIC MOISTURE TRANSPORT ---")
+
+        for barrier_key in [
+            "dinaric_west",
+            "julian_south",
+            "julian_central",
+            "kamnik_savinja",
+        ]:
+            barrier = barriers.get(barrier_key)
+            if barrier is None:
+                continue
+
+            sfc700 = (
+                barrier.get("ivt", {})
+                .get("surface_700", {})
+            )
+            qv850 = (
+                barrier.get("point_moisture_flux", {})
+                .get("850", {})
+            )
+
+            print(
+                barrier.get("label"),
+                "| normal",
+                barrier.get("upslope_normal_azimuth_deg"),
+                "deg | SFC-700 upslope IVT:",
+                sfc700.get("upslope_kg_m1_s1"),
+                "kg m-1 s-1",
+                "| fraction:",
+                sfc700.get("upslope_fraction_pct"),
+                "%",
+                "| 850 qV upslope:",
+                qv850.get("upslope_gkg_ms"),
+                "g/kg*m/s"
+            )
 
     change = p.get(
         "change",
@@ -4632,6 +5014,22 @@ def print_summary(profile):
             "freezing_level_msl_m",
             "lapse_rate_850_500_c_per_km",
             "lapse_rate_700_500_c_per_km",
+            "q_surface_gkg",
+            "q925_gkg",
+            "q850_gkg",
+            "ivt_kg_m_s",
+            "wind_speed_925_ms",
+            "wind_speed_850_ms",
+            "wind_speed_700_ms",
+            "wind_speed_500_ms",
+            "wind_speed_300_ms",
+            "shear_0_1km_ms",
+            "shear_0_3km_ms",
+            "shear_0_6km_ms",
+            "shear_sfc_700_ms",
+            "z500_m",
+            "thickness_925_500_m",
+            "mucape_jkg",
         ]:
 
             item = clim_parameters.get(
