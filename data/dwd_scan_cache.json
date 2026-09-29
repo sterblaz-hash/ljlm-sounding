@@ -1944,7 +1944,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-09-29T11:30:00Z",
       "profile_level_count": 1756,
-      "scanned_at": "2026-09-29T13:57:44.986795Z"
+      "scanned_at": "2026-09-29T14:01:55.943043Z"
     },
     "Z__C_EDZW_20260929123009_bda01%2Ctemp_bufr_999999_999999__MW_371.bin": {
       "contains_ljlm": false,
@@ -1954,7 +1954,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-09-29T11:30:00Z",
       "profile_level_count": 1953,
-      "scanned_at": "2026-09-29T13:57:39.978785Z"
+      "scanned_at": "2026-09-29T14:01:52.303978Z"
     },
     "Z__C_EDZW_20260929123802_bda01%2Ctemp_bufr_999999_999999__MW_373.bin": {
       "contains_ljlm": false,
@@ -2079,8 +2079,12 @@
     "Z__C_EDZW_20260929134702_bda01%2Ctemp_bufr_999999_999999__MW_403.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-09-29T13:57:35.331751Z"
+    },
+    "Z__C_EDZW_20260929135304_bda01%2Ctemp_bufr_999999_999999__MW_404.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-09-29T14:01:49.195915Z"
     }
   },
-  "updated_at": "2026-09-29T13:57:53.999250Z",
+  "updated_at": "2026-09-29T14:01:55.943344Z",
   "version": 1
 }

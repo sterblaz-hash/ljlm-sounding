@@ -6,8 +6,8 @@
   "nominal_date": "2026-09-29",
   "term": "12",
   "launch_time": "2026-09-29T11:30:00Z",
-  "processed_at": "2026-09-29T13:57:54.018970Z",
-  "rendered_at": "2026-09-29T13:58:01.291936Z",
+  "processed_at": "2026-09-29T14:01:55.950937Z",
+  "rendered_at": "2026-09-29T14:02:01.006658Z",
   "latest": {
     "skewt": "diagnostics/latest_skewt.png",
     "lowlevel": "diagnostics/latest_lowlevel.png",
