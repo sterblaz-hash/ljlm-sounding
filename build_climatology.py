@@ -39,6 +39,15 @@ MAX_WIND_HEIGHT_GAP_M = 1500.0
 
 STANDARD_WIND_LEVELS = (925, 850, 700, 500, 300)
 
+# Conservative gross-error QC for historical IGRA thermodynamic profiles.
+# These thresholds are intended to catch obvious encoding/merge artefacts,
+# not real inversions or ordinary sharp layers.
+THERMO_QC_TIGHT_GAP_HPA = 30.0
+THERMO_QC_TIGHT_GAP_TEMP_JUMP_C = 12.0
+THERMO_QC_BROAD_GAP_HPA = 75.0
+THERMO_QC_BROAD_GAP_TEMP_JUMP_C = 20.0
+
+
 PARAMETERS = [
     "t850",
     "t700",
@@ -1057,75 +1066,105 @@ def thickness(levels, bottom_pressure, top_pressure):
 def calculate_profile_parameters(profile):
     levels = profile["levels"]
 
+    thermo_qc = thermodynamic_profile_qc(levels)
+
     result = {
         "date": profile["date"],
         "hour": profile["hour"],
+        "_thermo_qc": thermo_qc,
     }
 
-    # Temperature
-    result["t850"] = interpolate_pressure(
-        levels,
-        "temperature_c",
-        850,
-    )
-    result["t700"] = interpolate_pressure(
-        levels,
-        "temperature_c",
-        700,
-    )
-    result["t500"] = interpolate_pressure(
-        levels,
-        "temperature_c",
-        500,
-    )
+    # --------------------------------------------------------
+    # Thermodynamic / moisture diagnostics.
+    # Grossly corrupted thermodynamic profiles are excluded
+    # from these variables, but wind/geopotential diagnostics
+    # below are still retained.
+    # --------------------------------------------------------
 
-    # Moisture / stability
-    result["pwat_mm"] = calculate_pwat(levels)
-    result["freezing_level_msl_m"] = freezing_level(levels)
+    if thermo_qc["passed"]:
+        # Temperature
+        result["t850"] = interpolate_pressure(
+            levels,
+            "temperature_c",
+            850,
+        )
+        result["t700"] = interpolate_pressure(
+            levels,
+            "temperature_c",
+            700,
+        )
+        result["t500"] = interpolate_pressure(
+            levels,
+            "temperature_c",
+            500,
+        )
 
-    result["lapse_rate_850_500_c_per_km"] = pressure_lapse_rate(
-        levels,
-        850,
-        500,
-    )
-    result["lapse_rate_700_500_c_per_km"] = pressure_lapse_rate(
-        levels,
-        700,
-        500,
-    )
+        # Moisture / stability
+        result["pwat_mm"] = calculate_pwat(levels)
+        result["freezing_level_msl_m"] = freezing_level(levels)
 
-    result["q_surface_gkg"] = q_surface(levels)
-    result["q925_gkg"] = q_at_pressure(levels, 925)
-    result["q850_gkg"] = q_at_pressure(levels, 850)
-    result["mucape_jkg"] = calculate_mucape(levels)
+        result["lapse_rate_850_500_c_per_km"] = pressure_lapse_rate(
+            levels,
+            850,
+            500,
+        )
+        result["lapse_rate_700_500_c_per_km"] = pressure_lapse_rate(
+            levels,
+            700,
+            500,
+        )
 
-    # Integrated moisture transport
-    result["ivt_kg_m_s"] = calculate_ivt(levels)
+        result["q_surface_gkg"] = q_surface(levels)
+        result["q925_gkg"] = q_at_pressure(levels, 925)
+        result["q850_gkg"] = q_at_pressure(levels, 850)
+        result["mucape_jkg"] = calculate_mucape(levels)
 
-    # Standard-level wind speed
+        # Integrated moisture transport
+        result["ivt_kg_m_s"] = calculate_ivt(levels)
+
+    else:
+        for parameter in [
+            "t850",
+            "t700",
+            "t500",
+            "pwat_mm",
+            "freezing_level_msl_m",
+            "lapse_rate_850_500_c_per_km",
+            "lapse_rate_700_500_c_per_km",
+            "q_surface_gkg",
+            "q925_gkg",
+            "q850_gkg",
+            "mucape_jkg",
+            "ivt_kg_m_s",
+        ]:
+            result[parameter] = None
+
+    # --------------------------------------------------------
+    # Wind diagnostics remain usable even if thermo QC fails.
+    # --------------------------------------------------------
+
     for level in STANDARD_WIND_LEVELS:
         result[f"wind_speed_{level}_ms"] = wind_speed_at_pressure(
             levels,
             level,
         )
 
-    # Bulk shear
     result["shear_0_1km_ms"] = bulk_shear(levels, 1000)
     result["shear_0_3km_ms"] = bulk_shear(levels, 3000)
     result["shear_0_6km_ms"] = bulk_shear(levels, 6000)
 
-    # Robust historical lower-tropospheric analogue.
-    # Kept separate from true 0–3 km AGL shear.
     result["shear_sfc_700_ms"] = surface_to_pressure_shear(
         levels,
         700,
     )
 
-    # Synoptic / thickness
+    # --------------------------------------------------------
+    # Geopotential / thickness are retained independently of
+    # thermodynamic-profile QC because they use reported heights.
+    # --------------------------------------------------------
+
     result["z500_m"] = geopotential_height_at_pressure(levels, 500)
 
-    # 1000 hPa can be below ground at Ljubljana; in that case interpolation
-    # naturally returns None. 925–500 hPa is kept as the robust local analogue.
     result["thickness_1000_500_m"] = thickness(
         levels,
         1000,
@@ -1288,11 +1327,123 @@ def extreme_dates(pool, parameter):
 
 
 # ============================================================
+# GROSS-ERROR QC TERMODINAMIČNEGA PROFILA
+# ============================================================
+
+def thermodynamic_profile_qc(levels):
+    """
+    Conservative gross-error screen for historical IGRA P/T/Td profiles.
+
+    A profile is rejected for thermodynamic/climatological parameters only
+    when temperature contains an implausibly large adjacent-level jump:
+
+      * >= 12 C across <= 30 hPa, or
+      * >= 20 C across <= 75 hPa.
+
+    Wind-only and geopotential/thickness diagnostics are retained even when
+    this thermodynamic screen fails.
+
+    Dewpoint jumps are reported as warnings but are not, by themselves,
+    used for hard rejection because real moisture discontinuities can be
+    much sharper than temperature gradients.
+    """
+
+    rows = [
+        x for x in levels
+        if valid_number(x.get("pressure_hpa"))
+        and valid_number(x.get("temperature_c"))
+    ]
+
+    rows.sort(
+        key=lambda x: float(x["pressure_hpa"]),
+        reverse=True,
+    )
+
+    # Deduplicate pressure.
+    unique = []
+    seen = set()
+
+    for row in rows:
+        key = round(float(row["pressure_hpa"]), 2)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(row)
+
+    hard_reasons = []
+    warnings = []
+
+    for lower, upper in zip(unique[:-1], unique[1:]):
+        p1 = float(lower["pressure_hpa"])
+        p2 = float(upper["pressure_hpa"])
+        dp = abs(p1 - p2)
+
+        t1 = float(lower["temperature_c"])
+        t2 = float(upper["temperature_c"])
+        dt = t2 - t1
+        abs_dt = abs(dt)
+
+        hard = False
+        threshold = None
+
+        if (
+            dp <= THERMO_QC_TIGHT_GAP_HPA
+            and abs_dt >= THERMO_QC_TIGHT_GAP_TEMP_JUMP_C
+        ):
+            hard = True
+            threshold = "tight_gap"
+
+        elif (
+            dp <= THERMO_QC_BROAD_GAP_HPA
+            and abs_dt >= THERMO_QC_BROAD_GAP_TEMP_JUMP_C
+        ):
+            hard = True
+            threshold = "broad_gap"
+
+        if hard:
+            hard_reasons.append({
+                "type": "temperature_jump",
+                "threshold": threshold,
+                "p1_hpa": round(p1, 1),
+                "p2_hpa": round(p2, 1),
+                "delta_p_hpa": round(dp, 1),
+                "t1_c": round(t1, 1),
+                "t2_c": round(t2, 1),
+                "delta_t_c": round(dt, 1),
+            })
+
+        td1 = lower.get("dewpoint_c")
+        td2 = upper.get("dewpoint_c")
+
+        if valid_number(td1) and valid_number(td2):
+            dtd = float(td2) - float(td1)
+
+            # Warning only: useful for investigating moisture artefacts.
+            if dp <= 30.0 and abs(dtd) >= 12.0:
+                warnings.append({
+                    "type": "dewpoint_jump_warning",
+                    "p1_hpa": round(p1, 1),
+                    "p2_hpa": round(p2, 1),
+                    "delta_p_hpa": round(dp, 1),
+                    "td1_c": round(float(td1), 1),
+                    "td2_c": round(float(td2), 1),
+                    "delta_td_c": round(dtd, 1),
+                })
+
+    return {
+        "passed": len(hard_reasons) == 0,
+        "hard_reasons": hard_reasons,
+        "warnings": warnings,
+    }
+
+
+# ============================================================
 # DIAGNOSTIKA EKSTREMOV
 # ============================================================
 
 EXTREME_QC_DATES = {
     date(2018, 12, 22): "MUCAPE maximum candidate",
+    date(2010, 8, 6): "second-highest MUCAPE candidate",
     date(2009, 10, 3): "q925 maximum candidate",
 }
 
@@ -1396,6 +1547,47 @@ def profile_thermo_qc(levels):
     }
 
 
+def print_thermodynamic_qc_summary(calculated):
+    failed = [
+        r for r in calculated
+        if isinstance(r.get("_thermo_qc"), dict)
+        and r["_thermo_qc"].get("passed") is False
+    ]
+
+    warned = [
+        r for r in calculated
+        if isinstance(r.get("_thermo_qc"), dict)
+        and r["_thermo_qc"].get("warnings")
+    ]
+
+    print()
+    print("=" * 72)
+    print("THERMODYNAMIC GROSS-ERROR QC")
+    print("=" * 72)
+    print("  profiles checked:", len(calculated))
+    print("  hard-failed profiles:", len(failed))
+    print("  profiles with dewpoint warnings:", len(warned))
+
+    if failed:
+        print()
+        print("  Hard-failed profiles:")
+        for record in failed[:30]:
+            reasons = record["_thermo_qc"].get("hard_reasons", [])
+            print(
+                "   ",
+                record["date"],
+                f"{record['hour']:02d} UTC",
+                reasons,
+            )
+
+        if len(failed) > 30:
+            print(
+                "   ...",
+                len(failed) - 30,
+                "additional hard-failed profiles not shown",
+            )
+
+
 def print_extreme_rankings(calculated, top_n=10):
     print()
     print("=" * 72)
@@ -1443,6 +1635,7 @@ def print_extreme_profile_details(profiles):
         label = EXTREME_QC_DATES[profile["date"]]
         parameters = calculate_profile_parameters(profile)
         qc = profile_thermo_qc(profile["levels"])
+        gross_qc = thermodynamic_profile_qc(profile["levels"])
 
         print()
         print("-" * 72)
@@ -1462,6 +1655,7 @@ def print_extreme_profile_details(profiles):
         print("T850:", parameters.get("t850"), "°C")
         print("T700:", parameters.get("t700"), "°C")
         print("T500:", parameters.get("t500"), "°C")
+        print("Gross-error QC:", gross_qc)
         print("Thermo QC:", qc)
 
         print()
@@ -1828,6 +2022,7 @@ def main():
             calculate_profile_parameters(profile)
         )
 
+    print_thermodynamic_qc_summary(calculated)
     print_extreme_rankings(calculated)
     print_extreme_profile_details(profiles)
 
@@ -1901,6 +2096,13 @@ def main():
             "mucape_method": (
                 "MetPy most_unstable_cape_cin from common P/T/Td levels. "
                 "Profile must begin within 50 hPa of sounding bottom and reach 300 hPa."
+            ),
+            "thermodynamic_gross_error_qc": (
+                "Thermodynamic and moisture-derived parameters are excluded when "
+                "adjacent temperature levels show >=12 C jump across <=30 hPa or "
+                ">=20 C jump across <=75 hPa. Wind and reported geopotential-height "
+                "diagnostics are retained. Large dewpoint jumps are logged as warnings "
+                "but are not hard-rejection criteria."
             ),
             "mucape_distribution_note": (
                 "Because MUCAPE has a large point mass at zero, occurrence fractions "
