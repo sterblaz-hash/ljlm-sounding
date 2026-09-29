@@ -22962,7 +22962,7 @@
   "source": "DWD Open Data BUFR",
   "source_file": "Z__C_EDZW_20260929123511_bda01,temp_bufr_999999_999999__MW_372.bin",
   "retrieved_at": "2026-09-29T13:05:16.077256Z",
-  "processed_at": "2026-09-29T13:47:32.334545Z",
+  "processed_at": "2026-09-29T13:57:54.018970Z",
   "term": "12",
   "nominal_date": "2026-09-29",
   "sounding_classification": {
@@ -23189,52 +23189,69 @@
         },
         "orographic_cross_barrier": {
           "available": true,
-          "version": 1,
+          "version": 2,
+          "primary_metric": "terrain_capped_ivt",
           "vector_convention": "u positive east, v positive north; azimuth clockwise from north; positive signed_cross_barrier means transport toward the barrier",
-          "interpretation": "upslope is max(0, signed cross-barrier transport). This is a moisture-transport diagnostic, not a direct rainfall forecast.",
+          "interpretation": "The primary orographic metric integrates moisture transport from the sounding surface to a representative barrier height, then projects that IVT onto the barrier-normal upslope direction. Generic pressure-layer IVT remains diagnostic context. This is a moisture-transport diagnostic, not a direct rainfall forecast.",
           "barriers": {
             "dinaric_west": {
               "label": "Dinaric barrier – Trnovski gozd / Nanos / Snežnik",
               "upslope_normal_azimuth_deg": 45.0,
-              "method": "literature_based_v1",
-              "ivt": {
+              "representative_barrier_height_msl_m": 1500.0,
+              "orientation_method": "literature_based_v1",
+              "height_method": "provisional_operational_v1",
+              "terrain_capped_ivt": {
+                "available": true,
+                "bottom_pressure_hpa": 991.5,
+                "top_pressure_hpa": 860.6,
+                "magnitude_kg_m1_s1": 21.7,
+                "u_kg_m1_s1": -20.3,
+                "v_kg_m1_s1": 7.7,
+                "transport_to_direction_deg": 290.8,
+                "sample_count": 93,
+                "max_pressure_gap_hpa": 3.7,
+                "integration": "pressure_coordinate_trapezoidal",
+                "formula": "IVT=(1/g)*integral(q*V dp)",
+                "surface_height_msl_m": 299.0,
+                "target_height_msl_m": 1500.0,
+                "layer_depth_m": 1201.0,
+                "top_boundary_method": "height_interpolation_log_pressure",
+                "layer": "lowest_common_level_to_1500m_msl",
+                "signed_cross_barrier_kg_m1_s1": -8.9,
+                "upslope_kg_m1_s1": 0.0,
+                "signed_fraction": -0.411,
+                "upslope_fraction": 0.0,
+                "upslope_fraction_pct": 0.0,
+                "angle_to_upslope_normal_deg": 114.2
+              },
+              "diagnostic_pressure_layer_ivt": {
                 "total": {
                   "signed_cross_barrier_kg_m1_s1": -7.8,
                   "upslope_kg_m1_s1": 0.0,
-                  "signed_fraction": -0.378,
-                  "upslope_fraction": 0.0,
                   "upslope_fraction_pct": 0.0,
                   "angle_to_upslope_normal_deg": 112.2
                 },
                 "surface_850": {
                   "signed_cross_barrier_kg_m1_s1": -8.3,
                   "upslope_kg_m1_s1": 0.0,
-                  "signed_fraction": -0.354,
-                  "upslope_fraction": 0.0,
                   "upslope_fraction_pct": 0.0,
                   "angle_to_upslope_normal_deg": 110.7
                 },
                 "surface_700": {
                   "signed_cross_barrier_kg_m1_s1": -3.0,
                   "upslope_kg_m1_s1": 0.0,
-                  "signed_fraction": -0.143,
-                  "upslope_fraction": 0.0,
                   "upslope_fraction_pct": 0.0,
                   "angle_to_upslope_normal_deg": 98.2
                 },
                 "850_700": {
                   "signed_cross_barrier_kg_m1_s1": 5.3,
                   "upslope_kg_m1_s1": 5.3,
-                  "signed_fraction": 1.001,
-                  "upslope_fraction": 1.001,
                   "upslope_fraction_pct": 100.1,
                   "angle_to_upslope_normal_deg": 0.0
                 },
                 "700_500": {
                   "signed_cross_barrier_kg_m1_s1": -3.1,
                   "upslope_kg_m1_s1": 0.0,
-                  "signed_fraction": -0.972,
-                  "upslope_fraction": 0.0,
                   "upslope_fraction_pct": 0.0,
                   "angle_to_upslope_normal_deg": 166.5
                 }
@@ -23263,45 +23280,61 @@
             "julian_south": {
               "label": "Southern Julian Alps – Tolmin / Bohinj sector",
               "upslope_normal_azimuth_deg": 45.0,
-              "method": "literature_based_v1",
-              "ivt": {
+              "representative_barrier_height_msl_m": 2000.0,
+              "orientation_method": "literature_based_v1",
+              "height_method": "provisional_operational_v1",
+              "terrain_capped_ivt": {
+                "available": true,
+                "bottom_pressure_hpa": 991.5,
+                "top_pressure_hpa": 810.2,
+                "magnitude_kg_m1_s1": 27.1,
+                "u_kg_m1_s1": -23.0,
+                "v_kg_m1_s1": 14.3,
+                "transport_to_direction_deg": 301.9,
+                "sample_count": 144,
+                "max_pressure_gap_hpa": 3.7,
+                "integration": "pressure_coordinate_trapezoidal",
+                "formula": "IVT=(1/g)*integral(q*V dp)",
+                "surface_height_msl_m": 299.0,
+                "target_height_msl_m": 2000.0,
+                "layer_depth_m": 1701.0,
+                "top_boundary_method": "height_interpolation_log_pressure",
+                "layer": "lowest_common_level_to_2000m_msl",
+                "signed_cross_barrier_kg_m1_s1": -6.2,
+                "upslope_kg_m1_s1": 0.0,
+                "signed_fraction": -0.227,
+                "upslope_fraction": 0.0,
+                "upslope_fraction_pct": 0.0,
+                "angle_to_upslope_normal_deg": 103.1
+              },
+              "diagnostic_pressure_layer_ivt": {
                 "total": {
                   "signed_cross_barrier_kg_m1_s1": -7.8,
                   "upslope_kg_m1_s1": 0.0,
-                  "signed_fraction": -0.378,
-                  "upslope_fraction": 0.0,
                   "upslope_fraction_pct": 0.0,
                   "angle_to_upslope_normal_deg": 112.2
                 },
                 "surface_850": {
                   "signed_cross_barrier_kg_m1_s1": -8.3,
                   "upslope_kg_m1_s1": 0.0,
-                  "signed_fraction": -0.354,
-                  "upslope_fraction": 0.0,
                   "upslope_fraction_pct": 0.0,
                   "angle_to_upslope_normal_deg": 110.7
                 },
                 "surface_700": {
                   "signed_cross_barrier_kg_m1_s1": -3.0,
                   "upslope_kg_m1_s1": 0.0,
-                  "signed_fraction": -0.143,
-                  "upslope_fraction": 0.0,
                   "upslope_fraction_pct": 0.0,
                   "angle_to_upslope_normal_deg": 98.2
                 },
                 "850_700": {
                   "signed_cross_barrier_kg_m1_s1": 5.3,
                   "upslope_kg_m1_s1": 5.3,
-                  "signed_fraction": 1.001,
-                  "upslope_fraction": 1.001,
                   "upslope_fraction_pct": 100.1,
                   "angle_to_upslope_normal_deg": 0.0
                 },
                 "700_500": {
                   "signed_cross_barrier_kg_m1_s1": -3.1,
                   "upslope_kg_m1_s1": 0.0,
-                  "signed_fraction": -0.972,
-                  "upslope_fraction": 0.0,
                   "upslope_fraction_pct": 0.0,
                   "angle_to_upslope_normal_deg": 166.5
                 }
@@ -23330,45 +23363,61 @@
             "julian_central": {
               "label": "Central Julian Alps",
               "upslope_normal_azimuth_deg": 10.0,
-              "method": "literature_based_v1",
-              "ivt": {
+              "representative_barrier_height_msl_m": 2500.0,
+              "orientation_method": "literature_based_v1",
+              "height_method": "provisional_operational_v1",
+              "terrain_capped_ivt": {
+                "available": true,
+                "bottom_pressure_hpa": 991.5,
+                "top_pressure_hpa": 762.3,
+                "magnitude_kg_m1_s1": 26.6,
+                "u_kg_m1_s1": -21.5,
+                "v_kg_m1_s1": 15.6,
+                "transport_to_direction_deg": 306.0,
+                "sample_count": 194,
+                "max_pressure_gap_hpa": 3.7,
+                "integration": "pressure_coordinate_trapezoidal",
+                "formula": "IVT=(1/g)*integral(q*V dp)",
+                "surface_height_msl_m": 299.0,
+                "target_height_msl_m": 2500.0,
+                "layer_depth_m": 2201.0,
+                "top_boundary_method": "height_interpolation_log_pressure",
+                "layer": "lowest_common_level_to_2500m_msl",
+                "signed_cross_barrier_kg_m1_s1": 11.6,
+                "upslope_kg_m1_s1": 11.6,
+                "signed_fraction": 0.437,
+                "upslope_fraction": 0.437,
+                "upslope_fraction_pct": 43.7,
+                "angle_to_upslope_normal_deg": 64.1
+              },
+              "diagnostic_pressure_layer_ivt": {
                 "total": {
                   "signed_cross_barrier_kg_m1_s1": 4.6,
                   "upslope_kg_m1_s1": 4.6,
-                  "signed_fraction": 0.222,
-                  "upslope_fraction": 0.222,
                   "upslope_fraction_pct": 22.2,
                   "angle_to_upslope_normal_deg": 77.2
                 },
                 "surface_850": {
                   "signed_cross_barrier_kg_m1_s1": 5.8,
                   "upslope_kg_m1_s1": 5.8,
-                  "signed_fraction": 0.246,
-                  "upslope_fraction": 0.246,
                   "upslope_fraction_pct": 24.6,
                   "angle_to_upslope_normal_deg": 75.8
                 },
                 "surface_700": {
                   "signed_cross_barrier_kg_m1_s1": 9.6,
                   "upslope_kg_m1_s1": 9.6,
-                  "signed_fraction": 0.451,
-                  "upslope_fraction": 0.451,
                   "upslope_fraction_pct": 45.1,
                   "angle_to_upslope_normal_deg": 63.2
                 },
                 "850_700": {
                   "signed_cross_barrier_kg_m1_s1": 3.8,
                   "upslope_kg_m1_s1": 3.8,
-                  "signed_fraction": 0.72,
-                  "upslope_fraction": 0.72,
                   "upslope_fraction_pct": 72.0,
                   "angle_to_upslope_normal_deg": 43.9
                 },
                 "700_500": {
                   "signed_cross_barrier_kg_m1_s1": -3.0,
                   "upslope_kg_m1_s1": 0.0,
-                  "signed_fraction": -0.949,
-                  "upslope_fraction": 0.0,
                   "upslope_fraction_pct": 0.0,
                   "angle_to_upslope_normal_deg": 161.5
                 }
@@ -23397,45 +23446,61 @@
             "kamnik_savinja": {
               "label": "Kamnik–Savinja Alps",
               "upslope_normal_azimuth_deg": 0.0,
-              "method": "literature_based_v1",
-              "ivt": {
+              "representative_barrier_height_msl_m": 2200.0,
+              "orientation_method": "literature_based_v1",
+              "height_method": "provisional_operational_v1",
+              "terrain_capped_ivt": {
+                "available": true,
+                "bottom_pressure_hpa": 991.5,
+                "top_pressure_hpa": 790.6,
+                "magnitude_kg_m1_s1": 27.7,
+                "u_kg_m1_s1": -23.1,
+                "v_kg_m1_s1": 15.3,
+                "transport_to_direction_deg": 303.4,
+                "sample_count": 165,
+                "max_pressure_gap_hpa": 3.7,
+                "integration": "pressure_coordinate_trapezoidal",
+                "formula": "IVT=(1/g)*integral(q*V dp)",
+                "surface_height_msl_m": 299.0,
+                "target_height_msl_m": 2200.0,
+                "layer_depth_m": 1901.0,
+                "top_boundary_method": "height_interpolation_log_pressure",
+                "layer": "lowest_common_level_to_2200m_msl",
+                "signed_cross_barrier_kg_m1_s1": 15.3,
+                "upslope_kg_m1_s1": 15.3,
+                "signed_fraction": 0.552,
+                "upslope_fraction": 0.552,
+                "upslope_fraction_pct": 55.2,
+                "angle_to_upslope_normal_deg": 56.5
+              },
+              "diagnostic_pressure_layer_ivt": {
                 "total": {
                   "signed_cross_barrier_kg_m1_s1": 8.0,
                   "upslope_kg_m1_s1": 8.0,
-                  "signed_fraction": 0.388,
-                  "upslope_fraction": 0.388,
                   "upslope_fraction_pct": 38.8,
                   "angle_to_upslope_normal_deg": 67.1
                 },
                 "surface_850": {
                   "signed_cross_barrier_kg_m1_s1": 9.6,
                   "upslope_kg_m1_s1": 9.6,
-                  "signed_fraction": 0.41,
-                  "upslope_fraction": 0.41,
                   "upslope_fraction_pct": 41.0,
                   "angle_to_upslope_normal_deg": 65.8
                 },
                 "surface_700": {
                   "signed_cross_barrier_kg_m1_s1": 12.7,
                   "upslope_kg_m1_s1": 12.7,
-                  "signed_fraction": 0.599,
-                  "upslope_fraction": 0.599,
                   "upslope_fraction_pct": 59.9,
                   "angle_to_upslope_normal_deg": 53.2
                 },
                 "850_700": {
                   "signed_cross_barrier_kg_m1_s1": 3.1,
                   "upslope_kg_m1_s1": 3.1,
-                  "signed_fraction": 0.585,
-                  "upslope_fraction": 0.585,
                   "upslope_fraction_pct": 58.5,
                   "angle_to_upslope_normal_deg": 54.2
                 },
                 "700_500": {
                   "signed_cross_barrier_kg_m1_s1": -2.8,
                   "upslope_kg_m1_s1": 0.0,
-                  "signed_fraction": -0.875,
-                  "upslope_fraction": 0.0,
                   "upslope_fraction_pct": 0.0,
                   "angle_to_upslope_normal_deg": 151.0
                 }
