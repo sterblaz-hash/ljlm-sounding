@@ -118,6 +118,10 @@ def _utc_text(value: str | None, fmt: str = "%d %b %Y %H:%M UTC") -> str:
 
 
 def _nominal_title(data: dict) -> str:
+    if data.get("profile_type") == "model":
+        run = _utc_text(data.get("run_time"), "%d %b %H UTC")
+        valid = _utc_text(data.get("valid_time"), "%d %b %H UTC")
+        return f"{data.get('model', 'Model')} · run {run} +{data['lead_hours']:03d}h · valid {valid}"
     date_text = data.get("nominal_date", "")
     term = str(data.get("term", "")).upper()
     try:
@@ -524,9 +528,13 @@ def render_skewt(data: dict, output: Path):
             p_all = profile.p_hpa[parcel_mask] * units.hPa
             t_all = profile.t_c[parcel_mask] * units.degC
             td_all = profile.td_c[parcel_mask] * units.degC
-            mu_p, mu_t, mu_td = mpcalc.most_unstable_parcel(
+            mu_p, mu_t, mu_td, mu_index = mpcalc.most_unstable_parcel(
                 p_all, t_all, td_all
             )
+            # An elevated MU parcel starts at its own pressure, not the surface.
+            p_all = p_all[mu_index:]
+            t_all = t_all[mu_index:]
+            td_all = td_all[mu_index:]
             parcel = mpcalc.parcel_profile(p_all, mu_t, mu_td).to("degC")
             keep = (
                 (p_all.magnitude >= p_top)
@@ -621,7 +629,7 @@ def render_skewt(data: dict, output: Path):
     )
     fig.text(
         0.075, 0.952,
-        f"{station} ({station_id})  ·  {nominal}  ·  launch {launch}",
+        f"{station} ({station_id})  ·  {nominal}" + ("" if data.get("profile_type") == "model" else f"  ·  launch {launch}"),
         ha="left", va="top",
         fontsize=9.6, color=MUTED,
     )
@@ -1141,6 +1149,11 @@ def render_products(input_path: str | os.PathLike, diagnostics_root="diagnostics
         "thetae": latest["thetae"].as_posix(),
         "hodograph": latest["hodograph"].as_posix(),
     }
+    if data.get("profile_type") == "model":
+        manifest.update({key: data.get(key) for key in (
+            "profile_type", "model", "run_time", "valid_time", "lead_hours",
+            "requested_latitude", "requested_longitude", "grid_latitude", "grid_longitude", "source",
+        )})
     with (diagnostics_root / "latest_products.json").open("w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
 
