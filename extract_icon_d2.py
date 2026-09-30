@@ -18,6 +18,7 @@ from icon_d2_native import (
 )
 from extract_ljlm import calculate_metpy_parameters, calculate_inversions, value_at_pressure
 from render_ljlm import render_products
+from icon_d2_forecast import publish_latest, verification_time
 
 ROOT = Path(__file__).resolve().parent / 'models' / 'icon-d2'
 LATITUDE = 46.06562
@@ -91,9 +92,18 @@ def main() -> None:
     parser.add_argument('--run', help='UTC run timestamp; default: newest published run')
     parser.add_argument('--lead-hours', type=int, default=3)
     parser.add_argument('--workers', type=int, default=4)
+    parser.add_argument('--publish-verification', action='store_true',
+                        help='Publish latest valid 00/12 slot; requires explicit 00/12 run and +12 h')
     args = parser.parse_args()
     if not 0 <= args.lead_hours <= 48 or not 1 <= args.workers <= 16:
         parser.error('lead-hours must be 0..48 and workers must be 1..16')
+    if args.publish_verification:
+        if not args.run:
+            parser.error('--publish-verification requires an explicit --run')
+        try:
+            verification_time(parse_utc(args.run), args.lead_hours)
+        except ValueError as exc:
+            parser.error(str(exc))
     run = parse_utc(args.run) if args.run else select_run(args.lead_hours)
     if run.hour % 3 or run.minute or run.second or run.microsecond:
         parser.error('run must be an exact three-hour UTC cycle')
@@ -105,7 +115,9 @@ def main() -> None:
     temp = output.with_suffix('.json.tmp')
     temp.write_text(json.dumps(profile, ensure_ascii=False, indent=2, allow_nan=False) + '\n')
     temp.replace(output)
-    render_products(output, diagnostics_root=directory / 'diagnostics' / f'f{args.lead_hours:03d}')
+    manifest = render_products(output, diagnostics_root=directory / 'diagnostics' / f'f{args.lead_hours:03d}')
+    if args.publish_verification:
+        publish_latest(output, manifest, ROOT)
     print(f'Saved {output}', flush=True)
 
 

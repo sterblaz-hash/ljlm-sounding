@@ -1,0 +1,124 @@
+name: Update ICON-D2 LJLM +12 h forecasts
+
+on:
+  schedule:
+    - cron: "20 1 * * *"   # 00 UTC run -> same-day 12 UTC
+    - cron: "20 13 * * *"  # 12 UTC run -> next-day 00 UTC
+  workflow_dispatch:
+    inputs:
+      run_cycle:
+        description: "ICON-D2 run cycle (UTC); lead is always +12 h"
+        type: choice
+        options: ["00", "12"]
+        default: "00"
+        required: true
+      run_date:
+        description: "UTC run date YYYY-MM-DD; blank selects most recent chosen cycle"
+        type: string
+        default: ""
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: icon-d2-ljlm-forecast
+  cancel-in-progress: false
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      MPLBACKEND: Agg
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Select explicit 00 or 12 UTC run
+        id: run
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          RUN_CYCLE: ${{ inputs.run_cycle }}
+          RUN_DATE: ${{ inputs.run_date }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "schedule" ]]; then
+            case "$SCHEDULE" in
+              '20 1 * * *') RUN_CYCLE=00 ;;
+              '20 13 * * *') RUN_CYCLE=12 ;;
+              *) echo "Unexpected schedule" >&2; exit 1 ;;
+            esac
+            run_time=$(python icon_d2_forecast.py --cycle "$RUN_CYCLE" --scheduled)
+          else
+            run_time=$(python icon_d2_forecast.py --cycle "$RUN_CYCLE" --run-date "$RUN_DATE")
+          fi
+          echo "time=$run_time" >> "$GITHUB_OUTPUT"
+          stamp=$(date -u -d "$run_time" +%Y%m%d%H)
+          echo "stamp=$stamp" >> "$GITHUB_OUTPUT"
+          echo "ICON-D2 run $run_time, fixed lead +12 h" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install dependencies
+        run: python -m pip install --retries 10 --timeout 60 -r requirements.txt
+
+      - name: Test forecast timing and publication
+        run: python -m unittest test_icon_d2_pipeline test_icon_d2_forecast -v
+
+      - name: Generate native +12 h forecast and latest verification slot
+        env:
+          RUN_TIME: ${{ steps.run.outputs.time }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if python extract_icon_d2.py --run "$RUN_TIME" --lead-hours 12 --publish-verification; then
+              exit 0
+            fi
+            if [[ "$attempt" -lt 3 ]]; then
+              echo "Run $RUN_TIME is incomplete or retrieval failed; retrying the same run in 5 minutes."
+              sleep 300
+            fi
+          done
+          echo "Failed to generate requested run; no substitute cycle will be used." >&2
+          exit 1
+
+      - name: Upload forecast products
+        uses: actions/upload-artifact@v4
+        with:
+          name: icon-d2-${{ steps.run.outputs.stamp }}-f012
+          path: |
+            models/icon-d2/${{ steps.run.outputs.stamp }}/ljlm_f012.json
+            models/icon-d2/${{ steps.run.outputs.stamp }}/diagnostics/f012/
+            models/icon-d2/latest/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Persist model products only
+        env:
+          RUN_STAMP: ${{ steps.run.outputs.stamp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "models/icon-d2/$RUN_STAMP/ljlm_f012.json" \
+            "models/icon-d2/$RUN_STAMP/diagnostics/f012" models/icon-d2/latest
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Update ICON-D2 $RUN_STAMP +12 h LJLM forecast"
+          # Rebase on concurrent observational updates without staging their files.
+          for attempt in 1 2 3; do
+            git pull --rebase origin "$GITHUB_REF_NAME"
+            if git push origin "HEAD:$GITHUB_REF_NAME"; then
+              exit 0
+            fi
+          done
+          exit 1
