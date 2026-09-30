@@ -332,13 +332,13 @@ def _dynamic_lowlevel_temp_limits(t: np.ndarray, td: np.ndarray):
 
 
 def _lowlevel_barb_pressures(surface_p: float, top_p: float = 700.0):
-    """Very dense low-level wind sampling, about every 5 hPa."""
+    """Low-level wind sampling, about every 10 hPa."""
     result = [surface_p]
-    p = math.floor(surface_p / 5.0) * 5.0
+    p = math.floor(surface_p / 10.0) * 10.0
     while p >= top_p:
         if p < surface_p - 0.25:
             result.append(p)
-        p -= 5.0
+        p -= 10.0
     if not any(abs(x - top_p) < 0.6 for x in result):
         result.append(float(top_p))
     return sorted(set(round(x, 2) for x in result), reverse=True)
@@ -762,7 +762,7 @@ def render_lowlevel(data: dict, output: Path):
             xbarb, np.asarray(wind_targets)[good],
             (ui[good] * units("m/s")).to("knots").magnitude,
             (vi[good] * units("m/s")).to("knots").magnitude,
-            length=3.7, linewidth=0.48, color=INK, pivot="middle",
+            length=4.5, linewidth=0.48, color=INK, pivot="middle",
         )
 
     height_targets = [x for x in (950, 925, 900, 850, 800, 750, 700) if p_top <= x <= surface_p]
