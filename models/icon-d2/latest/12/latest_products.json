@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "station": 14015,
+  "station_name": "Ljubljana",
+  "sounding_id": "icon-d2_2026093000_f012",
+  "nominal_date": "2026-09-30",
+  "term": "12",
+  "launch_time": null,
+  "processed_at": "2026-09-30T11:37:09Z",
+  "rendered_at": "2026-09-30T11:37:13.026563Z",
+  "latest": {
+    "skewt": "models/icon-d2/latest/12/skewt.png",
+    "lowlevel": "models/icon-d2/latest/12/lowlevel.png",
+    "skewt_zoom": "models/icon-d2/latest/12/skewt_zoom.png",
+    "thetae": "models/icon-d2/latest/12/thetae.png",
+    "hodograph": "models/icon-d2/latest/12/hodograph.png"
+  },
+  "archive": {
+    "skewt": "models/icon-d2/2026093000/diagnostics/f012/2026/09/20260930_12_skewt.png",
+    "lowlevel": "models/icon-d2/2026093000/diagnostics/f012/2026/09/20260930_12_lowlevel.png",
+    "skewt_zoom": "models/icon-d2/2026093000/diagnostics/f012/2026/09/20260930_12_skewt_zoom.png",
+    "thetae": "models/icon-d2/2026093000/diagnostics/f012/2026/09/20260930_12_thetae.png",
+    "hodograph": "models/icon-d2/2026093000/diagnostics/f012/2026/09/20260930_12_hodograph.png"
+  },
+  "skewt": "models/icon-d2/latest/12/skewt.png",
+  "skewt_zoom": "models/icon-d2/latest/12/skewt_zoom.png",
+  "lowlevel": "models/icon-d2/latest/12/lowlevel.png",
+  "thetae": "models/icon-d2/latest/12/thetae.png",
+  "hodograph": "models/icon-d2/latest/12/hodograph.png",
+  "profile_type": "model",
+  "model": "ICON-D2",
+  "run_time": "2026-09-30T00:00:00Z",
+  "valid_time": "2026-09-30T12:00:00Z",
+  "lead_hours": 12,
+  "requested_latitude": 46.06562,
+  "requested_longitude": 14.51221,
+  "grid_latitude": 46.06,
+  "grid_longitude": 14.52,
+  "source": "dwd-open-data-native",
+  "sounding": "models/icon-d2/latest/12/sounding.json",
+  "verification_date": "2026-09-30",
+  "verification_term": "12"
+}
