@@ -1,9 +1,9 @@
 {
   "current_expected": {
-    "key": "2026-10-01_00",
+    "key": "2026-10-01_12",
     "nominal_date": "2026-10-01",
     "status": "ok",
-    "term": "00"
+    "term": "12"
   },
   "special_soundings": {},
   "station": 14015,
@@ -235,7 +235,7 @@
     },
     "2026-09-30_00": {
       "archive_file": "data/2026/09/20260930_00.json",
-      "checked_at": "2026-10-01T02:00:46.064027Z",
+      "checked_at": "2026-10-01T13:04:10.000534Z",
       "first_seen_at": "2026-09-30T01:03:26.451848Z",
       "launch_time": "2026-09-29T23:30:00Z",
       "missing_after": "2026-09-30T01:50:00Z",
@@ -249,7 +249,7 @@
     },
     "2026-09-30_12": {
       "archive_file": "data/2026/09/20260930_12.json",
-      "checked_at": "2026-10-01T02:00:46.064027Z",
+      "checked_at": "2026-10-01T13:04:10.000534Z",
       "first_seen_at": "2026-09-30T13:05:10.493561Z",
       "launch_time": "2026-09-30T11:30:00Z",
       "missing_after": "2026-09-30T13:50:00Z",
@@ -263,7 +263,7 @@
     },
     "2026-10-01_00": {
       "archive_file": "data/2026/10/20261001_00.json",
-      "checked_at": "2026-10-01T02:00:46.064027Z",
+      "checked_at": "2026-10-01T13:04:10.000534Z",
       "first_seen_at": "2026-10-01T01:03:49.457217Z",
       "launch_time": "2026-09-30T23:30:00Z",
       "missing_after": "2026-10-01T01:50:00Z",
@@ -274,8 +274,22 @@
       "status": "ok",
       "term": "00",
       "waiting_from": "2026-10-01T00:50:00Z"
+    },
+    "2026-10-01_12": {
+      "archive_file": "data/2026/10/20261001_12.json",
+      "checked_at": "2026-10-01T13:04:10.000534Z",
+      "first_seen_at": "2026-10-01T13:04:10.000534Z",
+      "launch_time": "2026-10-01T11:30:00Z",
+      "missing_after": "2026-10-01T13:50:00Z",
+      "nominal_date": "2026-10-01",
+      "processed_at": "2026-10-01T13:05:28.428477Z",
+      "profile_level_count": 2547,
+      "retrieved_at": "2026-10-01T13:05:22.912941Z",
+      "status": "ok",
+      "term": "12",
+      "waiting_from": "2026-10-01T12:50:00Z"
     }
   },
-  "updated_at": "2026-10-01T02:00:46.064027Z",
+  "updated_at": "2026-10-01T13:04:10.000534Z",
   "version": 1
 }
