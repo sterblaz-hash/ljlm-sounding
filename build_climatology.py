@@ -73,6 +73,7 @@ PARAMETERS = [
     "thickness_1000_500_m",
     "thickness_925_500_m",
     "mucape_jkg",
+    "lifted_index_c",
 ]
 
 # Thermodynamic/moisture parameters are admitted to the official
@@ -92,6 +93,7 @@ THERMO_CLIMATOLOGY_PARAMETERS = {
     "q850_gkg",
     "ivt_kg_m_s",
     "mucape_jkg",
+    "lifted_index_c",
 }
 
 PARAMETER_METADATA = {
@@ -125,6 +127,7 @@ PARAMETER_METADATA = {
     "thickness_1000_500_m": {"label": "1000–500 hPa thickness", "unit": "m"},
     "thickness_925_500_m": {"label": "925–500 hPa thickness", "unit": "m"},
     "mucape_jkg": {"label": "MUCAPE", "unit": "J/kg"},
+    "lifted_index_c": {"label": "Lifted Index", "unit": "°C"},
 }
 
 
@@ -686,6 +689,35 @@ def pressure_lapse_rate(
     return (t_bottom - t_top) / depth_km
 
 
+def calculate_lifted_index(levels):
+    """Surface-parcel LI at 500 hPa, matching extract_ljlm.py's MetPy definition.
+
+    Use the lowest valid common P/T/Td level, within 50 hPa of the
+    sounding bottom. Require observations bracketing 500 hPa; never
+    extrapolate a truncated profile. Gross-error QC is applied by the caller.
+    """
+    rows = common_thermo_rows(levels)
+    pressures = [float(row["pressure_hpa"]) for row in levels
+                 if valid_number(row.get("pressure_hpa"))]
+    if len(rows) < 2 or not pressures:
+        return None
+    if max(pressures) - float(rows[0]["pressure_hpa"]) > 50:
+        return None
+    if not float(rows[-1]["pressure_hpa"]) <= 500 < float(rows[0]["pressure_hpa"]):
+        return None
+
+    p = np.array([row["pressure_hpa"] for row in rows]) * units.hPa
+    t = np.array([row["temperature_c"] for row in rows]) * units.degC
+    td = np.array([row["dewpoint_c"] for row in rows]) * units.degC
+    try:
+        parcel = mpcalc.parcel_profile(p, t[0], td[0])
+        li = mpcalc.lifted_index(p, t, parcel).to("delta_degC")
+        value = float(np.asarray(li.magnitude).item())
+        return value if math.isfinite(value) else None
+    except Exception:
+        return None
+
+
 def calculate_mucape(levels):
     """
     Historical MUCAPE from the IGRA profile.
@@ -1138,6 +1170,7 @@ def calculate_profile_parameters(profile):
         result["q925_gkg"] = q_at_pressure(levels, 925)
         result["q850_gkg"] = q_at_pressure(levels, 850)
         result["mucape_jkg"] = calculate_mucape(levels)
+        result["lifted_index_c"] = calculate_lifted_index(levels)
 
         # Integrated moisture transport
         result["ivt_kg_m_s"] = calculate_ivt(levels)
@@ -1155,6 +1188,7 @@ def calculate_profile_parameters(profile):
             "q925_gkg",
             "q850_gkg",
             "mucape_jkg",
+            "lifted_index_c",
             "ivt_kg_m_s",
         ]:
             result[parameter] = None
@@ -2303,6 +2337,12 @@ def main():
             "ivt_method": (
                 "Magnitude of 1/g integral(q*V dp), using IGRA dewpoint levels "
                 "and pressure-interpolated wind components."
+            ),
+            "lifted_index_method": (
+                "MetPy parcel_profile from the lowest valid common P/T/Td level, "
+                "then lifted_index at 500 hPa, matching operational surface-parcel LI. "
+                "Common levels must begin within 50 hPa of sounding bottom and "
+                "bracket 500 hPa. Only GOOD thermo profiles enter climatology."
             ),
             "mucape_method": (
                 "MetPy most_unstable_cape_cin from common P/T/Td levels. "

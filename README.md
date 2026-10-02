@@ -83,3 +83,52 @@ the workflow uploads a 30-day artifact and commits only the requested `f012`
 archive products and model latest slots to its branch. It does not stage or
 change observational data, climatology, or diagnostics. Manual dispatch also
 publishes model products; there is no automatic observed-versus-model scoring yet.
+
+## Compact dashboard data
+
+`build_dashboard_data.py` uses only the Python standard library and copies existing
+OBS diagnostics without recalculating soundings or changing source JSON.
+
+```sh
+python build_dashboard_data.py --backfill
+python build_dashboard_data.py --update data/latest.json
+python -m unittest test_dashboard_data -v
+```
+
+Backfill explicitly reads `data/YYYY/MM/*.json`, rebuilds each source month's
+compact summary, then overlays `data/latest.json`. Operational updates replace
+one record by `sounding_id` in `timeseries/ljlm/archive/YYYY/MM.json`; they never
+scan the full profile archive. Legacy profiles without an ID get one from their
+stored nominal date and term. Missing/nonfinite metrics become JSON `null`, while
+valid zero and negative values are retained. Orographic fields use the signed
+**terrain-capped** IVT and signed fraction. IVT direction is the transport-to
+azimuth in degrees, as stored in the source.
+
+The four windows (`latest_7d.json`, `latest_30d.json`, `latest_90d.json`, and
+`latest_1y.json`) read only compact summaries for the intersecting months (at most
+13). They use inclusive UTC bounds from current time minus 7/30/90/365 days to
+current time, based on **nominal date + term**, and sort chronologically. Each record includes `valid_time` as the nominal UTC timestamp (for example,
+`2026-10-02T00:00:00Z`). Actual launch time is retained separately; 00 and 12 UTC records remain distinct.
+`start_time` and `end_time` describe these requested bounds, even for empty or
+partially populated windows. `--as-of 2026-10-02T12:00:00Z` provides a reproducible
+window end; `--root PATH` selects a different repository root. Repeated runs are
+record-idempotent; window timestamps and membership advance with current time.
+
+`data/dashboard_manifest.json` advertises only existing latest OBS, status,
+diagnostic, ICON-D2 +12 h slot, and window products. Its `variables` list describes
+the supported numeric fields; individual records may have null values. Paths are
+relative to the repository/web root. The manifest is refreshed by the OBS job;
+ICON-D2 generation does not write OBS time-series. Initial backfill is needed to
+include observations predating installation of the incremental update.
+
+Examples: [compact record and manifest](dashboard_data_examples.md).
+
+Historical climatology includes `lifted_index_c` in °C, using the same MetPy
+surface-parcel definition as the operational sounding: `parcel_profile()` from
+the lowest valid common pressure/temperature/dewpoint level, then
+`lifted_index()` at 500 hPa. Common levels must start within 50 hPa of the
+sounding bottom and bracket 500 hPa. Existing thermodynamic QC applies; only
+GOOD profiles contribute to daily medians and climatological statistics.
+Negative and zero LI values remain valid. Rebuild with `python build_climatology.py`;
+LI then participates in observational climatology comparisons. Historical launch
+times differ from the current 00/12 UTC schedule, as documented in the product metadata.

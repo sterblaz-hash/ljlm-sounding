@@ -3923,6 +3923,7 @@ def calculate_climatology_comparison(
         "lapse_rate_700_500_c_per_km"
     )
     current_values["mucape_jkg"] = metpy_parameters.get("mucape_jkg")
+    current_values["lifted_index_c"] = metpy_parameters.get("lifted_index_c")
 
     moisture = metpy_parameters.get(
         "moisture_transport",
