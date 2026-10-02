@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "station": 14015,
+  "station_name": "Ljubljana",
+  "sounding_id": "icon-d2_2026100212_f012",
+  "nominal_date": "2026-10-03",
+  "term": "00",
+  "launch_time": null,
+  "processed_at": "2026-10-02T13:41:31Z",
+  "rendered_at": "2026-10-02T13:41:33.939338Z",
+  "latest": {
+    "skewt": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/latest_skewt.png",
+    "lowlevel": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/latest_lowlevel.png",
+    "skewt_zoom": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/latest_skewt_zoom.png",
+    "thetae": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/latest_thetae.png",
+    "hodograph": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/latest_hodograph.png"
+  },
+  "archive": {
+    "skewt": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/2026/10/20261003_00_skewt.png",
+    "lowlevel": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/2026/10/20261003_00_lowlevel.png",
+    "skewt_zoom": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/2026/10/20261003_00_skewt_zoom.png",
+    "thetae": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/2026/10/20261003_00_thetae.png",
+    "hodograph": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/2026/10/20261003_00_hodograph.png"
+  },
+  "skewt": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/latest_skewt.png",
+  "skewt_zoom": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/latest_skewt_zoom.png",
+  "lowlevel": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/latest_lowlevel.png",
+  "thetae": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/latest_thetae.png",
+  "hodograph": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026100212/diagnostics/f012/latest_hodograph.png",
+  "profile_type": "model",
+  "model": "ICON-D2",
+  "run_time": "2026-10-02T12:00:00Z",
+  "valid_time": "2026-10-03T00:00:00Z",
+  "lead_hours": 12,
+  "requested_latitude": 46.06562,
+  "requested_longitude": 14.51221,
+  "grid_latitude": 46.06,
+  "grid_longitude": 14.52,
+  "source": "dwd-open-data-native"
+}
