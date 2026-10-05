@@ -1,0 +1,4970 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+  <base target="_top">
+
+
+
+  <style>
+
+    :root {
+
+      --bg: #f3f7fb;
+
+      --panel: #ffffff;
+
+      --line: #dfe7f0;
+
+      --line-soft: #edf2f7;
+
+      --ink: #10223f;
+
+      --muted: #6b7a90;
+
+      --blue: #1769e0;
+
+      --blue-soft: #e9f2ff;
+
+      --green: #168a62;
+
+      --green-soft: #e6f6f0;
+
+      --orange: #c97b11;
+
+      --orange-soft: #fff3dc;
+
+      --red: #c9423a;
+
+      --red-soft: #fdebe9;
+
+      --shadow: 0 8px 28px rgba(31, 55, 86, 0.07);
+
+      --radius: 18px;
+
+    }
+
+
+
+    * {
+
+      box-sizing: border-box;
+
+    }
+
+
+
+    body {
+
+      margin: 0;
+
+      min-height: 100vh;
+
+      background: var(--bg);
+
+      color: var(--ink);
+
+      font-family:
+
+        Inter,
+
+        ui-sans-serif,
+
+        system-ui,
+
+        -apple-system,
+
+        BlinkMacSystemFont,
+
+        "Segoe UI",
+
+        sans-serif;
+
+    }
+
+
+
+    button,
+
+    select {
+
+      font: inherit;
+
+    }
+
+
+
+    .shell {
+
+      max-width: 1680px;
+
+      margin: 0 auto;
+
+      padding: 16px;
+
+    }
+
+
+
+    .topbar {
+
+      display: grid;
+
+      grid-template-columns:
+
+        minmax(260px, 1fr)
+
+        auto
+
+        minmax(300px, auto);
+
+      gap: 20px;
+
+      align-items: center;
+
+      background: var(--panel);
+
+      border: 1px solid var(--line);
+
+      border-radius: var(--radius);
+
+      box-shadow: var(--shadow);
+
+      padding: 16px 20px;
+
+    }
+
+
+
+    .brand-title {
+
+      display: flex;
+
+      align-items: baseline;
+
+      gap: 10px;
+
+    }
+
+
+
+    .brand-title strong {
+
+      font-size: 27px;
+
+      letter-spacing: -0.7px;
+
+    }
+
+
+
+    .station-id {
+
+      font-size: 22px;
+
+      color: #405676;
+
+      font-weight: 400;
+
+    }
+
+
+
+    .subtitle {
+
+      margin-top: 2px;
+
+      color: var(--muted);
+
+      font-size: 14px;
+
+    }
+
+
+
+    .time-block {
+
+      min-width: 260px;
+
+    }
+
+
+
+    .time-main {
+
+      font-size: 19px;
+
+      font-weight: 750;
+
+    }
+
+
+
+    .time-sub {
+
+      margin-top: 4px;
+
+      color: var(--muted);
+
+      font-size: 13px;
+
+    }
+
+
+
+    .status-row {
+
+      display: flex;
+
+      align-items: center;
+
+      gap: 8px;
+
+      margin-top: 7px;
+
+      font-size: 13px;
+
+    }
+
+
+
+    .status-dot {
+
+      width: 9px;
+
+      height: 9px;
+
+      border-radius: 50%;
+
+      background: #27ae75;
+
+      box-shadow:
+
+        0 0 0 4px rgba(39, 174, 117, 0.10);
+
+    }
+
+
+
+    .status-dot.waiting {
+
+      background: #d99a22;
+
+      box-shadow:
+
+        0 0 0 4px rgba(217, 154, 34, 0.10);
+
+    }
+
+
+
+    .status-dot.missing {
+
+      background: #d64b45;
+
+      box-shadow:
+
+        0 0 0 4px rgba(214, 75, 69, 0.10);
+
+    }
+
+
+
+    .archive-block {
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: flex-end;
+
+      gap: 10px;
+
+      min-width: 0;
+
+    }
+
+
+
+    .archive-label {
+
+      color: var(--muted);
+
+      font-size: 12px;
+
+      font-weight: 700;
+
+      text-transform: uppercase;
+
+      letter-spacing: 0.6px;
+
+    }
+
+
+
+    select {
+
+      min-width: 180px;
+
+      border: 1px solid var(--line);
+
+      background: #fff;
+
+      color: var(--ink);
+
+      padding: 9px 12px;
+
+      border-radius: 10px;
+
+      outline: none;
+
+    }
+
+
+
+    .dashboard {
+
+      display: grid;
+
+      grid-template-columns:
+
+        minmax(0, 1.15fr)
+
+        minmax(420px, 0.85fr);
+
+      gap: 14px;
+
+      margin-top: 14px;
+
+    }
+
+
+
+    .panel {
+
+      background: var(--panel);
+
+      border: 1px solid var(--line);
+
+      border-radius: var(--radius);
+
+      box-shadow: var(--shadow);
+
+      overflow: hidden;
+
+    }
+
+
+
+    .panel-head {
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+      gap: 12px;
+
+      padding: 15px 17px;
+
+      border-bottom: 1px solid var(--line-soft);
+
+    }
+
+
+
+    .panel-title {
+
+      font-size: 18px;
+
+      font-weight: 760;
+
+      letter-spacing: -0.2px;
+
+    }
+
+
+
+    .panel-note {
+
+      color: var(--muted);
+
+      font-size: 12px;
+
+    }
+
+
+
+    .plot-tabs {
+
+      display: flex;
+
+      gap: 6px;
+
+      flex-wrap: wrap;
+
+    }
+
+
+
+    .tab-btn {
+
+      border: 1px solid var(--line);
+
+      background: #fff;
+
+      color: #4d607a;
+
+      padding: 7px 10px;
+
+      border-radius: 9px;
+
+      cursor: pointer;
+
+      font-size: 12px;
+
+      font-weight: 650;
+
+    }
+
+
+
+    .tab-btn.active {
+
+      border-color: #9fc4fa;
+
+      background: var(--blue-soft);
+
+      color: var(--blue);
+
+    }
+
+
+
+    .main-plot {
+
+      min-height: 620px;
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      padding: 10px;
+
+      background: #fff;
+
+    }
+
+
+
+    .main-plot img {
+
+      display: block;
+
+      width: 100%;
+
+      max-height: 760px;
+
+      object-fit: contain;
+
+    }
+
+
+
+    .image-error {
+
+      display: none;
+
+      padding: 30px;
+
+      color: var(--muted);
+
+      text-align: center;
+
+      font-size: 13px;
+
+    }
+
+
+
+    .right-stack {
+
+      display: grid;
+
+      gap: 14px;
+
+      align-content: start;
+
+    }
+
+
+
+    .metric-grid {
+
+      display: grid;
+
+      grid-template-columns:
+
+        repeat(4, minmax(0, 1fr));
+
+      gap: 8px;
+
+      padding: 12px;
+
+    }
+
+
+
+    .metric {
+
+      min-height: 104px;
+
+      padding: 13px;
+
+      border: 1px solid var(--line-soft);
+
+      border-radius: 13px;
+
+      background:
+
+        linear-gradient(
+
+          180deg,
+
+          #ffffff 0%,
+
+          #fbfdff 100%
+
+        );
+
+    }
+
+
+
+    .metric-label {
+
+      color: #40516a;
+
+      font-size: 12px;
+
+      font-weight: 700;
+
+    }
+
+
+
+    .metric-value {
+
+      display: flex;
+
+      align-items: baseline;
+
+      gap: 5px;
+
+      margin-top: 8px;
+
+    }
+
+
+
+    .metric-number {
+
+      font-size: 23px;
+
+      line-height: 1;
+
+      font-weight: 770;
+
+      letter-spacing: -0.5px;
+
+    }
+
+
+
+    .metric-unit {
+
+      color: #526985;
+
+      font-size: 13px;
+
+    }
+
+
+
+    .percentile-pill {
+
+      display: inline-flex;
+
+      align-items: center;
+
+      margin-top: 9px;
+
+      padding: 3px 7px;
+
+      border-radius: 999px;
+
+      background: var(--blue-soft);
+
+      color: #225da8;
+
+      font-size: 11px;
+
+      font-weight: 750;
+
+    }
+
+
+
+    .clim-wrap {
+
+      padding: 4px 12px 14px;
+
+    }
+
+
+
+    .clim-table {
+
+      width: 100%;
+
+      border-collapse: collapse;
+
+    }
+
+
+
+    .clim-table th,
+
+    .clim-table td {
+
+      padding: 8px 7px;
+
+      border-bottom: 1px solid var(--line-soft);
+
+      vertical-align: middle;
+
+      font-size: 12px;
+
+    }
+
+
+
+    .clim-table th {
+
+      color: var(--muted);
+
+      font-weight: 700;
+
+      text-align: left;
+
+    }
+
+
+
+    .clim-table td.value {
+
+      width: 78px;
+
+      font-weight: 700;
+
+      white-space: nowrap;
+
+    }
+
+
+
+    .percentile-cell {
+
+      min-width: 220px;
+
+    }
+
+
+
+    .pbar {
+
+      position: relative;
+
+      height: 12px;
+
+      border-radius: 99px;
+
+      background:
+
+        linear-gradient(
+
+          90deg,
+
+          #eef3f9 0%,
+
+          #d7e9ff 25%,
+
+          #c2ddff 50%,
+
+          #d7e9ff 75%,
+
+          #eef3f9 100%
+
+        );
+
+      overflow: visible;
+
+    }
+
+
+
+    .pbar::before {
+
+      content: "";
+
+      position: absolute;
+
+      left: 50%;
+
+      top: -2px;
+
+      bottom: -2px;
+
+      width: 1px;
+
+      background: #6480a5;
+
+    }
+
+
+
+    .pmark {
+
+      position: absolute;
+
+      top: 50%;
+
+      width: 11px;
+
+      height: 11px;
+
+      border: 2px solid #fff;
+
+      border-radius: 50%;
+
+      background: #102f63;
+
+      box-shadow:
+
+        0 0 0 1px rgba(16, 47, 99, 0.25);
+
+      transform: translate(-50%, -50%);
+
+    }
+
+
+
+    .p-caption {
+
+      margin-top: 5px;
+
+      color: var(--muted);
+
+      font-size: 10px;
+
+      display: flex;
+
+      justify-content: space-between;
+
+    }
+
+
+
+    .range {
+
+      color: #536985;
+
+      font-size: 11px;
+
+      white-space: nowrap;
+
+    }
+
+
+
+    .caveat {
+
+      margin: 10px 12px 13px;
+
+      padding: 10px 12px;
+
+      border-radius: 11px;
+
+      background: #f7f9fc;
+
+      color: #68788d;
+
+      font-size: 11px;
+
+      line-height: 1.45;
+
+    }
+
+
+
+
+
+    .transport-wrap {
+
+      padding: 12px;
+
+    }
+
+
+
+    .transport-grid {
+
+      display: grid;
+
+      grid-template-columns:
+
+        repeat(4, minmax(0, 1fr));
+
+      gap: 8px;
+
+    }
+
+
+
+    .transport-card {
+
+      border: 1px solid var(--line-soft);
+
+      border-radius: 12px;
+
+      padding: 11px;
+
+      background: #fbfdff;
+
+      min-width: 0;
+
+    }
+
+
+
+    .transport-card-label {
+
+      color: #526985;
+
+      font-size: 11px;
+
+      font-weight: 750;
+
+    }
+
+
+
+    .transport-card-value {
+
+      margin-top: 5px;
+
+      font-size: 20px;
+
+      font-weight: 780;
+
+      letter-spacing: -0.4px;
+
+    }
+
+
+
+    .transport-card-unit {
+
+      margin-left: 4px;
+
+      color: var(--muted);
+
+      font-size: 11px;
+
+      font-weight: 600;
+
+    }
+
+
+
+    .transport-card-sub {
+
+      margin-top: 6px;
+
+      color: var(--muted);
+
+      font-size: 10px;
+
+      line-height: 1.35;
+
+    }
+
+
+
+    .humidity-row {
+
+      display: flex;
+
+      flex-wrap: wrap;
+
+      gap: 8px;
+
+      margin-top: 10px;
+
+    }
+
+
+
+    .humidity-pill {
+
+      padding: 6px 9px;
+
+      border-radius: 999px;
+
+      background: #f1f5fa;
+
+      color: #40516a;
+
+      font-size: 11px;
+
+      font-weight: 700;
+
+    }
+
+
+
+    .orographic-grid {
+
+      display: grid;
+
+      grid-template-columns:
+
+        repeat(2, minmax(0, 1fr));
+
+      gap: 9px;
+
+      padding: 12px;
+
+    }
+
+
+
+    .orographic-card {
+
+      border: 1px solid var(--line-soft);
+
+      border-radius: 13px;
+
+      padding: 12px;
+
+      background:
+
+        linear-gradient(
+
+          180deg,
+
+          #ffffff 0%,
+
+          #fbfdff 100%
+
+        );
+
+    }
+
+
+
+    .orographic-title {
+
+      font-size: 12px;
+
+      font-weight: 780;
+
+      line-height: 1.3;
+
+    }
+
+
+
+    .orographic-layer {
+
+      margin-top: 4px;
+
+      color: var(--muted);
+
+      font-size: 10px;
+
+    }
+
+
+
+    .orographic-main {
+
+      margin-top: 10px;
+
+      display: flex;
+
+      align-items: baseline;
+
+      gap: 5px;
+
+    }
+
+
+
+    .orographic-number {
+
+      font-size: 25px;
+
+      font-weight: 800;
+
+      letter-spacing: -0.5px;
+
+    }
+
+
+
+    .orographic-unit {
+
+      color: #526985;
+
+      font-size: 11px;
+
+    }
+
+
+
+    .orographic-caption {
+
+      color: var(--muted);
+
+      font-size: 10px;
+
+      font-weight: 700;
+
+      text-transform: uppercase;
+
+      letter-spacing: 0.35px;
+
+    }
+
+
+
+    .orographic-meta {
+
+      margin-top: 9px;
+
+      color: #536985;
+
+      font-size: 10px;
+
+      line-height: 1.45;
+
+    }
+
+
+
+    .signed-positive {
+
+      color: var(--green);
+
+    }
+
+
+
+    .signed-negative {
+
+      color: var(--red);
+
+    }
+
+
+
+    .fallback-badge {
+
+      display: inline-block;
+
+      margin-left: 5px;
+
+      padding: 2px 5px;
+
+      border-radius: 999px;
+
+      background: var(--orange-soft);
+
+      color: #8a5c14;
+
+      font-size: 9px;
+
+      font-weight: 750;
+
+      vertical-align: 1px;
+
+    }
+
+
+
+    .lower-grid {
+
+      grid-column: 1 / -1;
+
+      display: grid;
+
+      grid-template-columns:
+
+        minmax(360px, 0.75fr)
+
+        minmax(360px, 0.75fr)
+
+        minmax(500px, 1.2fr);
+
+      gap: 14px;
+
+    }
+
+
+
+    .hodo-image {
+
+      padding: 10px;
+
+      min-height: 390px;
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+    }
+
+
+
+    .hodo-image img {
+
+      max-width: 100%;
+
+      max-height: 470px;
+
+      object-fit: contain;
+
+    }
+
+
+
+    .table-wrap {
+
+      padding: 10px 12px 14px;
+
+      overflow-x: auto;
+
+    }
+
+
+
+    table.data {
+
+      width: 100%;
+
+      border-collapse: collapse;
+
+    }
+
+
+
+    table.data th,
+
+    table.data td {
+
+      padding: 8px 7px;
+
+      border-bottom: 1px solid var(--line-soft);
+
+      text-align: left;
+
+      font-size: 12px;
+
+      white-space: nowrap;
+
+    }
+
+
+
+    table.data th {
+
+      color: var(--muted);
+
+      font-weight: 700;
+
+    }
+
+
+
+    .strength {
+
+      display: inline-block;
+
+      min-width: 64px;
+
+      text-align: center;
+
+      padding: 4px 7px;
+
+      border-radius: 7px;
+
+      font-size: 11px;
+
+      font-weight: 700;
+
+      text-transform: capitalize;
+
+    }
+
+
+
+    .strength.weak {
+
+      color: #2b5e91;
+
+      background: #e8f2fd;
+
+    }
+
+
+
+    .strength.moderate {
+
+      color: #9a6108;
+
+      background: var(--orange-soft);
+
+    }
+
+
+
+    .strength.strong {
+
+      color: #a53a34;
+
+      background: var(--red-soft);
+
+    }
+
+
+
+    .change-tabs {
+
+      display: flex;
+
+      gap: 5px;
+
+    }
+
+
+
+    .change-tabs button {
+
+      border: 1px solid var(--line);
+
+      border-radius: 8px;
+
+      padding: 6px 10px;
+
+      background: #fff;
+
+      color: #5b6f89;
+
+      cursor: pointer;
+
+      font-size: 11px;
+
+      font-weight: 700;
+
+    }
+
+
+
+    .change-tabs button.active {
+
+      color: var(--blue);
+
+      background: var(--blue-soft);
+
+      border-color: #a8c9f7;
+
+    }
+
+
+
+    .delta {
+
+      font-weight: 750;
+
+    }
+
+
+
+    .delta.positive {
+
+      color: #b64b24;
+
+    }
+
+
+
+    .delta.negative {
+
+      color: #1769e0;
+
+    }
+
+
+
+    .footer {
+
+      padding: 13px 4px 4px;
+
+      color: #7d8999;
+
+      font-size: 10px;
+
+      text-align: center;
+
+    }
+
+
+
+    .loading {
+
+      padding: 80px 20px;
+
+      text-align: center;
+
+      color: var(--muted);
+
+    }
+
+
+
+    .error {
+
+      margin: 20px;
+
+      padding: 18px;
+
+      border-radius: 12px;
+
+      color: #9d302b;
+
+      background: #fff0ef;
+
+      border: 1px solid #f4c9c5;
+
+    }
+
+
+
+    @media (max-width: 1100px) {
+
+      .topbar {
+
+        grid-template-columns: 1fr;
+
+      }
+
+
+
+      .archive-block {
+
+        justify-content: flex-start;
+
+      }
+
+
+
+      .dashboard {
+
+        grid-template-columns: 1fr;
+
+      }
+
+
+
+      .lower-grid {
+
+        grid-template-columns: 1fr;
+
+      }
+
+
+
+      .metric-grid {
+
+        grid-template-columns:
+
+          repeat(2, minmax(0, 1fr));
+
+      }
+
+    }
+
+
+
+    @media (max-width: 620px) {
+
+      .shell {
+
+        padding: 8px;
+
+      }
+
+
+
+      .metric-grid {
+
+        grid-template-columns: 1fr 1fr;
+
+      }
+
+
+
+      .main-plot {
+
+        min-height: 390px;
+
+      }
+
+
+
+      .panel-head {
+
+        align-items: flex-start;
+
+        flex-direction: column;
+
+      }
+
+
+
+      .archive-block {
+
+        flex-wrap: wrap;
+
+      }
+
+
+
+      select {
+
+        width: 100%;
+
+      }
+
+    }
+
+    @media (max-width: 860px) {
+
+      .transport-grid,
+
+      .orographic-grid {
+
+        grid-template-columns:
+
+          repeat(2, minmax(0, 1fr));
+
+      }
+
+    }
+
+
+
+    @media (max-width: 520px) {
+
+      .transport-grid,
+
+      .orographic-grid {
+
+        grid-template-columns: 1fr;
+
+      }
+
+    }
+
+
+
+
+    .view-tabs {
+      display: flex;
+      gap: 8px;
+      margin: 0 0 14px;
+      padding: 6px;
+      width: fit-content;
+      max-width: 100%;
+      background: #eaf0f7;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+
+    .view-tab {
+      border: 0;
+      background: transparent;
+      color: #526985;
+      padding: 9px 15px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .view-tab.active {
+      background: #fff;
+      color: var(--blue);
+      box-shadow: 0 2px 8px rgba(31, 55, 86, 0.08);
+    }
+
+    .comparison-header {
+      margin-bottom: 14px;
+    }
+
+    .comparison-status {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--green);
+      border-radius: 12px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .comparison-status.waiting {
+      border-left-color: var(--orange);
+    }
+
+    .comparison-status.error {
+      border-left-color: var(--red);
+    }
+
+    .comparison-meta {
+      display: grid;
+      grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .comparison-meta-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 11px 13px;
+    }
+
+    .comparison-meta-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 750;
+      text-transform: uppercase;
+      letter-spacing: 0.45px;
+    }
+
+    .comparison-meta-value {
+      margin-top: 5px;
+      font-size: 15px;
+      font-weight: 760;
+      line-height: 1.35;
+    }
+
+    .comparison-plots {
+      display: grid;
+      grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .comparison-plot-image {
+      min-height: 560px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .comparison-plot-image img {
+      display: block;
+      width: 100%;
+      max-height: 740px;
+      object-fit: contain;
+    }
+
+    .comparison-metrics {
+      display: grid;
+      grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      padding: 12px;
+    }
+
+    .comparison-metric {
+      min-height: 112px;
+      padding: 12px;
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      background: #fbfdff;
+    }
+
+    .comparison-metric-title {
+      color: #40516a;
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .comparison-metric-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 6px;
+      color: #526985;
+      font-size: 11px;
+    }
+
+    .comparison-metric-row strong {
+      color: var(--ink);
+    }
+
+    .comparison-delta {
+      margin-top: 8px;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .comparison-rmse {
+      display: grid;
+      grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      padding: 12px;
+    }
+
+    .comparison-table td,
+    .comparison-table th {
+      text-align: right;
+    }
+
+    .comparison-table td:first-child,
+    .comparison-table th:first-child {
+      text-align: left;
+    }
+
+    @media (max-width: 1100px) {
+      .comparison-meta,
+      .comparison-metrics {
+        grid-template-columns:
+          repeat(2, minmax(0, 1fr));
+      }
+
+      .comparison-plots {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .view-tabs {
+        width: 100%;
+      }
+
+      .view-tab {
+        flex: 1;
+      }
+
+      .comparison-meta,
+      .comparison-metrics,
+      .comparison-rmse {
+        grid-template-columns: 1fr;
+      }
+
+      .comparison-plot-image {
+        min-height: 390px;
+      }
+    }
+
+  </style>
+
+</head>
+
+
+
+<body>
+
+  <div class="shell">
+
+    <div class="view-tabs" aria-label="Dashboard view">
+      <button
+        id="viewSoundingBtn"
+        class="view-tab active"
+        type="button"
+        onclick="showSoundingView()"
+      >
+        Sondaža
+      </button>
+
+      <button
+        id="viewComparisonBtn"
+        class="view-tab"
+        type="button"
+        onclick="showComparisonView()"
+      >
+        ICON-D2 +12 h
+      </button>
+    </div>
+
+    <div id="app">
+
+      <div class="loading">
+
+        Loading LJLM sounding …
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <script>
+
+    let currentData = null;
+
+    let currentPlot = 'zoom';
+
+    let currentChange = '24h';
+
+    let currentView = 'sounding';
+
+    let currentComparePlot = 'full';
+
+
+
+    function esc(value) {
+
+      return String(
+
+        value === null ||
+
+        value === undefined
+
+          ? ''
+
+          : value
+
+      )
+
+        .replace(/&/g, '&amp;')
+
+        .replace(/</g, '&lt;')
+
+        .replace(/>/g, '&gt;')
+
+        .replace(/"/g, '&quot;')
+
+        .replace(/'/g, '&#039;');
+
+    }
+
+
+
+    function fmt(value, digits) {
+
+      if (
+
+        value === null ||
+
+        value === undefined ||
+
+        !Number.isFinite(Number(value))
+
+      ) {
+
+        return '—';
+
+      }
+
+
+
+      const n = Number(value);
+
+
+
+      return n.toLocaleString(
+
+        'en-GB',
+
+        {
+
+          minimumFractionDigits:
+
+            digits || 0,
+
+          maximumFractionDigits:
+
+            digits || 0
+
+        }
+
+      );
+
+    }
+
+
+
+    function smartFmt(value, unit) {
+
+      if (
+
+        value === null ||
+
+        value === undefined ||
+
+        !Number.isFinite(Number(value))
+
+      ) {
+
+        return '—';
+
+      }
+
+
+
+      if (
+
+        unit === '°C' ||
+
+        unit === '°C/km' ||
+
+        unit === 'm/s' ||
+
+        unit === 'mm' ||
+
+        unit === 'g/kg'
+
+      ) {
+
+        return fmt(value, 1);
+
+      }
+
+
+
+      if (
+
+        unit === 'kg m⁻¹ s⁻¹' ||
+
+        unit === 'J/kg'
+
+      ) {
+
+        return fmt(value, 0);
+
+      }
+
+
+
+      return fmt(value, 0);
+
+    }
+
+
+
+    function utcLabel(text) {
+
+      if (!text) {
+
+        return '—';
+
+      }
+
+
+
+      return text
+
+        .replace('T', ' ')
+
+        .replace('Z', ' UTC');
+
+    }
+
+
+
+    function statusLabel(status) {
+
+      const s =
+
+        String(status || 'ok')
+
+          .toLowerCase();
+
+
+
+      if (s === 'waiting') {
+
+        return 'WAITING';
+
+      }
+
+
+
+      if (s === 'missing') {
+
+        return 'MISSING';
+
+      }
+
+
+
+      return 'OK';
+
+    }
+
+
+
+    function metricHtml(item) {
+
+      const percentile =
+
+        item.percentile !== null
+
+          ? (
+
+              '<div class="percentile-pill">' +
+
+              'P' +
+
+              Math.round(item.percentile) +
+
+              '</div>'
+
+            )
+
+          : '';
+
+
+
+      return (
+
+        '<div class="metric">' +
+
+          '<div class="metric-label">' +
+
+            esc(item.label) +
+
+          '</div>' +
+
+          '<div class="metric-value">' +
+
+            '<span class="metric-number">' +
+
+              smartFmt(
+
+                item.value,
+
+                item.unit
+
+              ) +
+
+            '</span>' +
+
+            '<span class="metric-unit">' +
+
+              esc(item.unit) +
+
+            '</span>' +
+
+          '</div>' +
+
+          percentile +
+
+        '</div>'
+
+      );
+
+    }
+
+
+
+
+
+    function moistureTransportHtml(data) {
+
+      const block =
+
+        data.moistureTransport || {};
+
+
+
+      if (!block.available) {
+
+        return (
+
+          '<div class="caveat">' +
+
+            (
+
+              block.error
+
+                ? (
+
+                    'Moisture transport unavailable: ' +
+
+                    esc(block.error)
+
+                  )
+
+                : 'Moisture transport not available.'
+
+            ) +
+
+          '</div>'
+
+        );
+
+      }
+
+
+
+      const cards = [];
+
+
+
+      if (
+
+        block.total &&
+
+        block.total.available
+
+      ) {
+
+        cards.push(
+
+          '<div class="transport-card">' +
+
+            '<div class="transport-card-label">' +
+
+              'Total IVT' +
+
+            '</div>' +
+
+            '<div class="transport-card-value">' +
+
+              smartFmt(
+
+                block.total.magnitude,
+
+                'kg m⁻¹ s⁻¹'
+
+              ) +
+
+              '<span class="transport-card-unit">' +
+
+                'kg m⁻¹ s⁻¹' +
+
+              '</span>' +
+
+            '</div>' +
+
+            '<div class="transport-card-sub">' +
+
+              (
+
+                block.total.direction !== null
+
+                  ? (
+
+                      'toward ' +
+
+                      fmt(
+
+                        block.total.direction,
+
+                        0
+
+                      ) +
+
+                      '°'
+
+                    )
+
+                  : ''
+
+              ) +
+
+            '</div>' +
+
+          '</div>'
+
+        );
+
+      }
+
+
+
+      (block.layers || [])
+
+        .filter(function(item) {
+
+          return item.available;
+
+        })
+
+        .forEach(function(item) {
+
+          cards.push(
+
+            '<div class="transport-card">' +
+
+              '<div class="transport-card-label">' +
+
+                esc(item.label) +
+
+              '</div>' +
+
+              '<div class="transport-card-value">' +
+
+                smartFmt(
+
+                  item.magnitude,
+
+                  'kg m⁻¹ s⁻¹'
+
+                ) +
+
+                '<span class="transport-card-unit">' +
+
+                  'kg m⁻¹ s⁻¹' +
+
+                '</span>' +
+
+              '</div>' +
+
+              '<div class="transport-card-sub">' +
+
+                (
+
+                  item.direction !== null
+
+                    ? (
+
+                        'toward ' +
+
+                        fmt(item.direction, 0) +
+
+                        '°'
+
+                      )
+
+                    : ''
+
+                ) +
+
+              '</div>' +
+
+            '</div>'
+
+          );
+
+        });
+
+
+
+      const humidity =
+
+        (block.humidity || [])
+
+          .filter(function(item) {
+
+            return item.value !== null;
+
+          })
+
+          .map(function(item) {
+
+            return (
+
+              '<span class="humidity-pill">' +
+
+                esc(item.label) +
+
+                ' ' +
+
+                smartFmt(
+
+                  item.value,
+
+                  'g/kg'
+
+                ) +
+
+                ' g/kg' +
+
+              '</span>'
+
+            );
+
+          })
+
+          .join('');
+
+
+
+      return (
+
+        '<div class="transport-wrap">' +
+
+          '<div class="transport-grid">' +
+
+            cards.join('') +
+
+          '</div>' +
+
+          (
+
+            humidity
+
+              ? (
+
+                  '<div class="humidity-row">' +
+
+                    humidity +
+
+                  '</div>'
+
+                )
+
+              : ''
+
+          ) +
+
+        '</div>'
+
+      );
+
+    }
+
+
+
+
+
+    function orographicTransportHtml(data) {
+
+      const block =
+
+        data.orographicTransport || {};
+
+
+
+      if (
+
+        !block.available ||
+
+        !block.rows ||
+
+        !block.rows.length
+
+      ) {
+
+        return (
+
+          '<div class="caveat">' +
+
+          'Orographic moisture transport not available.' +
+
+          '</div>'
+
+        );
+
+      }
+
+
+
+      const cards =
+
+        block.rows.map(
+
+          function(item) {
+
+            const signedClass =
+
+              item.signed === null
+
+                ? ''
+
+                : (
+
+                    item.signed >= 0
+
+                      ? 'signed-positive'
+
+                      : 'signed-negative'
+
+                  );
+
+
+
+            const fallback =
+
+              item.mode === 'pressure_fallback'
+
+                ? (
+
+                    '<span class="fallback-badge">' +
+
+                    'pressure fallback' +
+
+                    '</span>'
+
+                  )
+
+                : '';
+
+
+
+            return (
+
+              '<div class="orographic-card">' +
+
+                '<div class="orographic-title">' +
+
+                  esc(item.label) +
+
+                '</div>' +
+
+
+
+                '<div class="orographic-layer">' +
+
+                  esc(item.layerLabel) +
+
+                  fallback +
+
+                  (
+
+                    item.normalAzimuth !== null
+
+                      ? (
+
+                          ' · normal ' +
+
+                          fmt(
+
+                            item.normalAzimuth,
+
+                            0
+
+                          ) +
+
+                          '°'
+
+                        )
+
+                      : ''
+
+                  ) +
+
+                '</div>' +
+
+
+
+                '<div class="orographic-main">' +
+
+                  '<span class="orographic-number">' +
+
+                    smartFmt(
+
+                      item.upslope,
+
+                      'kg m⁻¹ s⁻¹'
+
+                    ) +
+
+                  '</span>' +
+
+                  '<span class="orographic-unit">' +
+
+                    'kg m⁻¹ s⁻¹' +
+
+                  '</span>' +
+
+                '</div>' +
+
+
+
+                '<div class="orographic-caption">' +
+
+                  'upslope IVT⊥' +
+
+                '</div>' +
+
+
+
+                '<div class="orographic-meta">' +
+
+                  'signed: ' +
+
+                  '<span class="' +
+
+                    signedClass +
+
+                  '">' +
+
+                    smartFmt(
+
+                      item.signed,
+
+                      'kg m⁻¹ s⁻¹'
+
+                    ) +
+
+                  '</span>' +
+
+                  ' · fraction: ' +
+
+                  (
+
+                    item.fractionPct !== null
+
+                      ? (
+
+                          fmt(
+
+                            item.fractionPct,
+
+                            0
+
+                          ) +
+
+                          '%'
+
+                        )
+
+                      : '—'
+
+                  ) +
+
+                  (
+
+                    item.angleDeg !== null
+
+                      ? (
+
+                          ' · angle: ' +
+
+                          fmt(
+
+                            item.angleDeg,
+
+                            0
+
+                          ) +
+
+                          '°'
+
+                        )
+
+                      : ''
+
+                  ) +
+
+                  (
+
+                    item.topPressure !== null
+
+                      ? (
+
+                          '<br>layer top ≈ ' +
+
+                          fmt(
+
+                            item.topPressure,
+
+                            0
+
+                          ) +
+
+                          ' hPa'
+
+                        )
+
+                      : ''
+
+                  ) +
+
+                '</div>' +
+
+              '</div>'
+
+            );
+
+          }
+
+        ).join('');
+
+
+
+      return (
+
+        '<div class="orographic-grid">' +
+
+          cards +
+
+        '</div>' +
+
+        '<div class="caveat">' +
+
+          'Positive signed transport is toward the selected barrier normal. ' +
+
+          'Upslope IVT⊥ is clipped at zero. ' +
+
+          (
+
+            block.version !== null
+
+              ? (
+
+                  'Orographic diagnostic v' +
+
+                  esc(block.version) +
+
+                  '.'
+
+                )
+
+              : ''
+
+          ) +
+
+        '</div>'
+
+      );
+
+    }
+
+
+
+
+
+    function climatologyHtml(data) {
+
+      if (
+
+        !data.climatology ||
+
+        !data.climatology.length
+
+      ) {
+
+        return (
+
+          '<div class="caveat">' +
+
+          'Climatology not available.' +
+
+          '</div>'
+
+        );
+
+      }
+
+
+
+      const rows =
+
+        data.climatology.map(
+
+          function(item) {
+
+            const pct =
+
+              Math.max(
+
+                0,
+
+                Math.min(
+
+                  100,
+
+                  Number(
+
+                    item.percentile || 0
+
+                  )
+
+                )
+
+              );
+
+
+
+            const range =
+
+              smartFmt(
+
+                item.historicalMin,
+
+                item.unit
+
+              ) +
+
+              ' / ' +
+
+              smartFmt(
+
+                item.historicalMax,
+
+                item.unit
+
+              );
+
+
+
+            return (
+
+              '<tr>' +
+
+                '<td><strong>' +
+
+                  esc(item.label) +
+
+                '</strong></td>' +
+
+
+
+                '<td class="value">' +
+
+                  smartFmt(
+
+                    item.value,
+
+                    item.unit
+
+                  ) +
+
+                  ' ' +
+
+                  esc(item.unit) +
+
+                '</td>' +
+
+
+
+                '<td class="percentile-cell">' +
+
+                  '<div class="pbar">' +
+
+                    '<div class="pmark" ' +
+
+                    'style="left:' +
+
+                    pct +
+
+                    '%"></div>' +
+
+                  '</div>' +
+
+
+
+                  '<div class="p-caption">' +
+
+                    '<span>P10</span>' +
+
+                    '<span>P50</span>' +
+
+                    '<span>P90</span>' +
+
+                  '</div>' +
+
+                '</td>' +
+
+
+
+                '<td><strong>P' +
+
+                  Math.round(
+
+                    item.percentile || 0
+
+                  ) +
+
+                '</strong></td>' +
+
+
+
+                '<td class="range">' +
+
+                  range +
+
+                '</td>' +
+
+              '</tr>'
+
+            );
+
+          }
+
+        ).join('');
+
+
+
+      const meta =
+
+        data.climatologyMeta || {};
+
+
+
+      return (
+
+        '<div class="clim-wrap">' +
+
+          '<table class="clim-table">' +
+
+            '<thead>' +
+
+              '<tr>' +
+
+                '<th>Parameter</th>' +
+
+                '<th>Current</th>' +
+
+                '<th>Percentile</th>' +
+
+                '<th></th>' +
+
+                '<th>Min / max</th>' +
+
+              '</tr>' +
+
+            '</thead>' +
+
+            '<tbody>' +
+
+              rows +
+
+            '</tbody>' +
+
+          '</table>' +
+
+        '</div>' +
+
+
+
+        (
+
+          meta.caveat
+
+            ? (
+
+              '<div class="caveat">' +
+
+                '<strong>' +
+
+                  esc(
+
+                    meta.referencePeriod ||
+
+                    'Historical reference'
+
+                  ) +
+
+                '</strong>' +
+
+                (
+
+                  meta.window
+
+                    ? (
+
+                      ' · ' +
+
+                      esc(meta.window)
+
+                    )
+
+                    : ''
+
+                ) +
+
+                '<br>' +
+
+                esc(meta.caveat) +
+
+              '</div>'
+
+            )
+
+            : ''
+
+        )
+
+      );
+
+    }
+
+
+
+    function inversionHtml(data) {
+
+      const rows =
+
+        (data.inversions || [])
+
+          .map(function(item) {
+
+            return (
+
+              '<tr>' +
+
+                '<td>' +
+
+                  fmt(item.baseAglM, 0) +
+
+                  ' m' +
+
+                '</td>' +
+
+                '<td>' +
+
+                  fmt(item.topAglM, 0) +
+
+                  ' m' +
+
+                '</td>' +
+
+                '<td>' +
+
+                  fmt(item.depthM, 0) +
+
+                  ' m' +
+
+                '</td>' +
+
+                '<td>' +
+
+                  (
+
+                    item.deltaTC !== null
+
+                      ? (
+
+                        (item.deltaTC >= 0 ? '+' : '') +
+
+                        fmt(item.deltaTC, 2) +
+
+                        ' °C'
+
+                      )
+
+                      : '—'
+
+                  ) +
+
+                '</td>' +
+
+                '<td>' +
+
+                  '<span class="strength ' +
+
+                    esc(item.strength) +
+
+                  '">' +
+
+                    esc(
+
+                      item.strength ||
+
+                      '—'
+
+                    ) +
+
+                  '</span>' +
+
+                '</td>' +
+
+              '</tr>'
+
+            );
+
+          })
+
+          .join('');
+
+
+
+      if (!rows) {
+
+        return (
+
+          '<div class="caveat">' +
+
+          'No inversion diagnostics available.' +
+
+          '</div>'
+
+        );
+
+      }
+
+
+
+      return (
+
+        '<div class="table-wrap">' +
+
+          '<table class="data">' +
+
+            '<thead>' +
+
+              '<tr>' +
+
+                '<th>Base AGL</th>' +
+
+                '<th>Top AGL</th>' +
+
+                '<th>Depth</th>' +
+
+                '<th>ΔT</th>' +
+
+                '<th>Strength</th>' +
+
+              '</tr>' +
+
+            '</thead>' +
+
+            '<tbody>' +
+
+              rows +
+
+            '</tbody>' +
+
+          '</table>' +
+
+        '</div>'
+
+      );
+
+    }
+
+
+
+    function changeBlock(data) {
+
+      const block =
+
+        currentChange === '12h'
+
+          ? data.changes.previousTerm
+
+          : data.changes.previousDay;
+
+
+
+      if (
+
+        !block ||
+
+        !block.available
+
+      ) {
+
+        return (
+
+          '<div class="caveat">' +
+
+          'Comparison not available.' +
+
+          '</div>'
+
+        );
+
+      }
+
+
+
+      const rows =
+
+        block.rows.map(
+
+          function(item) {
+
+            let cls = '';
+
+
+
+            if (
+
+              item.delta !== null
+
+            ) {
+
+              cls =
+
+                item.delta > 0
+
+                  ? 'positive'
+
+                  : (
+
+                    item.delta < 0
+
+                      ? 'negative'
+
+                      : ''
+
+                  );
+
+            }
+
+
+
+            const delta =
+
+              item.delta === null
+
+                ? '—'
+
+                : (
+
+                    (
+
+                      item.delta > 0
+
+                        ? '+'
+
+                        : ''
+
+                    ) +
+
+                    smartFmt(
+
+                      item.delta,
+
+                      item.unit
+
+                    ) +
+
+                    ' ' +
+
+                    esc(item.unit)
+
+                  );
+
+
+
+            return (
+
+              '<tr>' +
+
+                '<td><strong>' +
+
+                  esc(item.label) +
+
+                '</strong></td>' +
+
+                '<td>' +
+
+                  smartFmt(
+
+                    item.current,
+
+                    item.unit
+
+                  ) +
+
+                  ' ' +
+
+                  esc(item.unit) +
+
+                '</td>' +
+
+                '<td>' +
+
+                  smartFmt(
+
+                    item.previous,
+
+                    item.unit
+
+                  ) +
+
+                  ' ' +
+
+                  esc(item.unit) +
+
+                '</td>' +
+
+                '<td class="delta ' +
+
+                  cls +
+
+                '">' +
+
+                  delta +
+
+                '</td>' +
+
+              '</tr>'
+
+            );
+
+          }
+
+        ).join('');
+
+
+
+      return (
+
+        '<div class="table-wrap">' +
+
+          '<table class="data">' +
+
+            '<thead>' +
+
+              '<tr>' +
+
+                '<th>Parameter</th>' +
+
+                '<th>Current</th>' +
+
+                '<th>Previous</th>' +
+
+                '<th>Change</th>' +
+
+              '</tr>' +
+
+            '</thead>' +
+
+            '<tbody>' +
+
+              rows +
+
+            '</tbody>' +
+
+          '</table>' +
+
+        '</div>'
+
+      );
+
+    }
+
+
+
+    function plotUrl(data) {
+
+      if (currentPlot === 'full') {
+
+        return data.images.skewt;
+
+      }
+
+
+
+      if (currentPlot === 'thetae') {
+
+        return data.images.thetae;
+
+      }
+
+
+
+      return data.images.skewtZoom;
+
+    }
+
+
+
+    function plotTitle() {
+
+      if (currentPlot === 'full') {
+
+        return 'Full Skew-T';
+
+      }
+
+
+
+      if (currentPlot === 'thetae') {
+
+        return 'θe / θ profile';
+
+      }
+
+
+
+      return 'Low-level profile';
+
+    }
+
+
+
+    function archiveOptionsHtml(data) {
+
+      const options = [];
+
+
+
+      const latestSelected =
+
+        data.profilePath === 'data/latest.json';
+
+
+
+      options.push(
+
+        '<option value=""' +
+
+          (
+
+            latestSelected
+
+              ? ' selected'
+
+              : ''
+
+          ) +
+
+        '>' +
+
+          'Latest · ' +
+
+          esc(
+
+            data.nominalDate +
+
+            ' · ' +
+
+            data.term +
+
+            ' UTC'
+
+          ) +
+
+        '</option>'
+
+      );
+
+
+
+      (data.archiveOptions || [])
+
+        .forEach(function(item) {
+
+          const selected =
+
+            item.archiveFile ===
+
+            data.profilePath;
+
+
+
+          options.push(
+
+            '<option value="' +
+
+              esc(item.archiveFile) +
+
+            '"' +
+
+              (
+
+                selected
+
+                  ? ' selected'
+
+                  : ''
+
+              ) +
+
+            '>' +
+
+              esc(
+
+                item.nominalDate +
+
+                ' · ' +
+
+                item.term +
+
+                ' UTC'
+
+              ) +
+
+            '</option>'
+
+          );
+
+        });
+
+
+
+      return options.join('');
+
+    }
+
+
+
+    function render(data) {
+
+      currentData = data;
+
+
+
+      const status =
+
+        String(
+
+          data.soundingStatus || 'ok'
+
+        ).toLowerCase();
+
+
+
+      const html =
+
+        '<header class="topbar">' +
+
+
+
+          '<div>' +
+
+            '<div class="brand-title">' +
+
+              '<strong>' +
+
+                esc(
+
+                  String(
+
+                    data.stationName ||
+
+                    'Ljubljana'
+
+                  ).toUpperCase()
+
+                ) +
+
+              '</strong>' +
+
+              '<span class="station-id">' +
+
+                esc(data.station) +
+
+              '</span>' +
+
+            '</div>' +
+
+            '<div class="subtitle">' +
+
+              'Upper-air sounding' +
+
+            '</div>' +
+
+          '</div>' +
+
+
+
+          '<div class="time-block">' +
+
+            '<div class="time-main">' +
+
+              esc(data.nominalDate) +
+
+              ' · ' +
+
+              esc(data.term) +
+
+              ' UTC' +
+
+            '</div>' +
+
+
+
+            '<div class="time-sub">' +
+
+              'Launch: ' +
+
+              esc(
+
+                utcLabel(
+
+                  data.launchTime
+
+                )
+
+              ) +
+
+            '</div>' +
+
+
+
+            '<div class="status-row">' +
+
+              '<span class="status-dot ' +
+
+                esc(status) +
+
+              '"></span>' +
+
+              '<strong>' +
+
+                esc(
+
+                  statusLabel(status)
+
+                ) +
+
+              '</strong>' +
+
+              '<span class="time-sub">' +
+
+                'Processed ' +
+
+                esc(
+
+                  utcLabel(
+
+                    data.processedAt
+
+                  )
+
+                ) +
+
+              '</span>' +
+
+            '</div>' +
+
+          '</div>' +
+
+
+
+          '<div class="archive-block">' +
+
+            '<span class="archive-label">' +
+
+              'Archive' +
+
+            '</span>' +
+
+            '<select id="archiveSelect">' +
+
+              archiveOptionsHtml(data) +
+
+            '</select>' +
+
+          '</div>' +
+
+
+
+        '</header>' +
+
+
+
+        '<main class="dashboard">' +
+
+
+
+          '<section class="panel">' +
+
+            '<div class="panel-head">' +
+
+              '<div>' +
+
+                '<div class="panel-title" id="plotTitle">' +
+
+                  esc(plotTitle()) +
+
+                '</div>' +
+
+                '<div class="panel-note">' +
+
+                  'Static MetPy product · wind in kt' +
+
+                '</div>' +
+
+              '</div>' +
+
+
+
+              '<div class="plot-tabs">' +
+
+                '<button class="tab-btn ' +
+
+                  (
+
+                    currentPlot === 'zoom'
+
+                      ? 'active'
+
+                      : ''
+
+                  ) +
+
+                  '" data-plot="zoom">' +
+
+                  'Low level' +
+
+                '</button>' +
+
+
+
+                '<button class="tab-btn ' +
+
+                  (
+
+                    currentPlot === 'full'
+
+                      ? 'active'
+
+                      : ''
+
+                  ) +
+
+                  '" data-plot="full">' +
+
+                  'Full Skew-T' +
+
+                '</button>' +
+
+
+
+                '<button class="tab-btn ' +
+
+                  (
+
+                    currentPlot === 'thetae'
+
+                      ? 'active'
+
+                      : ''
+
+                  ) +
+
+                  '" data-plot="thetae">' +
+
+                  'θe / θ' +
+
+                '</button>' +
+
+              '</div>' +
+
+            '</div>' +
+
+
+
+            '<div class="main-plot">' +
+
+              '<img id="mainPlotImage" ' +
+
+                'src="' +
+
+                  esc(
+
+                    plotUrl(data)
+
+                  ) +
+
+                '" ' +
+
+                'alt="LJLM sounding">' +
+
+
+
+              '<div id="mainPlotError" ' +
+
+                'class="image-error">' +
+
+                'Image is not available for this archived sounding.' +
+
+              '</div>' +
+
+            '</div>' +
+
+          '</section>' +
+
+
+
+          '<div class="right-stack">' +
+
+
+
+            '<section class="panel">' +
+
+              '<div class="panel-head">' +
+
+                '<div class="panel-title">' +
+
+                  'Current state' +
+
+                '</div>' +
+
+                '<div class="panel-note">' +
+
+                  'Current sounding' +
+
+                '</div>' +
+
+              '</div>' +
+
+
+
+              '<div class="metric-grid">' +
+
+                data.metrics
+
+                  .map(metricHtml)
+
+                  .join('') +
+
+              '</div>' +
+
+            '</section>' +
+
+
+
+            '<section class="panel">' +
+
+              '<div class="panel-head">' +
+
+                '<div class="panel-title">' +
+
+                  'Moisture transport' +
+
+                '</div>' +
+
+                '<div class="panel-note">' +
+
+                  'IVT layers · q profile' +
+
+                '</div>' +
+
+              '</div>' +
+
+
+
+              moistureTransportHtml(data) +
+
+
+
+            '</section>' +
+
+
+
+            '<section class="panel">' +
+
+              '<div class="panel-head">' +
+
+                '<div class="panel-title">' +
+
+                  'Orographic moisture transport' +
+
+                '</div>' +
+
+                '<div class="panel-note">' +
+
+                  'cross-barrier IVT⊥' +
+
+                '</div>' +
+
+              '</div>' +
+
+
+
+              orographicTransportHtml(data) +
+
+
+
+            '</section>' +
+
+
+
+            '<section class="panel">' +
+
+              '<div class="panel-head">' +
+
+                '<div class="panel-title">' +
+
+                  'Climatological context' +
+
+                '</div>' +
+
+                '<div class="panel-note">' +
+
+                  esc(
+
+                    data.climatologyMeta
+
+                      .referencePeriod ||
+
+                    ''
+
+                  ) +
+
+                '</div>' +
+
+              '</div>' +
+
+
+
+              climatologyHtml(data) +
+
+
+
+            '</section>' +
+
+
+
+          '</div>' +
+
+
+
+          '<div class="lower-grid">' +
+
+
+
+            '<section class="panel">' +
+
+              '<div class="panel-head">' +
+
+                '<div class="panel-title">' +
+
+                  'Hodograph' +
+
+                '</div>' +
+
+                '<div class="panel-note">' +
+
+                  '0–12 km AGL' +
+
+                '</div>' +
+
+              '</div>' +
+
+
+
+              '<div class="hodo-image">' +
+
+                '<img src="' +
+
+                  esc(
+
+                    data.images.hodograph
+
+                  ) +
+
+                '" alt="LJLM hodograph">' +
+
+              '</div>' +
+
+            '</section>' +
+
+
+
+            '<section class="panel">' +
+
+              '<div class="panel-head">' +
+
+                '<div class="panel-title">' +
+
+                  'Inversions' +
+
+                '</div>' +
+
+                '<div class="panel-note">' +
+
+                  'Detected layers' +
+
+                '</div>' +
+
+              '</div>' +
+
+
+
+              inversionHtml(data) +
+
+
+
+            '</section>' +
+
+
+
+            '<section class="panel">' +
+
+              '<div class="panel-head">' +
+
+                '<div>' +
+
+                  '<div class="panel-title">' +
+
+                    'Recent changes' +
+
+                  '</div>' +
+
+                  '<div class="panel-note">' +
+
+                    (
+
+                      currentChange === '24h'
+
+                        ? 'Same nominal term'
+
+                        : 'Previous sounding'
+
+                    ) +
+
+                  '</div>' +
+
+                '</div>' +
+
+
+
+                '<div class="change-tabs">' +
+
+                  '<button data-change="12h" class="' +
+
+                    (
+
+                      currentChange === '12h'
+
+                        ? 'active'
+
+                        : ''
+
+                    ) +
+
+                  '">' +
+
+                    '12 h' +
+
+                  '</button>' +
+
+
+
+                  '<button data-change="24h" class="' +
+
+                    (
+
+                      currentChange === '24h'
+
+                        ? 'active'
+
+                        : ''
+
+                    ) +
+
+                  '">' +
+
+                    '24 h' +
+
+                  '</button>' +
+
+                '</div>' +
+
+              '</div>' +
+
+
+
+              '<div id="changeContent">' +
+
+                changeBlock(data) +
+
+              '</div>' +
+
+
+
+            '</section>' +
+
+
+
+          '</div>' +
+
+
+
+        '</main>' +
+
+
+
+        '<div class="footer">' +
+
+          'LJLM 14015 · DWD Open Data BUFR · operational sounding dashboard' +
+
+        '</div>';
+
+
+
+      document.getElementById(
+
+        'app'
+
+      ).innerHTML = html;
+
+
+
+      bindEvents();
+
+      bindImageFallback();
+
+    }
+
+
+
+    function bindImageFallback() {
+
+      const img =
+
+        document.getElementById(
+
+          'mainPlotImage'
+
+        );
+
+
+
+      const error =
+
+        document.getElementById(
+
+          'mainPlotError'
+
+        );
+
+
+
+      if (!img || !error) {
+
+        return;
+
+      }
+
+
+
+      img.onerror = function() {
+
+        img.style.display = 'none';
+
+        error.style.display = 'block';
+
+      };
+
+
+
+      img.onload = function() {
+
+        error.style.display = 'none';
+
+        img.style.display = 'block';
+
+      };
+
+    }
+
+
+
+    function bindEvents() {
+
+      document
+
+        .querySelectorAll(
+
+          '[data-plot]'
+
+        )
+
+        .forEach(function(button) {
+
+          button.addEventListener(
+
+            'click',
+
+            function() {
+
+              currentPlot =
+
+                button.dataset.plot;
+
+
+
+              const img =
+
+                document.getElementById(
+
+                  'mainPlotImage'
+
+                );
+
+
+
+              document
+
+                .querySelectorAll(
+
+                  '[data-plot]'
+
+                )
+
+                .forEach(
+
+                  function(item) {
+
+                    item.classList
+
+                      .toggle(
+
+                        'active',
+
+                        item.dataset.plot ===
+
+                        currentPlot
+
+                      );
+
+                  }
+
+                );
+
+
+
+              document.getElementById(
+
+                'plotTitle'
+
+              ).textContent =
+
+                plotTitle();
+
+
+
+              const error =
+
+                document.getElementById(
+
+                  'mainPlotError'
+
+                );
+
+
+
+              if (error) {
+
+                error.style.display =
+
+                  'none';
+
+              }
+
+
+
+              img.style.display =
+
+                'block';
+
+
+
+              img.src =
+
+                plotUrl(
+
+                  currentData
+
+                );
+
+            }
+
+          );
+
+        });
+
+
+
+      document
+
+        .querySelectorAll(
+
+          '[data-change]'
+
+        )
+
+        .forEach(function(button) {
+
+          button.addEventListener(
+
+            'click',
+
+            function() {
+
+              currentChange =
+
+                button.dataset.change;
+
+
+
+              document
+
+                .querySelectorAll(
+
+                  '[data-change]'
+
+                )
+
+                .forEach(
+
+                  function(item) {
+
+                    item.classList
+
+                      .toggle(
+
+                        'active',
+
+                        item.dataset.change ===
+
+                        currentChange
+
+                      );
+
+                  }
+
+                );
+
+
+
+              document.getElementById(
+
+                'changeContent'
+
+              ).innerHTML =
+
+                changeBlock(
+
+                  currentData
+
+                );
+
+            }
+
+          );
+
+        });
+
+
+
+      const archive =
+
+        document.getElementById(
+
+          'archiveSelect'
+
+        );
+
+
+
+      if (archive) {
+
+        archive.addEventListener(
+
+          'change',
+
+          function() {
+
+            load(
+
+              archive.value
+
+            );
+
+          }
+
+        );
+
+      }
+
+    }
+
+
+
+
+    function setMainView_(view) {
+      currentView = view;
+
+      const soundingButton =
+        document.getElementById('viewSoundingBtn');
+
+      const comparisonButton =
+        document.getElementById('viewComparisonBtn');
+
+      if (soundingButton) {
+        soundingButton.classList.toggle(
+          'active',
+          view === 'sounding'
+        );
+      }
+
+      if (comparisonButton) {
+        comparisonButton.classList.toggle(
+          'active',
+          view === 'comparison'
+        );
+      }
+    }
+
+
+    function showSoundingView() {
+      setMainView_('sounding');
+      load('');
+    }
+
+
+    function showComparisonView() {
+      setMainView_('comparison');
+
+      document.getElementById(
+        'app'
+      ).innerHTML =
+        '<div class="loading">' +
+        'Loading ICON-D2 verification …' +
+        '</div>';
+
+      google.script.run
+        .withSuccessHandler(
+          renderComparison
+        )
+        .withFailureHandler(
+          showError
+        )
+        .getSoundingComparison();
+    }
+
+
+    function comparisonPlotLabel_() {
+      const labels = {
+        full: 'Full Skew-T',
+        zoom: 'Low level',
+        thetae: 'θe / θ',
+        hodograph: 'Hodograph'
+      };
+
+      return (
+        labels[currentComparePlot] ||
+        labels.full
+      );
+    }
+
+
+    function comparisonImageUrl_(
+      data,
+      source
+    ) {
+      if (
+        !data ||
+        !data.images ||
+        !data.images[source]
+      ) {
+        return '';
+      }
+
+      return (
+        data.images[source][currentComparePlot] ||
+        ''
+      );
+    }
+
+
+    function signedFmt_(
+      value,
+      unit
+    ) {
+      if (
+        value === null ||
+        value === undefined ||
+        !Number.isFinite(Number(value))
+      ) {
+        return '—';
+      }
+
+      const n = Number(value);
+      const valueText =
+        smartFmt(n, unit);
+
+      return (
+        n > 0
+          ? '+' + valueText
+          : valueText
+      );
+    }
+
+
+    function comparisonMetaCard_(
+      label,
+      value
+    ) {
+      return (
+        '<div class="comparison-meta-card">' +
+          '<div class="comparison-meta-label">' +
+            esc(label) +
+          '</div>' +
+          '<div class="comparison-meta-value">' +
+            esc(value || '—') +
+          '</div>' +
+        '</div>'
+      );
+    }
+
+
+    function comparisonMetricHtml_(item) {
+      const unit = item.unit || '';
+
+      return (
+        '<div class="comparison-metric">' +
+          '<div class="comparison-metric-title">' +
+            esc(item.label) +
+          '</div>' +
+
+          '<div class="comparison-metric-row">' +
+            '<span>OBS</span>' +
+            '<strong>' +
+              smartFmt(
+                item.observation,
+                unit
+              ) +
+              (
+                unit
+                  ? ' ' + esc(unit)
+                  : ''
+              ) +
+            '</strong>' +
+          '</div>' +
+
+          '<div class="comparison-metric-row">' +
+            '<span>ICON</span>' +
+            '<strong>' +
+              smartFmt(
+                item.model,
+                unit
+              ) +
+              (
+                unit
+                  ? ' ' + esc(unit)
+                  : ''
+              ) +
+            '</strong>' +
+          '</div>' +
+
+          '<div class="comparison-delta ' +
+            (
+              Number(item.difference) > 0
+                ? 'signed-positive'
+                : (
+                    Number(item.difference) < 0
+                      ? 'signed-negative'
+                      : ''
+                  )
+            ) +
+          '">' +
+            'Δ ' +
+            signedFmt_(
+              item.difference,
+              unit
+            ) +
+            (
+              unit
+                ? ' ' + esc(unit)
+                : ''
+            ) +
+          '</div>' +
+        '</div>'
+      );
+    }
+
+
+    function comparisonPlotButton_(
+      key,
+      label
+    ) {
+      return (
+        '<button class="tab-btn ' +
+        (
+          currentComparePlot === key
+            ? 'active'
+            : ''
+        ) +
+        '" data-compare-plot="' +
+        esc(key) +
+        '">' +
+        esc(label) +
+        '</button>'
+      );
+    }
+
+
+    function comparisonImagePanel_(
+      title,
+      url
+    ) {
+      return (
+        '<div>' +
+          '<div class="panel-head">' +
+            '<div class="panel-title">' +
+              esc(title) +
+            '</div>' +
+          '</div>' +
+
+          '<div class="comparison-plot-image">' +
+            (
+              url
+                ? (
+                    '<img src="' +
+                    esc(url) +
+                    '" alt="' +
+                    esc(title) +
+                    '">'
+                  )
+                : (
+                    '<div class="image-error" style="display:block;">' +
+                    'Image not available.' +
+                    '</div>'
+                  )
+            ) +
+          '</div>' +
+        '</div>'
+      );
+    }
+
+
+    function comparisonWindText_(item) {
+      if (
+        !item ||
+        item.windSpeedMs === null ||
+        item.windSpeedMs === undefined ||
+        item.windDirectionDeg === null ||
+        item.windDirectionDeg === undefined
+      ) {
+        return '—';
+      }
+
+      return (
+        fmt(
+          item.windDirectionDeg,
+          0
+        ) +
+        '° / ' +
+        fmt(
+          item.windSpeedMs,
+          1
+        ) +
+        ' m/s'
+      );
+    }
+
+
+    function comparisonRowsHtml_(data) {
+      return (
+        data.levels || []
+      )
+        .map(function(row) {
+          if (
+            !row ||
+            row.available !== true
+          ) {
+            return (
+              '<tr>' +
+                '<td>' +
+                  esc(row.pressureHpa) +
+                  ' hPa' +
+                '</td>' +
+                '<td colspan="9">—</td>' +
+              '</tr>'
+            );
+          }
+
+          return (
+            '<tr>' +
+              '<td><strong>' +
+                esc(row.pressureHpa) +
+                ' hPa' +
+              '</strong></td>' +
+
+              '<td>' +
+                fmt(
+                  row.observation.temperatureC,
+                  1
+                ) +
+              '</td>' +
+
+              '<td>' +
+                fmt(
+                  row.model.temperatureC,
+                  1
+                ) +
+              '</td>' +
+
+              '<td class="delta">' +
+                signedFmt_(
+                  row.difference.temperatureC,
+                  '°C'
+                ) +
+              '</td>' +
+
+              '<td>' +
+                fmt(
+                  row.observation.dewpointC,
+                  1
+                ) +
+              '</td>' +
+
+              '<td>' +
+                fmt(
+                  row.model.dewpointC,
+                  1
+                ) +
+              '</td>' +
+
+              '<td class="delta">' +
+                signedFmt_(
+                  row.difference.dewpointC,
+                  '°C'
+                ) +
+              '</td>' +
+
+              '<td>' +
+                comparisonWindText_(
+                  row.observation
+                ) +
+              '</td>' +
+
+              '<td>' +
+                comparisonWindText_(
+                  row.model
+                ) +
+              '</td>' +
+
+              '<td>' +
+                fmt(
+                  row.difference.windVectorErrorMs,
+                  1
+                ) +
+                ' m/s' +
+              '</td>' +
+            '</tr>'
+          );
+        })
+        .join('');
+    }
+
+
+    function renderComparison(data) {
+      if (
+        currentView !== 'comparison'
+      ) {
+        return;
+      }
+
+      if (
+        !data ||
+        data.available !== true
+      ) {
+        const obsTime =
+          data &&
+          data.observationValidTime
+            ? (
+                '<br><span class="time-sub">' +
+                'OBS valid: ' +
+                esc(
+                  utcLabel(
+                    data.observationValidTime
+                  )
+                ) +
+                '</span>'
+              )
+            : '';
+
+        const modelTime =
+          data &&
+          data.modelValidTime
+            ? (
+                '<br><span class="time-sub">' +
+                'ICON-D2 valid: ' +
+                esc(
+                  utcLabel(
+                    data.modelValidTime
+                  )
+                ) +
+                '</span>'
+              )
+            : '';
+
+        document.getElementById(
+          'app'
+        ).innerHTML =
+          '<div class="comparison-status waiting">' +
+            '<strong>Comparison not available yet.</strong>' +
+            '<br>' +
+            esc(
+              (
+                data &&
+                data.message
+              ) ||
+              'Waiting for a matching observation and forecast.'
+            ) +
+            obsTime +
+            modelTime +
+          '</div>';
+
+        return;
+      }
+
+      const html =
+        '<div class="comparison-header">' +
+
+          '<div class="comparison-status">' +
+            '<strong>' +
+              'ICON-D2 +12 h forecast matched with LJLM observation.' +
+            '</strong>' +
+            '<br>' +
+            'Valid: ' +
+            esc(
+              utcLabel(
+                data.validTime
+              )
+            ) +
+            ' · ' +
+            esc(
+              data.convention || ''
+            ) +
+          '</div>' +
+
+          '<div class="comparison-meta">' +
+
+            comparisonMetaCard_(
+              'Observation',
+              (
+                data.observation.nominalDate +
+                ' · ' +
+                data.observation.term +
+                ' UTC'
+              )
+            ) +
+
+            comparisonMetaCard_(
+              'Launch',
+              utcLabel(
+                data.observation.launchTime
+              )
+            ) +
+
+            comparisonMetaCard_(
+              'ICON-D2 run',
+              utcLabel(
+                data.model.runTime
+              )
+            ) +
+
+            comparisonMetaCard_(
+              'Forecast lead',
+              (
+                '+' +
+                fmt(
+                  data.model.leadHours,
+                  0
+                ) +
+                ' h'
+              )
+            ) +
+
+          '</div>' +
+        '</div>' +
+
+
+        '<section class="panel">' +
+
+          '<div class="panel-head">' +
+            '<div>' +
+              '<div class="panel-title">' +
+                'Profile comparison' +
+              '</div>' +
+              '<div class="panel-note">' +
+                'OBS and ICON-D2 +12 h · ' +
+                esc(
+                  comparisonPlotLabel_()
+                ) +
+              '</div>' +
+            '</div>' +
+
+            '<div class="plot-tabs">' +
+              comparisonPlotButton_(
+                'full',
+                'Full Skew-T'
+              ) +
+              comparisonPlotButton_(
+                'zoom',
+                'Low level'
+              ) +
+              comparisonPlotButton_(
+                'thetae',
+                'θe / θ'
+              ) +
+              comparisonPlotButton_(
+                'hodograph',
+                'Hodograph'
+              ) +
+            '</div>' +
+          '</div>' +
+
+          '<div class="comparison-plots">' +
+            comparisonImagePanel_(
+              'OBS LJLM',
+              comparisonImageUrl_(
+                data,
+                'observation'
+              )
+            ) +
+
+            comparisonImagePanel_(
+              'ICON-D2 +12 h',
+              comparisonImageUrl_(
+                data,
+                'model'
+              )
+            ) +
+          '</div>' +
+        '</section>' +
+
+
+        '<section class="panel" style="margin-top:14px;">' +
+          '<div class="panel-head">' +
+            '<div>' +
+              '<div class="panel-title">' +
+                'Key diagnostics' +
+              '</div>' +
+              '<div class="panel-note">' +
+                'Difference = ICON-D2 − OBS' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="comparison-metrics">' +
+            (
+              data.diagnostics || []
+            )
+              .map(
+                comparisonMetricHtml_
+              )
+              .join('') +
+          '</div>' +
+        '</section>' +
+
+
+        '<section class="panel" style="margin-top:14px;">' +
+          '<div class="panel-head">' +
+            '<div>' +
+              '<div class="panel-title">' +
+                'Profile error' +
+              '</div>' +
+              '<div class="panel-note">' +
+                'RMSE at 925, 850, 700, 500 and 300 hPa' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="comparison-rmse">' +
+            comparisonMetaCard_(
+              'T RMSE',
+              (
+                fmt(
+                  data.rmse.temperatureC,
+                  2
+                ) +
+                ' °C'
+              )
+            ) +
+
+            comparisonMetaCard_(
+              'Td RMSE',
+              (
+                fmt(
+                  data.rmse.dewpointC,
+                  2
+                ) +
+                ' °C'
+              )
+            ) +
+
+            comparisonMetaCard_(
+              'Wind speed RMSE',
+              (
+                fmt(
+                  data.rmse.windSpeedMs,
+                  2
+                ) +
+                ' m/s'
+              )
+            ) +
+          '</div>' +
+        '</section>' +
+
+
+        '<section class="panel" style="margin-top:14px;">' +
+          '<div class="panel-head">' +
+            '<div>' +
+              '<div class="panel-title">' +
+                'Standard pressure levels' +
+              '</div>' +
+              '<div class="panel-note">' +
+                'Wind error uses u/v vector components' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="table-wrap">' +
+            '<table class="data comparison-table">' +
+              '<thead>' +
+                '<tr>' +
+                  '<th>Level</th>' +
+                  '<th>OBS T</th>' +
+                  '<th>ICON T</th>' +
+                  '<th>ΔT</th>' +
+                  '<th>OBS Td</th>' +
+                  '<th>ICON Td</th>' +
+                  '<th>ΔTd</th>' +
+                  '<th>OBS wind</th>' +
+                  '<th>ICON wind</th>' +
+                  '<th>Vector error</th>' +
+                '</tr>' +
+              '</thead>' +
+              '<tbody>' +
+                comparisonRowsHtml_(
+                  data
+                ) +
+              '</tbody>' +
+            '</table>' +
+          '</div>' +
+        '</section>' +
+
+        '<div class="footer">' +
+          'LJLM 14015 · OBS vs DWD ICON-D2 native +12 h forecast' +
+        '</div>';
+
+      document.getElementById(
+        'app'
+      ).innerHTML = html;
+
+      bindComparisonEvents_(
+        data
+      );
+    }
+
+
+    function bindComparisonEvents_(data) {
+      document
+        .querySelectorAll(
+          '[data-compare-plot]'
+        )
+        .forEach(function(button) {
+          button.addEventListener(
+            'click',
+            function() {
+              currentComparePlot =
+                button.dataset.comparePlot;
+
+              renderComparison(
+                data
+              );
+            }
+          );
+        });
+    }
+
+
+    function showError(error) {
+
+      const message =
+
+        error &&
+
+        error.message
+
+          ? error.message
+
+          : String(error);
+
+
+
+      document.getElementById(
+
+        'app'
+
+      ).innerHTML =
+
+        '<div class="error">' +
+
+          '<strong>Could not load LJLM dashboard.</strong>' +
+
+          '<br><br>' +
+
+          esc(message) +
+
+        '</div>';
+
+    }
+
+
+
+    function load(archiveFile) {
+
+      document.getElementById(
+
+        'app'
+
+      ).innerHTML =
+
+        '<div class="loading">' +
+
+        'Loading LJLM sounding …' +
+
+        '</div>';
+
+
+
+      google.script.run
+
+        .withSuccessHandler(
+
+          render
+
+        )
+
+        .withFailureHandler(
+
+          showError
+
+        )
+
+        .getDashboardData(
+
+          archiveFile || ''
+
+        );
+
+    }
+
+
+
+    load('');
+
+  </script>
+
+</body>
+
+</html>
