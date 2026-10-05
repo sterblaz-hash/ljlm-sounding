@@ -25452,7 +25452,7 @@
   "source": "DWD Open Data BUFR",
   "source_file": "Z__C_EDZW_20261005004303_bda01,temp_bufr_999999_999999__MW_493.bin",
   "retrieved_at": "2026-10-05T01:06:18.182665Z",
-  "processed_at": "2026-10-05T02:01:23.062977Z",
+  "processed_at": "2026-10-05T08:59:59.182804Z",
   "term": "00",
   "nominal_date": "2026-10-05",
   "sounding_classification": {
@@ -26319,6 +26319,24 @@
           "fraction_gt_500": 0.0105,
           "fraction_gt_1000": 0.0002
         },
+        "lifted_index_c": {
+          "value": 16.42,
+          "percentile": 89.3,
+          "n": 720,
+          "p10": 2.42,
+          "p50": 8.8,
+          "p90": 16.47,
+          "p95": 18.55,
+          "p99": 23.27,
+          "historical_min": -4.12,
+          "historical_min_date": "2000-09-21",
+          "historical_max": 27.37,
+          "historical_max_date": "2021-10-12",
+          "fraction_gt_0": null,
+          "fraction_gt_100": null,
+          "fraction_gt_500": null,
+          "fraction_gt_1000": null
+        },
         "q_surface_gkg": {
           "value": 6.02,
           "percentile": 23.3,
@@ -26676,13 +26694,263 @@
     },
     "change": {
       "previous_term": {
-        "available": false,
+        "available": true,
+        "previous_launch_time": "2026-10-04T11:30:00Z",
+        "previous_nominal_date": "2026-10-04",
+        "previous_term": "12",
+        "delta_definition": "current_minus_previous",
+        "parameters": {
+          "t850_c": {
+            "label": "T850",
+            "current": 12.78,
+            "previous": 13.07,
+            "delta": -0.29,
+            "unit": "degC"
+          },
+          "t700_c": {
+            "label": "T700",
+            "current": 2.76,
+            "previous": 3.37,
+            "delta": -0.61,
+            "unit": "degC"
+          },
+          "t500_c": {
+            "label": "T500",
+            "current": -13.8,
+            "previous": -13.86,
+            "delta": 0.06,
+            "unit": "degC"
+          },
+          "pwat_mm": {
+            "label": "PWAT",
+            "current": 11.01,
+            "previous": 8.96,
+            "delta": 2.05,
+            "unit": "mm"
+          },
+          "freezing_level_msl_m": {
+            "label": "Freezing level",
+            "current": 3675.0,
+            "previous": 3803.0,
+            "delta": -128.0,
+            "unit": "m"
+          },
+          "mlcape_jkg": {
+            "label": "MLCAPE",
+            "current": 0.0,
+            "previous": 0.0,
+            "delta": 0.0,
+            "unit": "J/kg"
+          },
+          "mucape_jkg": {
+            "label": "MUCAPE",
+            "current": 0.0,
+            "previous": 0.0,
+            "delta": 0.0,
+            "unit": "J/kg"
+          },
+          "shear_0_6km_ms": {
+            "label": "0-6 km shear",
+            "current": 6.89,
+            "previous": 3.11,
+            "delta": 3.78,
+            "unit": "m/s"
+          },
+          "q_surface_gkg": {
+            "label": "q surface",
+            "current": 6.02,
+            "previous": 5.97,
+            "delta": 0.05,
+            "unit": "g/kg"
+          },
+          "q925_gkg": {
+            "label": "q925",
+            "current": 5.83,
+            "previous": 5.01,
+            "delta": 0.82,
+            "unit": "g/kg"
+          },
+          "q850_gkg": {
+            "label": "q850",
+            "current": 0.63,
+            "previous": 0.78,
+            "delta": -0.15,
+            "unit": "g/kg"
+          },
+          "ivt_kg_m1_s1": {
+            "label": "IVT",
+            "current": 5.1,
+            "previous": 7.6,
+            "delta": -2.5,
+            "unit": "kg m-1 s-1"
+          },
+          "lapse_rate_850_500_c_per_km": {
+            "label": "Lapse rate 850-500",
+            "current": 6.27,
+            "previous": 6.35,
+            "delta": -0.08,
+            "unit": "degC/km"
+          },
+          "shear_sfc_700_ms": {
+            "label": "Surface-700 hPa shear",
+            "current": 1.5,
+            "previous": 1.8,
+            "delta": -0.3,
+            "unit": "m/s"
+          },
+          "z500_m": {
+            "label": "Z500",
+            "current": 5830.0,
+            "previous": 5858.0,
+            "delta": -28.0,
+            "unit": "m"
+          },
+          "thickness_925_500_m": {
+            "label": "925-500 hPa thickness",
+            "current": 4945.8,
+            "previous": 4952.4,
+            "delta": -6.6,
+            "unit": "m"
+          },
+          "ivt_surface_700_kg_m1_s1": {
+            "label": "IVT surface-700 hPa",
+            "current": 8.8,
+            "previous": 8.9,
+            "delta": -0.1,
+            "unit": "kg m-1 s-1"
+          }
+        },
         "requested_nominal_date": "2026-10-04",
         "requested_term": "12",
         "archive_file": "data/2026/10/20261004_12.json"
       },
       "previous_day_same_term": {
-        "available": false,
+        "available": true,
+        "previous_launch_time": "2026-10-03T23:30:00Z",
+        "previous_nominal_date": "2026-10-04",
+        "previous_term": "00",
+        "delta_definition": "current_minus_previous",
+        "parameters": {
+          "t850_c": {
+            "label": "T850",
+            "current": 12.78,
+            "previous": 8.94,
+            "delta": 3.84,
+            "unit": "degC"
+          },
+          "t700_c": {
+            "label": "T700",
+            "current": 2.76,
+            "previous": 3.49,
+            "delta": -0.73,
+            "unit": "degC"
+          },
+          "t500_c": {
+            "label": "T500",
+            "current": -13.8,
+            "previous": -13.89,
+            "delta": 0.09,
+            "unit": "degC"
+          },
+          "pwat_mm": {
+            "label": "PWAT",
+            "current": 11.01,
+            "previous": 10.17,
+            "delta": 0.84,
+            "unit": "mm"
+          },
+          "freezing_level_msl_m": {
+            "label": "Freezing level",
+            "current": 3675.0,
+            "previous": 3822.0,
+            "delta": -147.0,
+            "unit": "m"
+          },
+          "mlcape_jkg": {
+            "label": "MLCAPE",
+            "current": 0.0,
+            "previous": 0.0,
+            "delta": 0.0,
+            "unit": "J/kg"
+          },
+          "mucape_jkg": {
+            "label": "MUCAPE",
+            "current": 0.0,
+            "previous": 0.0,
+            "delta": 0.0,
+            "unit": "J/kg"
+          },
+          "shear_0_6km_ms": {
+            "label": "0-6 km shear",
+            "current": 6.89,
+            "previous": 1.15,
+            "delta": 5.74,
+            "unit": "m/s"
+          },
+          "q_surface_gkg": {
+            "label": "q surface",
+            "current": 6.02,
+            "previous": 5.88,
+            "delta": 0.14,
+            "unit": "g/kg"
+          },
+          "q925_gkg": {
+            "label": "q925",
+            "current": 5.83,
+            "previous": 4.41,
+            "delta": 1.42,
+            "unit": "g/kg"
+          },
+          "q850_gkg": {
+            "label": "q850",
+            "current": 0.63,
+            "previous": 2.41,
+            "delta": -1.78,
+            "unit": "g/kg"
+          },
+          "ivt_kg_m1_s1": {
+            "label": "IVT",
+            "current": 5.1,
+            "previous": 14.5,
+            "delta": -9.4,
+            "unit": "kg m-1 s-1"
+          },
+          "lapse_rate_850_500_c_per_km": {
+            "label": "Lapse rate 850-500",
+            "current": 6.27,
+            "previous": 5.38,
+            "delta": 0.89,
+            "unit": "degC/km"
+          },
+          "shear_sfc_700_ms": {
+            "label": "Surface-700 hPa shear",
+            "current": 1.5,
+            "previous": 3.35,
+            "delta": -1.85,
+            "unit": "m/s"
+          },
+          "z500_m": {
+            "label": "Z500",
+            "current": 5830.0,
+            "previous": 5865.0,
+            "delta": -35.0,
+            "unit": "m"
+          },
+          "thickness_925_500_m": {
+            "label": "925-500 hPa thickness",
+            "current": 4945.8,
+            "previous": 4949.1,
+            "delta": -3.3,
+            "unit": "m"
+          },
+          "ivt_surface_700_kg_m1_s1": {
+            "label": "IVT surface-700 hPa",
+            "current": 8.8,
+            "previous": 12.7,
+            "delta": -3.9,
+            "unit": "kg m-1 s-1"
+          }
+        },
         "requested_nominal_date": "2026-10-04",
         "requested_term": "00",
         "archive_file": "data/2026/10/20261004_00.json"
