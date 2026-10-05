@@ -226,3 +226,44 @@ assert.equal(annualBrowser.annualSegments_([
   {day: '02-28', p50: 1}, {day: '02-29', p50: null}, {day: '03-01', p50: 3}
 ], ['p50']).length, 2);
 console.log('Annual climatology regression checks passed for all 25 parameters.');
+
+// Exactly matching overlay metadata is optional and must never disable comparison.
+const observed = read('data/latest.json');
+const forecast = read('models/icon-d2/latest/' + observed.term + '/sounding.json');
+const overlayManifest = {
+  observation_sounding_id: observed.sounding_id, model_sounding_id: forecast.sounding_id,
+  valid_time: forecast.valid_time, lead_hours: 12, rendered_at: '2026-10-05T02:00:00Z',
+  skewt_overlay: 'verification/icon-d2/latest/' + observed.term + '/skewt_overlay.png'
+};
+backend.fetchJsonOptional_ = path => path.startsWith('verification/') ? null : read(path);
+backend.fetchJson_ = path => read(path);
+const noOverlay = backend.getSoundingComparison();
+assert.equal(noOverlay.available, true);
+assert.equal(noOverlay.overlay, null);
+for (const field of ['observation_sounding_id', 'model_sounding_id', 'valid_time', 'lead_hours']) {
+  backend.fetchJsonOptional_ = path => path.startsWith('verification/')
+    ? {...overlayManifest, [field]: field === 'lead_hours' ? 6 : 'stale'} : read(path);
+  assert.equal(backend.getSoundingComparison().overlay, null);
+}
+backend.fetchJsonOptional_ = path => path.startsWith('verification/') ? overlayManifest : read(path);
+const withOverlay = backend.getSoundingComparison();
+assert.match(withOverlay.overlay.url, /skewt_overlay.png\?v=2026-10-05/);
+const overlayBrowser = vm.createContext({document: {getElementById: element, querySelectorAll: () => []}, google: {script: {run: runner}}});
+vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], overlayBrowser);
+overlayBrowser.setMainView_('comparison');
+overlayBrowser.renderComparison(withOverlay);
+assert.equal((element('app').innerHTML.match(/<img /g) || []).length, 1);
+assert.match(element('app').innerHTML, /comparison-overlay/);
+for (const mode of ['full', 'zoom', 'thetae', 'hodograph']) {
+  vm.runInContext(`currentComparePlot = '${mode}'`, overlayBrowser);
+  overlayBrowser.renderComparison(withOverlay);
+  assert.equal((element('app').innerHTML.match(/<img /g) || []).length, 2);
+}
+vm.runInContext("currentComparePlot = 'overlay'", overlayBrowser);
+overlayBrowser.renderComparison(noOverlay);
+assert.equal((element('app').innerHTML.match(/<img /g) || []).length, 2);
+overlayBrowser.setMainView_('climatology');
+element('app').innerHTML = 'Annual';
+overlayBrowser.renderComparison(withOverlay);
+assert.equal(element('app').innerHTML, 'Annual');
+console.log('Optional overlay metadata and comparison layout checks passed.');

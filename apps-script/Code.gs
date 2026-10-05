@@ -1860,7 +1860,9 @@ function getSoundingComparison() {
     !comparisonSameInstant_(
       obsValidTime,
       modelValidTime
-    )
+    ) || model.lead_hours !== 12 ||
+    !Number.isFinite(Date.parse(model.run_time)) ||
+    Date.parse(model.run_time) + 12 * 3600000 !== Date.parse(modelValidTime)
   ) {
     return {
       available: false,
@@ -1873,6 +1875,8 @@ function getSoundingComparison() {
       model: comparisonModelMeta_(model)
     };
   }
+
+  const overlay = comparisonOverlay_(obs, model, term, obsValidTime);
 
   const pressures = [925, 850, 700, 500, 300];
 
@@ -2059,6 +2063,7 @@ function getSoundingComparison() {
   return {
     available: true,
     status: 'matched',
+    overlay: overlay,
     convention: 'Difference = ICON-D2 − OBS',
     validTime: obsValidTime,
 
@@ -2772,4 +2777,20 @@ function climatologyObservationValue_(profile, key) {
     'shear_0_1km_ms', 'shear_0_3km_ms', 'shear_0_6km_ms', 'shear_sfc_700_ms',
     'z500_m', 'thickness_1000_500_m', 'thickness_925_500_m'];
   return direct.indexOf(key) !== -1 ? finiteOrNull_(metpy[key]) : null;
+}
+
+
+function comparisonOverlay_(obs, model, term, validTime) {
+  const run = Date.parse(model.run_time);
+  if (model.lead_hours !== 12 || !Number.isFinite(run) || !comparisonSameInstant_(
+    new Date(run + 12 * 3600000).toISOString(), model.valid_time
+  )) return null;
+  const manifest = fetchJsonOptional_('verification/icon-d2/latest/' + term + '/latest_products.json');
+  const path = 'verification/icon-d2/latest/' + term + '/skewt_overlay.png';
+  if (!manifest || !obs.sounding_id || !model.sounding_id ||
+      manifest.observation_sounding_id !== obs.sounding_id ||
+      manifest.model_sounding_id !== model.sounding_id ||
+      !comparisonSameInstant_(manifest.valid_time, validTime) ||
+      manifest.lead_hours !== 12 || manifest.skewt_overlay !== path || !manifest.rendered_at) return null;
+  return {url: rawUrl_(path, manifest.rendered_at), renderedAt: manifest.rendered_at};
 }

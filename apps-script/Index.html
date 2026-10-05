@@ -1760,7 +1760,7 @@
 
     let currentView = 'sounding';
 
-    let currentComparePlot = 'full';
+    let currentComparePlot = 'overlay';
 
 
 
@@ -4232,6 +4232,7 @@
 
     function showComparisonView() {
       setMainView_('comparison');
+      currentComparePlot = 'overlay';
 
       document.getElementById(
         'app'
@@ -4255,6 +4256,7 @@
 
     function comparisonPlotLabel_() {
       const labels = {
+        overlay: 'Overlay',
         full: 'Full Skew-T',
         zoom: 'Low level',
         thetae: 'θe / θ',
@@ -4630,6 +4632,8 @@
         return;
       }
 
+      if (currentComparePlot === 'overlay' && !data.overlay) currentComparePlot = 'full';
+
       const html =
         '<div class="comparison-header">' +
 
@@ -4708,6 +4712,7 @@
             '</div>' +
 
             '<div class="plot-tabs">' +
+              (data.overlay ? comparisonPlotButton_('overlay', 'Overlay') : '') +
               comparisonPlotButton_(
                 'full',
                 'Full Skew-T'
@@ -4727,6 +4732,9 @@
             '</div>' +
           '</div>' +
 
+          (currentComparePlot === 'overlay' && data.overlay
+            ? '<div class="comparison-overlay">' + comparisonImagePanel_('OBS vs ICON-D2 +12 h', data.overlay.url) + '</div>'
+            : (
           '<div class="comparison-plots">' +
             comparisonImagePanel_(
               'OBS LJLM',
@@ -4743,7 +4751,8 @@
                 'model'
               )
             ) +
-          '</div>' +
+          '</div>'
+          )) +
         '</section>' +
 
 
