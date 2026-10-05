@@ -182,7 +182,10 @@ def build_manifest(root):
         if products:
             slots[term] = products
     windows = existing({label: BASE / f"latest_{label}.json" for label in WINDOWS})
+    climatology_index = Path('climatology/dashboard/index.json')
     return {"version": VERSION, **STATION, "observations": obs,
+            "climatology": {"available": (root / climatology_index).is_file(),
+                            **({"index": str(climatology_index)} if (root / climatology_index).is_file() else {})},
             "icon_d2": {"lead_hours": 12, "slots": slots},
             "timeseries": {"available": bool(windows), "windows": windows, "variables": VARIABLES}}
 

@@ -145,3 +145,84 @@ for (const [signed, fraction] of [[-120, -0.4], [80, 0.25], [0, 0], [null, null]
   assert.equal(backend.buildOrographicTransport_(metpy).rows[0].fractionPct, null);
 }
 console.log('Signed orographic card regression checks passed.');
+
+// Annual climatology backend validation, mappings and real compact curves.
+const climateFetches = [];
+backend.fetchJson_ = path => { climateFetches.push(path); return read(path); };
+for (const key of ['../latest', 'q700_gkg', 'sbcape_jkg', '__proto__']) {
+  const start = climateFetches.length;
+  assert.throws(() => backend.getDashboardClimatology(key));
+  assert.ok(climateFetches.slice(start).every(path =>
+    ['data/dashboard_manifest.json', 'climatology/dashboard/index.json'].includes(path)));
+}
+const annualIndex = read('climatology/dashboard/index.json');
+const annualResponses = new Map();
+for (const definition of annualIndex.parameters) {
+  const response = backend.getDashboardClimatology(definition.key);
+  annualResponses.set(definition.key, response);
+  assert.equal(response.days.length, 366);
+  for (const day of response.days) {
+    const values = ['p10', 'p25', 'p50', 'p75', 'p90'].map(key => day[key]);
+    if (values.every(v => v !== null)) {
+      assert.ok(values.every((v, index) => index === 0 || values[index - 1] <= v));
+    }
+  }
+}
+assert.equal(annualResponses.get('t850').currentTime, latest.nominal_date + 'T' + latest.term + ':00:00Z');
+assert.equal(annualResponses.get('ivt_kg_m_s').currentValue,
+  latest.parameters.metpy.moisture_transport.ivt.magnitude_kg_m1_s1);
+assert.equal(annualResponses.get('wind_speed_850_ms').currentValue, latest.parameters.metpy.standard_winds['850'].speed_ms);
+assert.equal(annualResponses.get('thickness_1000_500_m').currentValue, null);
+assert.equal(backend.climatologyObservationValue_({}, 't850'), null);
+const fetchCount = climateFetches.filter(p => p === 'climatology/dashboard/t850.json').length;
+backend.getDashboardClimatology('t850');
+assert.equal(climateFetches.filter(p => p === 'climatology/dashboard/t850.json').length, fetchCount);
+runner.getDashboardClimatology = key => { calls.push({type: 'climatology', key, success, failure}); };
+const annualBrowser = vm.createContext({document: {getElementById: element, querySelectorAll: () => []}, google: {script: {run: runner}}});
+const beforeInit = calls.length;
+vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], annualBrowser);
+assert.equal(calls.length, beforeInit + 1);
+assert.equal(calls.at(-1).type, 'sounding');
+annualBrowser.showClimatologyView();
+const firstAnnual = calls.at(-1);
+assert.equal(firstAnnual.type, 'climatology');
+assert.equal(firstAnnual.key, 't850');
+const afterFirst = calls.length;
+annualBrowser.showClimatologyView();
+assert.equal(calls.length, afterFirst); // pending deduplication
+firstAnnual.success(annualResponses.get('t850'));
+assert.match(element('annualChart').innerHTML, /data-annual-obs/);
+assert.match(element('annualChart').innerHTML, new RegExp(latest.nominal_date));
+annualBrowser.setMainView_('timeseries');
+annualBrowser.showClimatologyView();
+assert.equal(calls.length, afterFirst); // browser cache
+for (const definition of annualIndex.parameters) {
+  annualBrowser.loadAnnualParameter_(definition.key);
+  if (definition.key !== 't850') calls.at(-1).success(annualResponses.get(definition.key));
+  assert.doesNotMatch(element('annualChart').innerHTML, /NaN|undefined/);
+  if (definition.key === 'thickness_1000_500_m') assert.doesNotMatch(element('annualChart').innerHTML, /data-annual-obs/);
+}
+// Use uncached keys to exercise out-of-order completion without changing data fixtures.
+vm.runInContext("delete annualCache.t700; delete annualCache.t500;", annualBrowser);
+annualBrowser.loadAnnualParameter_('t700');
+const late = calls.at(-1);
+annualBrowser.loadAnnualParameter_('t500');
+const newer = calls.at(-1);
+newer.success(annualResponses.get('t500'));
+const rendered = element('app').innerHTML;
+late.success(annualResponses.get('t700'));
+assert.equal(element('app').innerHTML, rendered);
+vm.runInContext("delete annualCache.pwat_mm;", annualBrowser);
+annualBrowser.loadAnnualParameter_('pwat_mm');
+const pendingAnnual = calls.at(-1);
+annualBrowser.setMainView_('sounding');
+element('app').innerHTML = 'Sondaža';
+pendingAnnual.success(annualResponses.get('pwat_mm'));
+assert.equal(element('app').innerHTML, 'Sondaža');
+assert.equal(annualBrowser.annualDay_('02-29'), 59);
+assert.equal(annualBrowser.annualDay_('03-01'), 60);
+assert.equal(annualBrowser.annualDay_('02-30'), null);
+assert.equal(annualBrowser.annualSegments_([
+  {day: '02-28', p50: 1}, {day: '02-29', p50: null}, {day: '03-01', p50: 3}
+], ['p50']).length, 2);
+console.log('Annual climatology regression checks passed for all 25 parameters.');

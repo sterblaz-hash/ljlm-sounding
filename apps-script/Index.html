@@ -1732,6 +1732,8 @@
       </button>
       <button id="viewTimeseriesBtn" class="view-tab" type="button"
         onclick="showTimeseriesView()">Potek</button>
+      <button id="viewClimatologyBtn" class="view-tab" type="button"
+        onclick="showClimatologyView()">Klimatologija</button>
     </div>
 
     <div id="app">
@@ -4196,6 +4198,7 @@
 
     function setMainView_(view) {
       currentView = view;
+      document.getElementById('viewClimatologyBtn').classList.toggle('active', view === 'climatology');
 
       const soundingButton =
         document.getElementById('viewSoundingBtn');
@@ -5115,6 +5118,134 @@
         const show = function() { document.getElementById('potekPoint').textContent = circle.getAttribute('aria-label'); };
         circle.onmouseenter = show; circle.onfocus = show; circle.onclick = show;
         circle.onkeydown = function(event) { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); show(); } };
+      });
+    }
+
+    const annualCache = Object.create(null);
+    const annualPending = new Set();
+    let annualParameter = 't850';
+    let annualParameters = [];
+
+    function showClimatologyView() {
+      setMainView_('climatology');
+      loadAnnualParameter_(annualParameter);
+    }
+
+    function loadAnnualParameter_(key) {
+      annualParameter = key;
+      renderAnnual_();
+      if (annualCache[key] || annualPending.has(key)) return;
+      annualPending.add(key);
+      google.script.run.withSuccessHandler(function(data) {
+        annualPending.delete(key);
+        annualCache[key] = data;
+        annualParameters = data.parameters;
+        if (currentView === 'climatology' && annualParameter === key) renderAnnual_();
+      }).withFailureHandler(function(error) {
+        annualPending.delete(key);
+        if (currentView !== 'climatology' || annualParameter !== key) return;
+        renderAnnual_();
+        document.getElementById('annualChart').innerHTML = '<p>' + esc(error && error.message || error) +
+          '</p><button id="annualRetry" class="tab-btn">Poskusi znova</button>';
+        document.getElementById('annualRetry').onclick = function() { loadAnnualParameter_(key); };
+      }).getDashboardClimatology(key);
+    }
+
+    function annualDay_(day) {
+      if (!/^\d{2}-\d{2}$/.test(day || '')) return null;
+      const time = Date.parse('2000-' + day + 'T00:00:00Z');
+      if (!Number.isFinite(time) || new Date(time).toISOString().slice(5, 10) !== day) return null;
+      return (time - Date.UTC(2000, 0, 1)) / 86400000;
+    }
+
+    function annualSegments_(days, fields) {
+      const segments = []; let segment = [], previous = null;
+      days.forEach(function(day) {
+        const position = annualDay_(day.day);
+        const valid = position !== null && fields.every(function(key) {
+          return typeof day[key] === 'number' && Number.isFinite(day[key]);
+        });
+        if (!valid || (previous !== null && position !== previous + 1)) {
+          if (segment.length) segments.push(segment);
+          segment = [];
+        }
+        if (valid) segment.push(day);
+        previous = valid ? position : null;
+      });
+      if (segment.length) segments.push(segment);
+      return segments;
+    }
+
+    function renderAnnual_() {
+      if (currentView !== 'climatology') return;
+      const data = annualCache[annualParameter];
+      document.getElementById('app').innerHTML = '<section class="panel">' +
+        '<div class="panel-head"><div class="panel-title">Klimatologija</div></div>' +
+        '<div class="potek-controls"><label for="annualParameter">Parameter</label><select id="annualParameter" ' +
+        (annualParameters.length ? '' : 'disabled') + '>' + annualParameters.map(function(item) {
+          return '<option value="' + esc(item.key) + '" ' + (item.key === annualParameter ? 'selected' : '') + '>' +
+            esc(item.label + ' [' + item.unit + ']') + '</option>';
+        }).join('') + '</select></div><div id="annualChart" class="potek-chart" aria-live="polite"></div>' +
+        '<div id="annualDetail" class="potek-note" aria-live="polite">Izberite dan za percentile.</div>' +
+        '<div id="annualMeta" class="potek-note"></div></section>';
+      document.getElementById('annualParameter').onchange = function(event) { loadAnnualParameter_(event.target.value); };
+      const chart = document.getElementById('annualChart');
+      if (!data) { chart.textContent = 'Nalaganje klimatologije …'; return; }
+      const metadata = data.metadata;
+      const current = typeof data.currentValue === 'number' && Number.isFinite(data.currentValue) && data.currentTime;
+      document.getElementById('annualMeta').textContent = [
+        data.label + ' [' + data.unit + ']', metadata.reference_period,
+        metadata.window_description, metadata.smoothing_description, metadata.historical_time_caveat,
+        current ? 'OBS: ' + utcLabel(data.currentTime) + ' · ' + fmt(data.currentValue, 2) + ' ' + data.unit : 'Trenutna opazovana vrednost ni na voljo.'
+      ].filter(Boolean).join(' · ');
+      const days = data.days.slice().filter(function(day) { return annualDay_(day.day) !== null; })
+        .sort(function(a, b) { return annualDay_(a.day) - annualDay_(b.day); });
+      const fields = ['p10', 'p25', 'p50', 'p75', 'p90'];
+      const values = days.flatMap(function(day) { return fields.map(function(key) { return day[key]; }); })
+        .filter(function(v) { return typeof v === 'number' && Number.isFinite(v); });
+      const currentDay = current ? annualDay_(data.currentTime.slice(5, 10)) : null;
+      if (currentDay !== null) values.push(data.currentValue);
+      if (!values.length) { chart.textContent = 'Klimatološke vrednosti niso na voljo.'; return; }
+      let min = Math.min(...values), max = Math.max(...values);
+      const pad = (max - min) * 0.08 || Math.max(Math.abs(max) * 0.08, 1);
+      min -= pad; max += pad;
+      const x = function(day) { return 75 + day / 365 * 760; };
+      const y = function(value) { return 300 - (value - min) / (max - min) * 250; };
+      let svg = '<svg viewBox="0 0 860 380" role="group" aria-label="' + esc(data.label + ' [' + data.unit + ']') + '">' +
+        '<text x="75" y="24" font-size="15" fill="#526985">' + esc(data.label + ' [' + data.unit + ']') + '</text>';
+      for (let i = 0; i <= 4; i++) {
+        const value = min + (max - min) * i / 4;
+        svg += '<line x1="75" x2="835" y1="' + y(value) + '" y2="' + y(value) + '" stroke="#e2e8f0"/>' +
+          '<text x="67" y="' + (y(value) + 4) + '" text-anchor="end" font-size="12" fill="#526985">' + esc(fmt(value, 1)) + '</text>';
+      }
+      [['p10', 'p90', '#e1ecfa'], ['p25', 'p75', '#b9d4f3']].forEach(function(band) {
+        annualSegments_(days, band.slice(0, 2)).forEach(function(segment) {
+          const lower = segment.map(function(day) { return x(annualDay_(day.day)) + ',' + y(day[band[0]]); });
+          const upper = segment.slice().reverse().map(function(day) { return x(annualDay_(day.day)) + ',' + y(day[band[1]]); });
+          svg += '<path d="M' + lower.join(' L') + ' L' + upper.join(' L') + ' Z" fill="' + band[2] + '"/>';
+        });
+      });
+      annualSegments_(days, ['p50']).forEach(function(segment) {
+        svg += '<path d="M' + segment.map(function(day) { return x(annualDay_(day.day)) + ',' + y(day.p50); }).join(' L') +
+          '" fill="none" stroke="#2673bd" stroke-width="2"/>';
+      });
+      ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Avg', 'Sep', 'Okt', 'Nov', 'Dec'].forEach(function(label, month) {
+        const position = annualDay_(String(month + 1).padStart(2, '0') + '-01');
+        svg += '<text x="' + x(position) + '" y="325" text-anchor="middle" font-size="12" fill="#526985">' + label + '</text>';
+      });
+      days.forEach(function(day, index) {
+        const label = day.day + ' · ' + fields.map(function(key) { return key.toUpperCase() + ': ' + fmt(day[key], 2); }).join(' · ') + ' ' + data.unit + ' · n: ' + fmt(day.n, 0);
+        svg += '<rect x="' + (x(annualDay_(day.day)) - 1.2) + '" y="45" width="2.4" height="260" fill="transparent" data-annual-day="' + index + '" aria-label="' + esc(label) + '"><title>' + esc(label) + '</title></rect>';
+      });
+      if (currentDay !== null) {
+        const label = 'OBS: ' + utcLabel(data.currentTime) + ' · ' + fmt(data.currentValue, 2) + ' ' + data.unit;
+        svg += '<circle data-annual-obs="true" cx="' + x(currentDay) + '" cy="' + y(data.currentValue) + '" r="6" fill="#c9423a" stroke="white" stroke-width="2" tabindex="0" aria-label="' + esc(label) + '"><title>' + esc(label) + '</title></circle>';
+      }
+      svg += '<text x="75" y="358" font-size="12" fill="#526985">P10–P90 · P25–P75 · P50 (mediana) · OBS ●</text></svg>';
+      chart.innerHTML = svg;
+      chart.querySelectorAll('[data-annual-day], [data-annual-obs]').forEach(function(point) {
+        const show = function() { document.getElementById('annualDetail').textContent = point.getAttribute('aria-label'); };
+        point.onmouseenter = show; point.onclick = show; point.onfocus = show;
       });
     }
 

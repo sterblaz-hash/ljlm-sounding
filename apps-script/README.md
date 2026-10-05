@@ -33,3 +33,21 @@ node apps-script/test-dashboard.cjs
 
 These checks mock Apps Script and the DOM. Verify the deployed web app on desktop
 and mobile after manual deployment, including window switching and touch details.
+
+The **Klimatologija** view lazily loads one compact annual parameter curve from
+`climatology/dashboard/`, resolved through the dashboard manifest and compact
+index. It shows P10–P90 and P25–P75 bands, P50, and the latest equivalent OBS
+value at its nominal UTC calendar date. Loaded parameters are cached for the
+browser session; reload for fresh observations. No percentile is inferred from
+the plotted bands. The historical nominal-time caveat is shown with the source
+reference period, window, and smoothing description.
+
+After updating the historical climatology, rebuild its compact dashboard files:
+
+```sh
+python3 build_dashboard_climatology.py
+```
+
+Normal observation builder runs retain the compact climatology manifest entry
+when the index exists. The compact builder reads the historical source locally
+without recalculating it; Apps Script never fetches the large daily source.

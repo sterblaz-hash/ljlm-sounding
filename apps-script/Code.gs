@@ -2714,3 +2714,62 @@ function getDashboardTimeseries(windowKey) {
   }
   return result;
 }
+
+// Compact annual curves only; the full historical distribution is never fetched.
+function getDashboardClimatology(parameterKey) {
+  if (typeof parameterKey !== 'string' || !/^[a-z][a-z0-9_]*$/.test(parameterKey)) {
+    throw new Error('Unknown climatology parameter.');
+  }
+  const manifest = fetchJson_(LJLM_CONFIG.MANIFEST_PATH);
+  const entry = manifest.climatology || {};
+  if (!entry.available || entry.index !== 'climatology/dashboard/index.json') {
+    throw new Error('Dashboard climatology is unavailable.');
+  }
+  const index = fetchJson_(entry.index);
+  const definition = (index.parameters || []).find(function(item) { return item.key === parameterKey; });
+  if (!definition || definition.path !== 'climatology/dashboard/' + parameterKey + '.json') {
+    throw new Error('Unknown climatology parameter.');
+  }
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'ljlm-climatology:' + parameterKey + ':' + (index.created_utc || '');
+  const cached = cache.get(cacheKey);
+  const curve = cached ? JSON.parse(cached) : fetchJson_(definition.path);
+  if (!Array.isArray(curve.days) || curve.parameter !== parameterKey) {
+    throw new Error('Invalid annual climatology.');
+  }
+  if (!cached) {
+    const encoded = JSON.stringify(curve);
+    if (Utilities.newBlob(encoded).getBytes().length < 95000) {
+      cache.put(cacheKey, encoded, LJLM_CONFIG.CACHE_SECONDS);
+    }
+  }
+  const profile = fetchJson_(LJLM_CONFIG.LATEST_PATH);
+  return {
+    parameter: parameterKey, label: definition.label, unit: definition.unit,
+    parameters: index.parameters, metadata: index, days: curve.days,
+    currentValue: climatologyObservationValue_(profile, parameterKey),
+    currentTime: comparisonObservationValidTime_(profile)
+  };
+}
+
+function climatologyObservationValue_(profile, key) {
+  const parameters = profile.parameters || {};
+  const metpy = parameters.metpy || {};
+  if (['t850', 't700', 't500'].indexOf(key) !== -1) {
+    return finiteOrNull_(nestedValue_(parameters.standard_levels || {}, key, 'value'));
+  }
+  if (['q_surface_gkg', 'q925_gkg', 'q850_gkg'].indexOf(key) !== -1) {
+    const level = key === 'q_surface_gkg' ? 'surface' : key.slice(1, 4);
+    return comparisonNestedFinite_(metpy, ['moisture_transport', 'humidity_profile', level, 'specific_humidity_gkg']);
+  }
+  if (key === 'ivt_kg_m_s') {
+    return comparisonNestedFinite_(metpy, ['moisture_transport', 'ivt', 'magnitude_kg_m1_s1']);
+  }
+  const wind = /^wind_speed_(925|850|700|500|300)_ms$/.exec(key);
+  if (wind) return comparisonNestedFinite_(metpy, ['standard_winds', wind[1], 'speed_ms']);
+  const direct = ['pwat_mm', 'freezing_level_msl_m', 'lifted_index_c', 'mucape_jkg',
+    'lapse_rate_850_500_c_per_km', 'lapse_rate_700_500_c_per_km',
+    'shear_0_1km_ms', 'shear_0_3km_ms', 'shear_0_6km_ms', 'shear_sfc_700_ms',
+    'z500_m', 'thickness_1000_500_m', 'thickness_925_500_m'];
+  return direct.indexOf(key) !== -1 ? finiteOrNull_(metpy[key]) : null;
+}

@@ -240,7 +240,10 @@ class DashboardTests(unittest.TestCase):
         self.put('timeseries/ljlm/latest_7d.json', {})
         self.put('models/icon-d2/latest/12/sounding.json', {})
         self.put('diagnostics/latest_products.json', {})
+        self.put('climatology/dashboard/index.json', {'parameters': []})
         manifest = builder.build_manifest(self.root)
+        self.assertEqual(manifest['climatology'], {
+            'available': True, 'index': 'climatology/dashboard/index.json'})
         self.assertNotIn('status', manifest['observations'])
         self.assertEqual(list(manifest['timeseries']['windows']), ['7d'])
         self.assertEqual(list(manifest['icon_d2']['slots']), ['12'])
