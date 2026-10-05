@@ -1693,6 +1693,15 @@
       }
     }
 
+    .view-tabs { flex-wrap: wrap; }
+    .extra-diagnostics { padding: 14px; }
+    .extra-diagnostics summary { cursor: pointer; color: var(--blue); }
+    .potek-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 16px; }
+    .potek-controls select { max-width: 100%; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: white; }
+    .potek-chart { padding: 0 16px 16px; }
+    .potek-chart svg { display: block; width: 100%; height: auto; min-height: 240px; }
+    .potek-chart circle { cursor: pointer; }
+    .potek-note { padding: 12px 16px; color: #526985; font-size: 13px; }
   </style>
 
 </head>
@@ -1721,6 +1730,8 @@
       >
         ICON-D2 +12 h
       </button>
+      <button id="viewTimeseriesBtn" class="view-tab" type="button"
+        onclick="showTimeseriesView()">Potek</button>
     </div>
 
     <div id="app">
@@ -3319,6 +3330,8 @@
 
     function render(data) {
 
+      if (currentView !== 'sounding') return;
+
       currentData = data;
 
 
@@ -3630,6 +3643,9 @@
                   .join('') +
 
               '</div>' +
+              '<details class="extra-diagnostics"><summary>Dodatna diagnostika · Lifted Index, CAPE/CIN, shear, lapse rates</summary>' +
+                '<div class="metric-grid">' + (data.additionalDiagnostics || []).map(metricHtml).join('') + '</div>' +
+              '</details>' +
 
             '</section>' +
 
@@ -4205,6 +4221,8 @@
       const comparisonButton =
         document.getElementById('viewComparisonBtn');
 
+      document.getElementById('viewTimeseriesBtn').classList.toggle('active', view === 'timeseries');
+
       if (soundingButton) {
         soundingButton.classList.toggle(
           'active',
@@ -4242,7 +4260,9 @@
           renderComparison
         )
         .withFailureHandler(
-          showError
+          function(error) {
+            if (currentView === 'comparison') showError(error);
+          }
         )
         .getSoundingComparison();
     }
@@ -4947,7 +4967,9 @@
 
         .withFailureHandler(
 
-          showError
+          function(error) {
+            if (currentView === 'sounding') showError(error);
+          }
 
         )
 
@@ -4960,6 +4982,159 @@
     }
 
 
+
+    const timeseriesCache = Object.create(null);
+    const timeseriesPending = new Set();
+    let timeseriesWindow = '7d';
+    let timeseriesParameter = 'pwat_mm';
+    const timeseriesDefinitions = {
+      pwat_mm: ['PWAT', 'mm'],
+      freezing_level_msl_m: ['Freezing level MSL', 'm'],
+      lifted_index_c: ['Lifted Index', '°C'],
+      sbcape_jkg: ['SBCAPE', 'J/kg'], sbcin_jkg: ['SBCIN', 'J/kg'],
+      mlcape_jkg: ['MLCAPE', 'J/kg'], mlcin_jkg: ['MLCIN', 'J/kg'],
+      mucape_jkg: ['MUCAPE', 'J/kg'], mucin_jkg: ['MUCIN', 'J/kg'],
+      lapse_rate_850_500_c_per_km: ['850–500 hPa lapse rate', '°C/km'],
+      lapse_rate_700_500_c_per_km: ['700–500 hPa lapse rate', '°C/km'],
+      shear_0_1km_ms: ['0–1 km shear', 'm/s'],
+      shear_0_3km_ms: ['0–3 km shear', 'm/s'],
+      shear_0_6km_ms: ['0–6 km shear', 'm/s'],
+      shear_sfc_700_ms: ['SFC–700 hPa shear', 'm/s'],
+      z500_m: ['Z500', 'm'], thickness_925_500_m: ['925–500 hPa thickness', 'm'],
+      t850_c: ['T850', '°C'], td850_c: ['Td850', '°C'],
+      t700_c: ['T700', '°C'], td700_c: ['Td700', '°C'],
+      t500_c: ['T500', '°C'], td500_c: ['Td500', '°C'],
+      q_surface_gkg: ['q surface', 'g/kg'], q925_gkg: ['q925', 'g/kg'],
+      q850_gkg: ['q850', 'g/kg'], q700_gkg: ['q700', 'g/kg'],
+      ivt_kg_m1_s1: ['IVT magnitude', 'kg m⁻¹ s⁻¹'],
+      ivt_direction_deg: ['IVT direction (toward)', '°']
+    };
+    [['dinaric_west', 'Dinaric west'], ['julian_south', 'Julian south'],
+      ['julian_central', 'Julian central'], ['kamnik_savinja', 'Kamnik–Savinja']]
+      .forEach(function(barrier) {
+        timeseriesDefinitions[barrier[0] + '_signed_ivt'] = [barrier[1] + ' · signed IVT', 'kg m⁻¹ s⁻¹'];
+        timeseriesDefinitions[barrier[0] + '_signed_fraction'] = [barrier[1] + ' · signed fraction', '%'];
+      });
+
+    function showTimeseriesView() {
+      setMainView_('timeseries');
+      loadTimeseriesWindow_(timeseriesWindow);
+    }
+
+    function loadTimeseriesWindow_(key) {
+      timeseriesWindow = key;
+      renderTimeseries_();
+      if (timeseriesCache[key] || timeseriesPending.has(key)) return;
+      timeseriesPending.add(key);
+      google.script.run.withSuccessHandler(function(data) {
+        timeseriesPending.delete(key);
+        timeseriesCache[key] = data;
+        if (currentView === 'timeseries' && timeseriesWindow === key) renderTimeseries_();
+      }).withFailureHandler(function(error) {
+        timeseriesPending.delete(key);
+        if (currentView !== 'timeseries' || timeseriesWindow !== key) return;
+        renderTimeseries_();
+        document.getElementById('potekChart').innerHTML = '<p class="potek-note">' +
+          esc(error.message || error) + '</p><button class="tab-btn" id="potekRetry">Poskusi znova</button>';
+        document.getElementById('potekRetry').onclick = function() { loadTimeseriesWindow_(key); };
+      }).getDashboardTimeseries(key);
+    }
+
+    function timeseriesPoints_(records, key) {
+      return records.map(function(record) {
+        const value = record[key];
+        return {
+          time: Date.parse(record.valid_time),
+          validTime: record.valid_time,
+          value: typeof value === 'number' && Number.isFinite(value)
+            ? value * (key.endsWith('_signed_fraction') ? 100 : 1) : null
+        };
+      }).filter(function(point) { return Number.isFinite(point.time); })
+        .sort(function(a, b) { return a.time - b.time; });
+    }
+
+    function timeseriesDate_(time) {
+      return new Date(time).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+    }
+
+    function renderTimeseries_() {
+      if (currentView !== 'timeseries') return;
+      const data = timeseriesCache[timeseriesWindow];
+      const variables = data ? data.variables.filter(function(key) {
+        return Object.prototype.hasOwnProperty.call(timeseriesDefinitions, key);
+      }) : [];
+      if (variables.length && !variables.includes(timeseriesParameter)) timeseriesParameter = variables[0];
+      document.getElementById('app').innerHTML = '<section class="panel">' +
+        '<div class="panel-head"><div class="panel-title">Potek · OBS</div>' +
+        '<div class="panel-note">Nominalni čas UTC</div></div>' +
+        '<div class="potek-controls">' + [['7d', '7 dni'], ['30d', '30 dni'], ['90d', '90 dni'], ['1y', '1 leto']]
+          .map(function(window) {
+            return '<button type="button" class="tab-btn ' + (timeseriesWindow === window[0] ? 'active' : '') +
+              '" aria-pressed="' + (timeseriesWindow === window[0]) + '" data-window="' + window[0] + '">' + window[1] + '</button>';
+          }).join('') + '<label for="potekParameter">Parameter</label><select id="potekParameter" ' +
+          (variables.length ? '' : 'disabled') + '>' + variables.map(function(key) {
+            const def = timeseriesDefinitions[key];
+            return '<option value="' + esc(key) + '" ' + (key === timeseriesParameter ? 'selected' : '') + '>' +
+              esc(def[0] + ' [' + def[1] + ']') + '</option>';
+          }).join('') + '</select></div><div id="potekChart" class="potek-chart" aria-live="polite"></div>' +
+          '<div id="potekPoint" class="potek-note" aria-live="polite">Izberite točko za vrednost in čas UTC.</div>' +
+          '<div class="potek-note">Manjkajoče vrednosti in izpuščeni termini so prikazani kot vrzeli. ' +
+          'Signed IVT: pozitivno proti izbrani upslope normali, negativno v nasprotni smeri. ' +
+          (data ? 'Podatki pripravljeni: ' + esc(data.generatedAt) : '') + '</div></section>';
+      document.querySelectorAll('[data-window]').forEach(function(button) {
+        button.onclick = function() { loadTimeseriesWindow_(button.dataset.window); };
+      });
+      document.getElementById('potekParameter').onchange = function(event) {
+        timeseriesParameter = event.target.value;
+        renderTimeseries_();
+      };
+      const chart = document.getElementById('potekChart');
+      if (!data) { chart.textContent = 'Nalaganje opazovanj …'; return; }
+      const points = timeseriesPoints_(data.records, timeseriesParameter);
+      const values = points.filter(function(point) { return point.value !== null; });
+      if (!values.length) { chart.textContent = 'Za ta parameter v izbranem obdobju ni podatkov.'; return; }
+      const def = timeseriesDefinitions[timeseriesParameter];
+      let min = Math.min(...values.map(function(p) { return p.value; }));
+      let max = Math.max(...values.map(function(p) { return p.value; }));
+      const pad = (max - min) * 0.08 || Math.max(Math.abs(max) * 0.08, 1);
+      min -= pad; max += pad;
+      let start = Date.parse(data.startTime), end = Date.parse(data.endTime);
+      if (!Number.isFinite(start)) start = points[0].time;
+      if (!Number.isFinite(end)) end = points[points.length - 1].time;
+      if (end <= start) end = start + 86400000;
+      const x = function(t) { return 75 + (t - start) / (end - start) * 760; };
+      const y = function(v) { return 300 - (v - min) / (max - min) * 250; };
+      let svg = '<svg viewBox="0 0 860 370" role="img" aria-label="' + esc(def[0] + ' [' + def[1] + '] · OBS UTC') + '">' +
+        '<text x="75" y="24" fill="#526985" font-size="15">' + esc(def[0] + ' [' + def[1] + ']') + '</text>';
+      for (let i = 0; i <= 4; i++) {
+        const value = min + (max - min) * i / 4;
+        svg += '<line x1="75" x2="835" y1="' + y(value) + '" y2="' + y(value) + '" stroke="#e2e8f0"/>' +
+          '<text x="67" y="' + (y(value) + 4) + '" text-anchor="end" font-size="12" fill="#526985">' + esc(fmt(value, 1)) + '</text>';
+        const time = start + (end - start) * i / 4;
+        svg += '<text x="' + x(time) + '" y="325" text-anchor="' + (i === 0 ? 'start' : i === 4 ? 'end' : 'middle') +
+          '" font-size="12" fill="#526985">' + timeseriesDate_(time).slice(0, 10) + '</text>';
+      }
+      let path = '', previous = null;
+      points.forEach(function(point) {
+        if (point.value === null) { previous = null; return; }
+        path += (previous && point.time - previous.time <= 12 * 3600000 ? ' L' : ' M') + x(point.time) + ',' + y(point.value);
+        previous = point;
+      });
+      svg += '<path d="' + path + '" fill="none" stroke="#2673bd" stroke-width="2"/>';
+      values.forEach(function(point, index) {
+        const label = timeseriesDate_(point.time) + ' · ' + def[0] + ': ' + fmt(point.value, 2) + ' ' + def[1];
+        svg += '<circle cx="' + x(point.time) + '" cy="' + y(point.value) + '" r="8" fill="transparent" ' +
+          'tabindex="0" role="button" data-point="' + index + '" aria-label="' + esc(label) + '"><title>' + esc(label) + '</title></circle>' +
+          '<circle cx="' + x(point.time) + '" cy="' + y(point.value) + '" r="3" fill="#2673bd" pointer-events="none"/>';
+      });
+      svg += '<text x="455" y="357" text-anchor="middle" font-size="12" fill="#526985">Nominalni / veljavni čas UTC</text></svg>';
+      chart.innerHTML = svg;
+      chart.querySelectorAll('[data-point]').forEach(function(circle) {
+        const show = function() { document.getElementById('potekPoint').textContent = circle.getAttribute('aria-label'); };
+        circle.onmouseenter = show; circle.onfocus = show; circle.onclick = show;
+        circle.onkeydown = function(event) { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); show(); } };
+      });
+    }
 
     load('');
 

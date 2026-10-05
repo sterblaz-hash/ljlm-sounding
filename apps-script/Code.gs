@@ -2,6 +2,8 @@ const LJLM_CONFIG = Object.freeze({
 
   RAW_BASE: 'https://raw.githubusercontent.com/sterblaz-hash/ljlm-sounding/main',
 
+  MANIFEST_PATH: 'data/dashboard_manifest.json',
+
   STATUS_PATH: 'data/status.json',
 
   LATEST_PATH: 'data/latest.json',
@@ -321,6 +323,21 @@ function buildDashboardView_(
     ],
 
 
+
+    additionalDiagnostics: [
+      ['lifted_index_c', 'Lifted Index', '°C'],
+      ['sbcape_jkg', 'SBCAPE', 'J/kg'],
+      ['sbcin_jkg', 'SBCIN', 'J/kg'],
+      ['mlcape_jkg', 'MLCAPE', 'J/kg'],
+      ['mlcin_jkg', 'MLCIN', 'J/kg'],
+      ['mucin_jkg', 'MUCIN', 'J/kg'],
+      ['shear_0_1km_ms', '0–1 km shear', 'm/s'],
+      ['shear_0_3km_ms', '0–3 km shear', 'm/s'],
+      ['lapse_rate_850_500_c_per_km', '850–500 hPa lapse rate', '°C/km'],
+      ['lapse_rate_700_500_c_per_km', '700–500 hPa lapse rate', '°C/km']
+    ].map(function(def) {
+      return metric_(def[1], metpy[def[0]], def[2], climPercentile_(climatology, def[0]));
+    }),
 
     moistureTransport:
 
@@ -917,6 +934,8 @@ function buildClimatology_(climatology) {
     ['t500', 'T500', '°C'],
 
     ['pwat_mm', 'PWAT', 'mm'],
+
+    ['lifted_index_c', 'Lifted Index', '°C'],
 
     ['freezing_level_msl_m', 'Freezing level', 'm'],
 
@@ -2656,4 +2675,44 @@ function testSoundingComparison() {
       2
     )
   );
+}
+
+
+// Only compact observation windows may be requested by the browser.
+function getDashboardTimeseries(windowKey) {
+  if (['7d', '30d', '90d', '1y'].indexOf(windowKey) === -1) {
+    throw new Error('Unknown observation window.');
+  }
+  const manifest = fetchJson_(LJLM_CONFIG.MANIFEST_PATH);
+  const series = manifest.timeseries || {};
+  const path = (series.windows || {})[windowKey];
+  if (series.available !== true || path !== 'timeseries/ljlm/latest_' + windowKey + '.json') {
+    throw new Error('Observation window is unavailable.');
+  }
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'ljlm-timeseries:' + windowKey;
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    const result = JSON.parse(cached);
+    result.variables = series.variables || [];
+    return result;
+  }
+  const data = fetchJson_(path);
+  if (!Array.isArray(data.records)) {
+    throw new Error('Invalid observation time series.');
+  }
+  const result = {
+    window: windowKey,
+    variables: series.variables || [],
+    generatedAt: data.generated_at || '',
+    startTime: data.start_time || '',
+    endTime: data.end_time || '',
+    records: data.records
+  };
+  const encoded = JSON.stringify(result);
+  // Apps Script cache entries are limited to 100 KB; larger windows still load.
+  if (Utilities.newBlob(encoded).getBytes().length < 95000) {
+    cache.put(cacheKey, encoded, LJLM_CONFIG.CACHE_SECONDS);
+  }
+  return result;
 }
