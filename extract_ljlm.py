@@ -300,13 +300,36 @@ def update_dwd_scan_cache(
     cache.setdefault("packages", {})[filename] = item
 
 
-def find_candidate_files():
+def dwd_search_mode(now):
+    """Select recovery window using the nominal UTC time of missing terms."""
+    if is_manual_run():
+        return "manual catch-up", 72
+
+    cutoff = now - timedelta(hours=48)
+    for entry in load_status_file()["terms"].values():
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("status") != "missing" or entry.get("term") not in ("00", "12"):
+            continue
+        try:
+            nominal_time = datetime.strptime(
+                f"{entry['nominal_date']} {entry['term']}", "%Y-%m-%d %H"
+            ).replace(tzinfo=timezone.utc)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if cutoff <= nominal_time <= now:
+            return "scheduled catch-up", 48
+
+    return "scheduled", 3
+
+
+def find_candidate_files(now=None, search_mode=None):
     """Return only recent DWD TEMP BUFR packages.
 
     Scheduled GitHub Actions runs use a short 3-hour window because the
     regular 00/12 UTC soundings normally arrive shortly after the launch.
-    A manual workflow_dispatch run uses a 24-hour catch-up window, useful
-    for delayed or special soundings.
+    Missing regular terms from the previous 48 hours enable scheduled
+    catch-up with a 48-hour window. Manual runs always search 72 hours.
 
     Filtering is done from the timestamp embedded in the DWD filename,
     before any BUFR file is downloaded or opened with ecCodes.
@@ -335,11 +358,8 @@ def find_candidate_files():
         "manual_local"
     )
 
-    manual_run = is_manual_run()
-
-    search_hours = 24 if manual_run else 3
-
-    now = datetime.now(timezone.utc)
+    now = now or datetime.now(timezone.utc)
+    mode, search_hours = search_mode or dwd_search_mode(now)
     cutoff = now - timedelta(hours=search_hours)
 
     recent_files = []
@@ -365,7 +385,7 @@ def find_candidate_files():
 
     print(
         "Search mode:",
-        "manual catch-up" if manual_run else "scheduled"
+        mode
     )
 
     print(
@@ -5352,7 +5372,8 @@ def main():
 
     scan_cache = load_dwd_scan_cache(now)
 
-    candidates = find_candidate_files()
+    search_mode = dwd_search_mode(now)
+    candidates = find_candidate_files(now=now, search_mode=search_mode)
     directory_elapsed = time.perf_counter() - directory_started
 
     print(
@@ -5506,7 +5527,7 @@ def main():
             )
 
             if (
-                not manual_run
+                search_mode[0] == "scheduled"
                 and term == expected_term_name
                 and nominal_date == expected_nominal_date
             ):
