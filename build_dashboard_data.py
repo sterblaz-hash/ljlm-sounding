@@ -91,6 +91,40 @@ def update(root, source):
     save_month(path, [*records, record])
 
 
+def sync_recent(root, now, hours):
+    """Merge regular archive terms in an inclusive nominal UTC window.
+
+    Archive filenames encode nominal date/term, so enumerate only eligible
+    00/12 UTC paths instead of reading every historical profile.
+    """
+    if hours <= 0:
+        raise ValueError("Recent synchronization hours must be positive")
+    start = now - timedelta(hours=hours)
+    day = start.replace(hour=0, minute=0, second=0, microsecond=0)
+    groups = {}
+    while day <= now:
+        for term in ("00", "12"):
+            nominal = day.replace(hour=int(term))
+            if not start <= nominal <= now:
+                continue
+            source = root / "data" / nominal.strftime("%Y/%m") / (
+                nominal.strftime("%Y%m%d") + f"_{term}.json"
+            )
+            if not source.is_file():
+                continue
+            profile = read_json(source)
+            if profile.get("term") not in ("00", "12"):
+                continue
+            if not start <= record_time(profile) <= now:
+                continue
+            record = extract_record(profile)
+            groups.setdefault(month_path(root, record), []).append(record)
+        day += timedelta(days=1)
+    for path, recovered in groups.items():
+        existing = read_json(path)["records"] if path.exists() else []
+        save_month(path, [*existing, *recovered])
+
+
 def backfill(root):
     # Process one source month at a time, bounding memory as the archive grows.
     for directory in sorted((root / "data").glob("[0-9][0-9][0-9][0-9]/[0-9][0-9]")):
@@ -158,6 +192,7 @@ def main():
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--update", type=Path)
     mode.add_argument("--backfill", action="store_true")
+    mode.add_argument("--sync-recent-hours", type=int)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent)
     parser.add_argument("--as-of", help="UTC window end (ISO timestamp); defaults to current time")
     args = parser.parse_args()
@@ -165,8 +200,12 @@ def main():
     if now.tzinfo is None:
         parser.error("--as-of must include a timezone")
     now = now.astimezone(timezone.utc)
+    if args.sync_recent_hours is not None and args.sync_recent_hours <= 0:
+        parser.error("--sync-recent-hours must be positive")
     if args.backfill:
         backfill(args.root)
+    elif args.sync_recent_hours is not None:
+        sync_recent(args.root, now, args.sync_recent_hours)
     else:
         update(args.root, args.root / args.update)
     build_windows(args.root, now)

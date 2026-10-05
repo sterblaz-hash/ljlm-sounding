@@ -37,7 +37,7 @@ jobs:
         run: python render_ljlm.py --input data/latest.json
 
       - name: Update dashboard data
-        run: python build_dashboard_data.py --update data/latest.json
+        run: python build_dashboard_data.py --sync-recent-hours 72
 
       - name: Commit and push
         shell: bash

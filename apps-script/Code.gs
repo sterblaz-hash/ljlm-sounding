@@ -871,11 +871,9 @@ function buildOrographicTransport_(metpy) {
 
           fractionPct:
 
-            finiteOrNull_(
-
-              primary.upslope_fraction_pct
-
-            ),
+            finiteOrNull_(primary.signed_fraction) === null
+              ? null
+              : finiteOrNull_(primary.signed_fraction) * 100,
 
           angleDeg:
 

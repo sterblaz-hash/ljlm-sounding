@@ -2392,11 +2392,11 @@
 
                 '<div class="orographic-main">' +
 
-                  '<span class="orographic-number">' +
+                  '<span class="orographic-number ' + signedClass + '">' +
 
                     smartFmt(
 
-                      item.upslope,
+                      item.signed,
 
                       'kg m⁻¹ s⁻¹'
 
@@ -2416,7 +2416,7 @@
 
                 '<div class="orographic-caption">' +
 
-                  'upslope IVT⊥' +
+                  'cross-barrier IVT⊥' +
 
                 '</div>' +
 
@@ -2424,25 +2424,7 @@
 
                 '<div class="orographic-meta">' +
 
-                  'signed: ' +
-
-                  '<span class="' +
-
-                    signedClass +
-
-                  '">' +
-
-                    smartFmt(
-
-                      item.signed,
-
-                      'kg m⁻¹ s⁻¹'
-
-                    ) +
-
-                  '</span>' +
-
-                  ' · fraction: ' +
+                  'signed fraction: ' +
 
                   (
 
@@ -2536,9 +2518,9 @@
 
         '<div class="caveat">' +
 
-          'Positive signed transport is toward the selected barrier normal. ' +
+          'Positive transport is toward the selected upslope normal. ' +
 
-          'Upslope IVT⊥ is clipped at zero. ' +
+          'Negative transport is in the opposite direction. ' +
 
           (
 

@@ -106,3 +106,42 @@ assert.equal((path.match(/L/g) || []).length, 1);
 vm.runInContext("timeseriesCache['7d'].records = []; renderTimeseries_();", browser);
 assert.match(element('potekChart').textContent, /ni podatkov/);
 console.log('Gap and empty-window regression checks passed.');
+
+// Signed cross-barrier values drive the sounding cards, never clipped upslope.
+for (const [signed, fraction] of [[-120, -0.4], [80, 0.25], [0, 0], [null, null]]) {
+  const layer = {
+    available: true, magnitude_kg_m1_s1: 300,
+    signed_cross_barrier_kg_m1_s1: signed, signed_fraction: fraction,
+    upslope_kg_m1_s1: 999, upslope_fraction_pct: 99,
+    angle_to_upslope_normal_deg: 135, top_pressure_hpa: 850
+  };
+  const metpy = {moisture_transport: {orographic_cross_barrier: {
+    available: true, version: 3, barriers: {dinaric_west: {
+      label: 'Test barrier', upslope_normal_azimuth_deg: 45,
+      representative_barrier_height_msl_m: 1500, terrain_capped_ivt: layer
+    }}
+  }}};
+  const block = backend.buildOrographicTransport_(metpy);
+  const row = block.rows[0];
+  assert.equal(row.signed, signed);
+  assert.equal(row.fractionPct, fraction === null ? null : fraction * 100);
+  assert.equal(row.upslope, 999); // compatibility field only
+  const card = browser.orographicTransportHtml({orographicTransport: block});
+  assert.match(card, /cross-barrier IVT⊥/);
+  assert.doesNotMatch(card, /clipped|upslope IVT⊥|999|99%/);
+  assert.match(card, /Test barrier/);
+  assert.match(card, /1500 m MSL/);
+  assert.match(card, /45°/);
+  assert.match(card, /135°/);
+  assert.match(card, /850 hPa/);
+  if (signed === -120) {
+    assert.match(card, /signed-negative/);
+    assert.match(card, /-120/);
+    assert.match(card, /-40%/);
+  }
+  if (fraction === null) assert.match(card, /signed fraction: —/);
+  // Old profiles without signed_fraction must show no fraction, not the clipped field.
+  delete layer.signed_fraction;
+  assert.equal(backend.buildOrographicTransport_(metpy).rows[0].fractionPct, null);
+}
+console.log('Signed orographic card regression checks passed.');

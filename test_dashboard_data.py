@@ -169,6 +169,69 @@ class DashboardTests(unittest.TestCase):
             builder.update(self.root, path)
             builder.build_windows(self.root, datetime(2026, 10, 2, tzinfo=timezone.utc))
 
+    def test_recent_sync_recovers_all_terms_and_is_idempotent(self):
+        now = datetime(2026, 10, 2, 12, tzinfo=timezone.utc)
+        # Seed an older compact record and the latest term; recover the middle.
+        old = sounding('2026-09-28', '12')
+        latest = sounding('2026-10-02', '12')
+        for profile in (old, latest):
+            path = self.put('data/latest.json', profile)
+            builder.update(self.root, path)
+        recent = [('2026-09-29', '12'), ('2026-09-30', '00'),
+                  ('2026-09-30', '12'), ('2026-10-01', '00'),
+                  ('2026-10-01', '12'), ('2026-10-02', '00'),
+                  ('2026-10-02', '12')]
+        sources = []
+        for date, term in reversed(recent):
+            profile = sounding(date, term)
+            profile['processed_at'] = '2099-01-01T00:00:00Z'
+            profile['parameters'] = {'metpy': {'pwat_mm': None}}
+            sources.append(self.put(f'data/{date[:4]}/{date[5:7]}/{date.replace("-", "")}_{term}.json', profile))
+        # Malformed old, future, special and unrelated files must never be read.
+        for path in ('data/2026/09/20260929_00.json',
+                     'data/2026/10/20261003_00.json',
+                     'data/1900/01/19000101_00.json',
+                     'data/2026/10/20261001_special.json',
+                     'data/2026/10/status.json', 'data/2026/10/other.json',
+                     'data/latest.json', 'data/status.json'):
+            self.put(path, {'unrelated': True})
+        real_read = builder.read_json
+        accessed = []
+        def read(path):
+            if path.is_relative_to(self.root / 'data'):
+                accessed.append(path)
+                self.assertIn(path, sources)
+            return real_read(path)
+        def run():
+            with patch('sys.argv', ['build_dashboard_data.py', '--sync-recent-hours', '72',
+                                    '--root', str(self.root), '--as-of', now.isoformat()]), \
+                    patch.object(builder, 'read_json', side_effect=read):
+                builder.main()
+            paths = [*(self.root / builder.BASE).rglob('*.json'),
+                     self.root / 'data/dashboard_manifest.json']
+            return {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in paths}
+        first = run()
+        self.assertEqual(set(accessed), set(sources))
+        self.assertEqual(first, run())
+        for label in builder.WINDOWS:
+            records = real_read(self.root / builder.BASE / f'latest_{label}.json')['records']
+            self.assertEqual([r['sounding_id'] for r in records],
+                             [old['sounding_id']] + [sounding(d, t)['sounding_id'] for d, t in recent])
+            self.assertEqual(len({r['sounding_id'] for r in records}), len(records))
+            self.assertTrue(all(r['pwat_mm'] is None for r in records))
+        manifest = real_read(self.root / 'data/dashboard_manifest.json')
+        self.assertEqual(set(manifest['timeseries']['windows']), set(builder.WINDOWS))
+
+    def test_recent_sync_uses_profile_nominal_time_and_regular_terms(self):
+        now = datetime(2026, 10, 2, 12, tzinfo=timezone.utc)
+        self.put('data/2026/10/20261002_00.json', sounding('2026-09-20'))
+        self.put('data/2026/10/20261002_12.json', sounding(term='special'))
+        builder.sync_recent(self.root, now, 72)
+        self.assertFalse((self.root / builder.BASE).exists())
+        for hours in (0, -1):
+            with self.assertRaises(ValueError):
+                builder.sync_recent(self.root, now, hours)
+
     def test_manifest_only_existing_products(self):
         empty = builder.build_manifest(self.root)
         self.assertFalse(empty['timeseries']['available'])
