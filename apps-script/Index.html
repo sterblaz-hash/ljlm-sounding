@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html>
+<html lang="en">
 
 <head>
 
@@ -325,6 +325,7 @@
 
 
     .dashboard {
+      align-items: start;
 
       display: grid;
 
@@ -492,6 +493,7 @@
 
 
 
+    .left-stack,
     .right-stack {
 
       display: grid;
@@ -619,6 +621,15 @@
     }
 
 
+
+    .clim-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px; }
+    .clim-summary-item { min-width: 0; padding: 9px; border: 1px solid var(--line-soft); border-radius: 10px; background: #fbfdff; }
+    .clim-summary-label { color: #40516a; font-size: 11px; font-weight: 700; }
+    .clim-summary-value { margin-top: 5px; font-size: 14px; font-weight: 750; }
+    .clim-summary-item .percentile-pill { margin-top: 6px; }
+    .clim-summary-action { padding: 0 12px 12px; }
+    @media (max-width: 620px) { .clim-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 380px) { .clim-summary { grid-template-columns: 1fr; } }
 
     .clim-wrap {
 
@@ -1110,18 +1121,9 @@
 
     .lower-grid {
 
-      grid-column: 1 / -1;
-
       display: grid;
-
-      grid-template-columns:
-
-        minmax(360px, 0.75fr)
-
-        minmax(360px, 0.75fr)
-
-        minmax(500px, 1.2fr);
-
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
       gap: 14px;
 
     }
@@ -1701,6 +1703,28 @@
     .potek-chart { padding: 0 16px 16px; }
     .potek-chart svg { display: block; width: 100%; height: auto; min-height: 240px; }
     .potek-chart circle { cursor: pointer; }
+    .potek-chart-viewport { max-width: 1000px; margin: 0 auto; overflow-x: auto; overscroll-behavior-x: contain; }
+    .potek-chart-inner { width: 100%; min-width: 680px; }
+    .potek-chart-inner svg { min-height: 0; }
+    .potek-chart { min-width: 0; max-width: 100%; }
+    .potek-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 auto 14px; max-width: 1000px; color: #526985; font-size: 11px; }
+    .potek-legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .potek-legend i { width: 18px; height: 12px; border-radius: 3px; }
+    .heat-low { background: #568bb7; }
+    .heat-lower { background: #bdd5e8; }
+    .heat-normal { background: #e9edf0; }
+    .heat-upper { background: #ead0ac; }
+    .heat-high { background: #bf8053; }
+    .heat-missing { background: #fafbfd; border: 1px dashed #d9e1ea !important; }
+    .potek-heatmap { display: grid; gap: 4px; padding-bottom: 8px; }
+    .heat-label { position: sticky; left: 0; z-index: 1; background: #fff; padding: 10px 8px; font-size: 12px; font-weight: 700; box-shadow: 4px 0 5px rgba(255,255,255,.9); }
+    .heat-group { grid-column: 1 / -1; border-top: 1px solid var(--line-soft); background: #f7f9fc; }
+    .heat-group span { display: inline-block; position: sticky; left: 0; padding: 6px 8px; color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: .3px; }
+    .heat-cell { border: 0; border-radius: 5px; min-height: 40px; padding: 0; cursor: pointer; }
+    .heat-cell:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+    .heat-time { font-size: 10px; color: #526985; text-align: center; padding: 8px 0; white-space: pre-line; }
+    @media (pointer: coarse) { .potek-chart-inner [data-point] { r: 18px; } }
+    @media (max-width: 620px) { .potek-chart { padding: 0 8px 12px; } .heat-label { font-size: 11px; } }
     .potek-note { padding: 12px 16px; color: #526985; font-size: 13px; }
   </style>
 
@@ -1719,7 +1743,7 @@
         type="button"
         onclick="showSoundingView()"
       >
-        Sondaža
+        Sounding
       </button>
 
       <button
@@ -1731,9 +1755,9 @@
         ICON-D2 +12 h
       </button>
       <button id="viewTimeseriesBtn" class="view-tab" type="button"
-        onclick="showTimeseriesView()">Potek</button>
+        onclick="showTimeseriesView()">Time series</button>
       <button id="viewClimatologyBtn" class="view-tab" type="button"
-        onclick="showClimatologyView()">Klimatologija</button>
+        onclick="showClimatologyView()">Climatology</button>
     </div>
 
     <div id="app">
@@ -1753,6 +1777,8 @@
   <script>
 
     let currentData = null;
+    let dashboardPending = false;
+    let climatologyMode = 'annual';
 
     let currentPlot = 'zoom';
 
@@ -1948,25 +1974,7 @@
 
     function metricHtml(item) {
 
-      const percentile =
-
-        item.percentile !== null
-
-          ? (
-
-              '<div class="percentile-pill">' +
-
-              'P' +
-
-              Math.round(item.percentile) +
-
-              '</div>'
-
-            )
-
-          : '';
-
-
+      const percentile = percentileBadge_(item.percentile);
 
       return (
 
@@ -2552,262 +2560,30 @@
 
 
 
-    function climatologyHtml(data) {
-
-      if (
-
-        !data.climatology ||
-
-        !data.climatology.length
-
-      ) {
-
-        return (
-
-          '<div class="caveat">' +
-
-          'Climatology not available.' +
-
-          '</div>'
-
-        );
-
-      }
-
-
-
-      const rows =
-
-        data.climatology.map(
-
-          function(item) {
-
-            const pct =
-
-              Math.max(
-
-                0,
-
-                Math.min(
-
-                  100,
-
-                  Number(
-
-                    item.percentile || 0
-
-                  )
-
-                )
-
-              );
-
-
-
-            const range =
-
-              smartFmt(
-
-                item.historicalMin,
-
-                item.unit
-
-              ) +
-
-              ' / ' +
-
-              smartFmt(
-
-                item.historicalMax,
-
-                item.unit
-
-              );
-
-
-
-            return (
-
-              '<tr>' +
-
-                '<td><strong>' +
-
-                  esc(item.label) +
-
-                '</strong></td>' +
-
-
-
-                '<td class="value">' +
-
-                  smartFmt(
-
-                    item.value,
-
-                    item.unit
-
-                  ) +
-
-                  ' ' +
-
-                  esc(item.unit) +
-
-                '</td>' +
-
-
-
-                '<td class="percentile-cell">' +
-
-                  '<div class="pbar">' +
-
-                    '<div class="pmark" ' +
-
-                    'style="left:' +
-
-                    pct +
-
-                    '%"></div>' +
-
-                  '</div>' +
-
-
-
-                  '<div class="p-caption">' +
-
-                    '<span>P10</span>' +
-
-                    '<span>P50</span>' +
-
-                    '<span>P90</span>' +
-
-                  '</div>' +
-
-                '</td>' +
-
-
-
-                '<td><strong>P' +
-
-                  Math.round(
-
-                    item.percentile || 0
-
-                  ) +
-
-                '</strong></td>' +
-
-
-
-                '<td class="range">' +
-
-                  range +
-
-                '</td>' +
-
-              '</tr>'
-
-            );
-
-          }
-
-        ).join('');
-
-
-
-      const meta =
-
-        data.climatologyMeta || {};
-
-
-
-      return (
-
-        '<div class="clim-wrap">' +
-
-          '<table class="clim-table">' +
-
-            '<thead>' +
-
-              '<tr>' +
-
-                '<th>Parameter</th>' +
-
-                '<th>Current</th>' +
-
-                '<th>Percentile</th>' +
-
-                '<th></th>' +
-
-                '<th>Min / max</th>' +
-
-              '</tr>' +
-
-            '</thead>' +
-
-            '<tbody>' +
-
-              rows +
-
-            '</tbody>' +
-
-          '</table>' +
-
-        '</div>' +
-
-
-
-        (
-
-          meta.caveat
-
-            ? (
-
-              '<div class="caveat">' +
-
-                '<strong>' +
-
-                  esc(
-
-                    meta.referencePeriod ||
-
-                    'Historical reference'
-
-                  ) +
-
-                '</strong>' +
-
-                (
-
-                  meta.window
-
-                    ? (
-
-                      ' · ' +
-
-                      esc(meta.window)
-
-                    )
-
-                    : ''
-
-                ) +
-
-                '<br>' +
-
-                esc(meta.caveat) +
-
-              '</div>'
-
-            )
-
-            : ''
-
-        )
-
-      );
-
+    function percentileBadge_(value) {
+      return typeof value === 'number' && Number.isFinite(value)
+        ? '<div class="percentile-pill">P' + Math.round(value) + '</div>'
+        : '';
     }
 
+    function climatologyHtml(data) {
+      const definitions = [
+        ['t850', 'T850'], ['pwat_mm', 'PWAT'],
+        ['freezing_level_msl_m', 'Freezing level'], ['lifted_index_c', 'Lifted Index'],
+        ['shear_0_6km_ms', '0–6 km shear'], ['z500_m', 'Z500']
+      ];
+      const items = definitions.map(function(definition) {
+        const item = (data.climatology || []).find(function(entry) { return entry.key === definition[0]; });
+        if (!item || typeof item.value !== 'number' || !Number.isFinite(item.value)) return '';
+        return '<div class="clim-summary-item">' +
+          '<div class="clim-summary-label">' + esc(definition[1]) + '</div>' +
+          '<div class="clim-summary-value">' + smartFmt(item.value, item.unit) + ' ' + esc(item.unit) + '</div>' +
+          percentileBadge_(item.percentile) + '</div>';
+      }).join('');
+      return (items ? '<div class="clim-summary">' + items + '</div>'
+        : '<div class="caveat">Climatology not available.</div>') +
+        '<div class="clim-summary-action"><button type="button" class="tab-btn" onclick="showClimatologyView()">Open Climatology →</button></div>';
+    }
 
 
     function inversionHtml(data) {
@@ -3474,6 +3250,7 @@
 
 
 
+          '<div class="left-stack">' +
           '<section class="panel">' +
 
             '<div class="panel-head">' +
@@ -3594,6 +3371,74 @@
 
 
 
+          '<div class="lower-grid">' +
+            '<section class="panel">' +
+
+              '<div class="panel-head">' +
+
+                '<div class="panel-title">' +
+
+                  'Hodograph' +
+
+                '</div>' +
+
+                '<div class="panel-note">' +
+
+                  '0–12 km AGL' +
+
+                '</div>' +
+
+              '</div>' +
+
+
+
+              '<div class="hodo-image">' +
+
+                '<img src="' +
+
+                  esc(
+
+                    data.images.hodograph
+
+                  ) +
+
+                '" alt="LJLM hodograph">' +
+
+              '</div>' +
+
+            '</section>' +
+
+
+
+            '<section class="panel">' +
+
+              '<div class="panel-head">' +
+
+                '<div class="panel-title">' +
+
+                  'Inversions' +
+
+                '</div>' +
+
+                '<div class="panel-note">' +
+
+                  'Detected layers' +
+
+                '</div>' +
+
+              '</div>' +
+
+
+
+              inversionHtml(data) +
+
+
+
+            '</section>' +
+
+
+
+          '</div></div>' +
           '<div class="right-stack">' +
 
 
@@ -3627,7 +3472,7 @@
                   .join('') +
 
               '</div>' +
-              '<details class="extra-diagnostics"><summary>Dodatna diagnostika · Lifted Index, CAPE/CIN, shear, lapse rates</summary>' +
+              '<details class="extra-diagnostics"><summary>Additional diagnostics · Lifted Index, CAPE/CIN, shear, lapse rates</summary>' +
                 '<div class="metric-grid">' + (data.additionalDiagnostics || []).map(metricHtml).join('') + '</div>' +
               '</details>' +
 
@@ -3705,7 +3550,7 @@
 
                   esc(
 
-                    data.climatologyMeta
+                    (data.climatologyMeta || {})
 
                       .referencePeriod ||
 
@@ -3720,80 +3565,6 @@
 
 
               climatologyHtml(data) +
-
-
-
-            '</section>' +
-
-
-
-          '</div>' +
-
-
-
-          '<div class="lower-grid">' +
-
-
-
-            '<section class="panel">' +
-
-              '<div class="panel-head">' +
-
-                '<div class="panel-title">' +
-
-                  'Hodograph' +
-
-                '</div>' +
-
-                '<div class="panel-note">' +
-
-                  '0–12 km AGL' +
-
-                '</div>' +
-
-              '</div>' +
-
-
-
-              '<div class="hodo-image">' +
-
-                '<img src="' +
-
-                  esc(
-
-                    data.images.hodograph
-
-                  ) +
-
-                '" alt="LJLM hodograph">' +
-
-              '</div>' +
-
-            '</section>' +
-
-
-
-            '<section class="panel">' +
-
-              '<div class="panel-head">' +
-
-                '<div class="panel-title">' +
-
-                  'Inversions' +
-
-                '</div>' +
-
-                '<div class="panel-note">' +
-
-                  'Detected layers' +
-
-                '</div>' +
-
-              '</div>' +
-
-
-
-              inversionHtml(data) +
 
 
 
@@ -3890,8 +3661,6 @@
 
 
           '</div>' +
-
-
 
         '</main>' +
 
@@ -4937,7 +4706,8 @@
 
     function load(archiveFile) {
 
-      document.getElementById(
+      dashboardPending = true;
+      if (currentView === 'sounding') document.getElementById(
 
         'app'
 
@@ -4955,13 +4725,23 @@
 
         .withSuccessHandler(
 
-          render
+          function(data) {
+            dashboardPending = false;
+            if (currentView === 'sounding' || !currentData) currentData = data;
+            if (currentView === 'climatology' && climatologyMode === 'current') renderCurrentClimatology_();
+            else render(data);
+          }
 
         )
 
         .withFailureHandler(
 
           function(error) {
+            dashboardPending = false;
+            if (currentView === 'climatology' && climatologyMode === 'current') {
+              renderCurrentClimatology_();
+              document.getElementById('currentClimateContent').innerHTML = '<div class="caveat">' + esc(error && error.message || error) + '</div><button class="tab-btn" onclick="showClimatologyView()">Try again</button>';
+            }
             if (currentView === 'sounding') showError(error);
           }
 
@@ -4979,6 +4759,7 @@
 
     const timeseriesCache = Object.create(null);
     const timeseriesPending = new Set();
+    let timeseriesMode = 'graph';
     let timeseriesWindow = '7d';
     let timeseriesParameter = 'pwat_mm';
     const timeseriesDefinitions = {
@@ -5029,7 +4810,7 @@
         if (currentView !== 'timeseries' || timeseriesWindow !== key) return;
         renderTimeseries_();
         document.getElementById('potekChart').innerHTML = '<p class="potek-note">' +
-          esc(error.message || error) + '</p><button class="tab-btn" id="potekRetry">Poskusi znova</button>';
+          esc(error.message || error) + '</p><button class="tab-btn" id="potekRetry">Try again</button>';
         document.getElementById('potekRetry').onclick = function() { loadTimeseriesWindow_(key); };
       }).getDashboardTimeseries(key);
     }
@@ -5059,22 +4840,27 @@
       }) : [];
       if (variables.length && !variables.includes(timeseriesParameter)) timeseriesParameter = variables[0];
       document.getElementById('app').innerHTML = '<section class="panel">' +
-        '<div class="panel-head"><div class="panel-title">Potek · OBS</div>' +
-        '<div class="panel-note">Nominalni čas UTC</div></div>' +
-        '<div class="potek-controls">' + [['7d', '7 dni'], ['30d', '30 dni'], ['90d', '90 dni'], ['1y', '1 leto']]
+        '<div class="panel-head"><div class="panel-title">Time series · OBS</div>' +
+        '<div class="panel-note">Nominal time UTC</div></div>' +
+        '<div class="potek-controls">' + ['graph', 'heatmap'].map(function(mode) {
+          return '<button class="tab-btn ' + (timeseriesMode === mode ? 'active' : '') + '" type="button" aria-pressed="' + (timeseriesMode === mode) + '" data-potek-mode="' + mode + '">' + (mode === 'graph' ? 'Graph' : 'Heatmap') + '</button>';
+        }).join('') + [['7d', '7 days'], ['30d', '30 days'], ['90d', '90 days'], ['1y', '1 year']]
           .map(function(window) {
             return '<button type="button" class="tab-btn ' + (timeseriesWindow === window[0] ? 'active' : '') +
               '" aria-pressed="' + (timeseriesWindow === window[0]) + '" data-window="' + window[0] + '">' + window[1] + '</button>';
-          }).join('') + '<label for="potekParameter">Parameter</label><select id="potekParameter" ' +
+          }).join('') + '<label for="potekParameter" ' + (timeseriesMode === 'heatmap' ? 'hidden' : '') + '>Parameter</label><select id="potekParameter" ' + (timeseriesMode === 'heatmap' ? 'hidden ' : '') +
           (variables.length ? '' : 'disabled') + '>' + variables.map(function(key) {
             const def = timeseriesDefinitions[key];
             return '<option value="' + esc(key) + '" ' + (key === timeseriesParameter ? 'selected' : '') + '>' +
               esc(def[0] + ' [' + def[1] + ']') + '</option>';
           }).join('') + '</select></div><div id="potekChart" class="potek-chart" aria-live="polite"></div>' +
-          '<div id="potekPoint" class="potek-note" aria-live="polite">Izberite točko za vrednost in čas UTC.</div>' +
-          '<div class="potek-note">Manjkajoče vrednosti in izpuščeni termini so prikazani kot vrzeli. ' +
-          'Signed IVT: pozitivno proti izbrani upslope normali, negativno v nasprotni smeri. ' +
-          (data ? 'Podatki pripravljeni: ' + esc(data.generatedAt) : '') + '</div></section>';
+          '<div id="potekPoint" class="potek-note" aria-live="polite">Select a point for its value and UTC time.</div>' +
+          '<div class="potek-note">Missing values and skipped terms are shown as gaps. ' +
+          'Signed IVT: positive toward the selected upslope normal, negative in the opposite direction. ' +
+          (data ? 'Data generated: ' + esc(data.generatedAt) : '') + '</div></section>';
+      document.querySelectorAll('[data-potek-mode]').forEach(function(button) {
+        button.onclick = function() { timeseriesMode = button.dataset.potekMode; renderTimeseries_(); };
+      });
       document.querySelectorAll('[data-window]').forEach(function(button) {
         button.onclick = function() { loadTimeseriesWindow_(button.dataset.window); };
       });
@@ -5083,10 +4869,11 @@
         renderTimeseries_();
       };
       const chart = document.getElementById('potekChart');
-      if (!data) { chart.textContent = 'Nalaganje opazovanj …'; return; }
+      if (!data) { chart.textContent = 'Loading observations …'; return; }
+      if (timeseriesMode === 'heatmap') { renderHeatmap_(data); return; }
       const points = timeseriesPoints_(data.records, timeseriesParameter);
       const values = points.filter(function(point) { return point.value !== null; });
-      if (!values.length) { chart.textContent = 'Za ta parameter v izbranem obdobju ni podatkov.'; return; }
+      if (!values.length) { chart.textContent = 'No data for this parameter in the selected period.'; return; }
       const def = timeseriesDefinitions[timeseriesParameter];
       let min = Math.min(...values.map(function(p) { return p.value; }));
       let max = Math.max(...values.map(function(p) { return p.value; }));
@@ -5104,9 +4891,14 @@
         const value = min + (max - min) * i / 4;
         svg += '<line x1="75" x2="835" y1="' + y(value) + '" y2="' + y(value) + '" stroke="#e2e8f0"/>' +
           '<text x="67" y="' + (y(value) + 4) + '" text-anchor="end" font-size="12" fill="#526985">' + esc(fmt(value, 1)) + '</text>';
-        const time = start + (end - start) * i / 4;
-        svg += '<text x="' + x(time) + '" y="325" text-anchor="' + (i === 0 ? 'start' : i === 4 ? 'end' : 'middle') +
-          '" font-size="12" fill="#526985">' + timeseriesDate_(time).slice(0, 10) + '</text>';
+      }
+      const tickCount = { '7d': 6, '30d': 4, '90d': 3, '1y': 2 }[timeseriesWindow];
+      for (let i = 0; i <= tickCount; i++) {
+        const time = start + (end - start) * i / tickCount;
+        const label = timeseriesDate_(time);
+        svg += '<text x="' + x(time) + '" y="325" text-anchor="' + (i === 0 ? 'start' : i === tickCount ? 'end' : 'middle') +
+          '" font-size="12" fill="#526985">' + label.slice(5, 10) +
+          (timeseriesWindow === '7d' ? '<tspan x="' + x(time) + '" dy="15">' + label.slice(11, 16) + '</tspan>' : '') + '</text>';
       }
       let path = '', previous = null;
       points.forEach(function(point) {
@@ -5117,17 +4909,125 @@
       svg += '<path d="' + path + '" fill="none" stroke="#2673bd" stroke-width="2"/>';
       values.forEach(function(point, index) {
         const label = timeseriesDate_(point.time) + ' · ' + def[0] + ': ' + fmt(point.value, 2) + ' ' + def[1];
-        svg += '<circle cx="' + x(point.time) + '" cy="' + y(point.value) + '" r="8" fill="transparent" ' +
+        svg += '<circle cx="' + x(point.time) + '" cy="' + y(point.value) + '" r="12" fill="transparent" ' +
           'tabindex="0" role="button" data-point="' + index + '" aria-label="' + esc(label) + '"><title>' + esc(label) + '</title></circle>' +
           '<circle cx="' + x(point.time) + '" cy="' + y(point.value) + '" r="3" fill="#2673bd" pointer-events="none"/>';
       });
-      svg += '<text x="455" y="357" text-anchor="middle" font-size="12" fill="#526985">Nominalni / veljavni čas UTC</text></svg>';
-      chart.innerHTML = svg;
+      svg += '<text x="455" y="357" text-anchor="middle" font-size="12" fill="#526985">Nominal / valid time UTC</text></svg>';
+      const plotWidth = { '7d': 680, '30d': 780, '90d': 860, '1y': 960 }[timeseriesWindow];
+      chart.innerHTML = '<div class="potek-chart-viewport"><div class="potek-chart-inner" style="min-width:' + plotWidth + 'px">' + svg + '</div></div>';
       chart.querySelectorAll('[data-point]').forEach(function(circle) {
         const show = function() { document.getElementById('potekPoint').textContent = circle.getAttribute('aria-label'); };
         circle.onmouseenter = show; circle.onfocus = show; circle.onclick = show;
         circle.onkeydown = function(event) { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); show(); } };
       });
+    }
+
+    // Only current OBS variables with matching compact climatology references.
+    const heatmapRows = [
+      ['t850_c', 't850', 'Temperature'],
+      ['t700_c', 't700', 'Temperature'],
+      ['t500_c', 't500', 'Temperature'],
+      ['freezing_level_msl_m', 'freezing_level_msl_m', 'Temperature'],
+      ['pwat_mm', 'pwat_mm', 'Moisture'],
+      ['q_surface_gkg', 'q_surface_gkg', 'Moisture'],
+      ['q925_gkg', 'q925_gkg', 'Moisture'],
+      ['q850_gkg', 'q850_gkg', 'Moisture'],
+      ['ivt_kg_m1_s1', 'ivt_kg_m_s', 'Moisture'],
+      ['lifted_index_c', 'lifted_index_c', 'Stability'],
+      ['mucape_jkg', 'mucape_jkg', 'Stability'],
+      ['lapse_rate_850_500_c_per_km', 'lapse_rate_850_500_c_per_km', 'Stability'],
+      ['lapse_rate_700_500_c_per_km', 'lapse_rate_700_500_c_per_km', 'Stability'],
+      ['shear_0_1km_ms', 'shear_0_1km_ms', 'Wind / shear'],
+      ['shear_0_3km_ms', 'shear_0_3km_ms', 'Wind / shear'],
+      ['shear_0_6km_ms', 'shear_0_6km_ms', 'Wind / shear'],
+      ['shear_sfc_700_ms', 'shear_sfc_700_ms', 'Wind / shear'],
+      ['z500_m', 'z500_m', 'Dynamics'],
+      ['thickness_925_500_m', 'thickness_925_500_m', 'Dynamics']
+    ];
+    const heatmapBands = ['< P10', 'P10–25', 'P25–75', 'P75–90', '> P90'];
+    const heatmapClasses = ['heat-low', 'heat-lower', 'heat-normal', 'heat-upper', 'heat-high'];
+    const heatmapErrors = Object.create(null);
+
+    function heatmapBand_(value, day) {
+      const fields = ['p10', 'p25', 'p50', 'p75', 'p90'];
+      if (typeof value !== 'number' || !Number.isFinite(value) || !day ||
+          !fields.every(function(key, i) { return typeof day[key] === 'number' && Number.isFinite(day[key]) &&
+            (i === 0 || day[fields[i - 1]] <= day[key]); })) return null;
+      // Equal thresholds stay in the central band, including zero CAPE.
+      return value < day.p10 ? 0 : value < day.p25 ? 1 : value <= day.p75 ? 2 : value <= day.p90 ? 3 : 4;
+    }
+
+    function loadHeatmapClimate_(key) {
+      if (annualCache[key] || annualPending.has(key) || heatmapErrors[key]) return;
+      annualPending.add(key);
+      google.script.run.withSuccessHandler(function(data) {
+        annualPending.delete(key); delete heatmapErrors[key]; annualCache[key] = data; annualParameters = data.parameters;
+        if (currentView === 'timeseries' && timeseriesMode === 'heatmap') renderTimeseries_();
+        if (currentView === 'climatology' && annualParameter === key) renderAnnual_();
+      }).withFailureHandler(function(error) {
+        annualPending.delete(key); heatmapErrors[key] = String(error && error.message || error);
+        if (currentView === 'timeseries' && timeseriesMode === 'heatmap') renderTimeseries_();
+      }).getDashboardClimatology(key);
+    }
+
+    function renderHeatmap_(data) {
+      const rows = heatmapRows.slice();
+      rows.forEach(function(row) { loadHeatmapClimate_(row[1]); });
+      const records = data.records.filter(function(record) { return Number.isFinite(Date.parse(record.valid_time)); })
+        .slice().sort(function(a, b) { return Date.parse(a.valid_time) - Date.parse(b.valid_time); });
+      if (!records.length) { document.getElementById('potekChart').textContent = 'No observations in the selected period.'; return; }
+      // Include absent nominal terms, rather than visually collapsing missing observations.
+      const byTime = new Map(records.map(function(record) { return [Date.parse(record.valid_time), record]; }));
+      const slots = [];
+      for (let time = Date.parse(records[0].valid_time); time <= Date.parse(records[records.length - 1].valid_time); time += 12 * 3600000) {
+        slots.push(byTime.get(time) || {valid_time: new Date(time).toISOString()});
+      }
+      const details = [];
+      let markup = '<div class="potek-legend">' + heatmapBands.map(function(label, i) {
+        return '<span><i class="' + heatmapClasses[i] + '"></i>' + esc(label) + '</span>';
+      }).join('') + '<span><i class="heat-missing"></i>No data / reference</span></div>';
+      markup += '<div class="potek-chart-viewport"><div class="potek-heatmap" style="grid-template-columns:140px repeat(' + slots.length + ', minmax(28px, 1fr)); min-width:' + Math.max(680, 140 + slots.length * 28) + 'px">';
+      let previousGroup = null;
+      rows.forEach(function(row) {
+        if (row[2] !== previousGroup) {
+          markup += '<div class="heat-group"><span>' + esc(row[2]) + '</span></div>';
+          previousGroup = row[2];
+        }
+        const def = timeseriesDefinitions[row[0]], curve = annualCache[row[1]];
+        const days = new Map((curve ? curve.days : []).map(function(day) { return [day.day, day]; }));
+        markup += '<div class="heat-label">' + esc(def[0]) + '</div>';
+        slots.forEach(function(record) {
+          const value = record[row[0]], day = days.get(record.valid_time.slice(5, 10));
+          const band = heatmapBand_(value, day);
+          const raw = typeof value === 'number' && Number.isFinite(value);
+          const text = def[0] + ' · ' + timeseriesDate_(Date.parse(record.valid_time)) + ' · ' +
+            (raw ? fmt(value, 2) + ' ' + def[1] : 'Missing value') + ' · ' +
+            (!raw ? 'Missing observation' : band !== null ? heatmapBands[band] : heatmapErrors[row[1]] ? 'Reference unavailable: ' + heatmapErrors[row[1]] : curve ? 'No climatological reference for this day' : 'Loading reference …') +
+            (day ? ' · P10: ' + fmt(day.p10, 2) + ' / P50: ' + fmt(day.p50, 2) + ' / P90: ' + fmt(day.p90, 2) + ' ' + def[1] : '');
+          details.push(text);
+          markup += '<button type="button" class="heat-cell ' + (band === null ? 'heat-missing' : heatmapClasses[band]) +
+            '" data-heat-cell="' + (details.length - 1) + '" aria-label="' + esc(text) + '" title="' + esc(text) + '"></button>';
+        });
+      });
+      markup += '<div class="heat-label">UTC</div>';
+      const stride = Math.max(1, Math.ceil(slots.length / ({'7d': 7, '30d': 6, '90d': 5, '1y': 4}[timeseriesWindow])));
+      slots.forEach(function(record, i) {
+        markup += '<div class="heat-time">' + (i % stride === 0 ? esc(record.valid_time.slice(5, 10) + '\n' + record.valid_time.slice(11, 16)) : '') + '</div>';
+      });
+      markup += '</div></div>';
+      const reference = annualCache.t850;
+      if (reference) markup += '<div class="potek-note">' + esc([reference.metadata.reference_period, reference.metadata.window_description, reference.metadata.historical_time_caveat].filter(Boolean).join(' · ')) + '</div>';
+      if (Object.keys(heatmapErrors).length) markup += '<button type="button" class="tab-btn" id="heatRetry">Try again · references</button>';
+      const chart = document.getElementById('potekChart'); chart.innerHTML = markup;
+      chart.querySelectorAll('[data-heat-cell]').forEach(function(cell) {
+        const show = function() { document.getElementById('potekPoint').textContent = details[Number(cell.dataset.heatCell)]; };
+        cell.onmouseenter = show; cell.onfocus = show; cell.onclick = show;
+      });
+      if (Object.keys(heatmapErrors).length) document.getElementById('heatRetry').onclick = function() {
+        Object.keys(heatmapErrors).forEach(function(key) { delete heatmapErrors[key]; }); renderTimeseries_();
+      };
+      document.getElementById('potekPoint').textContent = 'Select a cell for its value, UTC time and climatological band.';
     }
 
     const annualCache = Object.create(null);
@@ -5137,7 +5037,10 @@
 
     function showClimatologyView() {
       setMainView_('climatology');
-      loadAnnualParameter_(annualParameter);
+      if (climatologyMode === 'current') {
+        renderCurrentClimatology_();
+        if (!currentData && !dashboardPending) load('');
+      } else loadAnnualParameter_(annualParameter);
     }
 
     function loadAnnualParameter_(key) {
@@ -5147,17 +5050,62 @@
       annualPending.add(key);
       google.script.run.withSuccessHandler(function(data) {
         annualPending.delete(key);
+        delete heatmapErrors[key];
         annualCache[key] = data;
         annualParameters = data.parameters;
         if (currentView === 'climatology' && annualParameter === key) renderAnnual_();
+        if (currentView === 'timeseries' && timeseriesMode === 'heatmap') renderTimeseries_();
       }).withFailureHandler(function(error) {
         annualPending.delete(key);
+        if (currentView === 'timeseries' && timeseriesMode === 'heatmap') {
+          heatmapErrors[key] = String(error && error.message || error); renderTimeseries_(); return;
+        }
         if (currentView !== 'climatology' || annualParameter !== key) return;
         renderAnnual_();
         document.getElementById('annualChart').innerHTML = '<p>' + esc(error && error.message || error) +
-          '</p><button id="annualRetry" class="tab-btn">Poskusi znova</button>';
+          '</p><button id="annualRetry" class="tab-btn">Try again</button>';
         document.getElementById('annualRetry').onclick = function() { loadAnnualParameter_(key); };
       }).getDashboardClimatology(key);
+    }
+
+    function climatologyTabs_() {
+      return '<div class="potek-controls" aria-label="Climatology view">' +
+        [['annual', 'Annual cycle'], ['current', 'Current sounding']].map(function(item) {
+          return '<button type="button" class="tab-btn ' + (climatologyMode === item[0] ? 'active' : '') +
+            '" aria-pressed="' + (climatologyMode === item[0]) + '" onclick="setClimatologyMode_(\'' + item[0] + '\')">' + item[1] + '</button>';
+        }).join('') + '</div>';
+    }
+
+    function setClimatologyMode_(mode) {
+      climatologyMode = mode;
+      showClimatologyView();
+    }
+
+    function detailedClimatologyHtml_(data) {
+      const rows = (data.climatology || []).map(function(item) {
+        const valid = typeof item.percentile === 'number' && Number.isFinite(item.percentile);
+        const pct = valid ? Math.max(0, Math.min(100, item.percentile)) : null;
+        return '<tr><td><strong>' + esc(item.label) + '</strong></td><td class="value">' +
+          smartFmt(item.value, item.unit) + ' ' + esc(item.unit) + '</td><td class="percentile-cell">' +
+          (valid ? '<div class="pbar"><div class="pmark" style="left:' + pct + '%"></div></div>' +
+            '<div class="p-caption"><span>P10</span><span>P50</span><span>P90</span></div>' : '—') +
+          '</td><td>' + (valid ? 'P' + Math.round(item.percentile) : '—') + '</td><td class="range">' +
+          smartFmt(item.historicalMin, item.unit) + ' / ' + smartFmt(item.historicalMax, item.unit) + '</td></tr>';
+      }).join('');
+      const meta = data.climatologyMeta || {};
+      return (rows ? '<div class="table-wrap"><table class="clim-table"><thead><tr><th>Parameter</th><th>Current</th><th>Percentile</th><th></th><th>Min / max</th></tr></thead><tbody>' + rows + '</tbody></table></div>' :
+        '<div class="caveat">Climatology not available.</div>') +
+        '<div class="caveat"><strong>' + esc(meta.referencePeriod || 'Historical reference') + '</strong>' +
+        (meta.window ? ' · ' + esc(meta.window) : '') + (meta.caveat ? '<br>' + esc(meta.caveat) : '') + '</div>';
+    }
+
+    function renderCurrentClimatology_() {
+      if (currentView !== 'climatology' || climatologyMode !== 'current') return;
+      document.getElementById('app').innerHTML = '<section class="panel"><div class="panel-head">' +
+        '<div class="panel-title">Climatology</div><div class="panel-note">' +
+        (currentData ? esc(currentData.nominalDate + ' · ' + currentData.term + ' UTC') : '') +
+        '</div></div>' + climatologyTabs_() + '<div id="currentClimateContent">' +
+        (currentData ? detailedClimatologyHtml_(currentData) : '<div class="loading">Loading current sounding climatology …</div>') + '</div></section>';
     }
 
     function annualDay_(day) {
@@ -5186,26 +5134,26 @@
     }
 
     function renderAnnual_() {
-      if (currentView !== 'climatology') return;
+      if (currentView !== 'climatology' || climatologyMode !== 'annual') return;
       const data = annualCache[annualParameter];
       document.getElementById('app').innerHTML = '<section class="panel">' +
-        '<div class="panel-head"><div class="panel-title">Klimatologija</div></div>' +
+        '<div class="panel-head"><div class="panel-title">Climatology</div></div>' + climatologyTabs_() +
         '<div class="potek-controls"><label for="annualParameter">Parameter</label><select id="annualParameter" ' +
         (annualParameters.length ? '' : 'disabled') + '>' + annualParameters.map(function(item) {
           return '<option value="' + esc(item.key) + '" ' + (item.key === annualParameter ? 'selected' : '') + '>' +
             esc(item.label + ' [' + item.unit + ']') + '</option>';
         }).join('') + '</select></div><div id="annualChart" class="potek-chart" aria-live="polite"></div>' +
-        '<div id="annualDetail" class="potek-note" aria-live="polite">Izberite dan za percentile.</div>' +
+        '<div id="annualDetail" class="potek-note" aria-live="polite">Select a day for its percentiles.</div>' +
         '<div id="annualMeta" class="potek-note"></div></section>';
       document.getElementById('annualParameter').onchange = function(event) { loadAnnualParameter_(event.target.value); };
       const chart = document.getElementById('annualChart');
-      if (!data) { chart.textContent = 'Nalaganje klimatologije …'; return; }
+      if (!data) { chart.textContent = 'Loading climatology …'; return; }
       const metadata = data.metadata;
       const current = typeof data.currentValue === 'number' && Number.isFinite(data.currentValue) && data.currentTime;
       document.getElementById('annualMeta').textContent = [
         data.label + ' [' + data.unit + ']', metadata.reference_period,
         metadata.window_description, metadata.smoothing_description, metadata.historical_time_caveat,
-        current ? 'OBS: ' + utcLabel(data.currentTime) + ' · ' + fmt(data.currentValue, 2) + ' ' + data.unit : 'Trenutna opazovana vrednost ni na voljo.'
+        current ? 'OBS: ' + utcLabel(data.currentTime) + ' · ' + fmt(data.currentValue, 2) + ' ' + data.unit : 'Current observation unavailable.'
       ].filter(Boolean).join(' · ');
       const days = data.days.slice().filter(function(day) { return annualDay_(day.day) !== null; })
         .sort(function(a, b) { return annualDay_(a.day) - annualDay_(b.day); });
@@ -5214,7 +5162,7 @@
         .filter(function(v) { return typeof v === 'number' && Number.isFinite(v); });
       const currentDay = current ? annualDay_(data.currentTime.slice(5, 10)) : null;
       if (currentDay !== null) values.push(data.currentValue);
-      if (!values.length) { chart.textContent = 'Klimatološke vrednosti niso na voljo.'; return; }
+      if (!values.length) { chart.textContent = 'Climatological values unavailable.'; return; }
       let min = Math.min(...values), max = Math.max(...values);
       const pad = (max - min) * 0.08 || Math.max(Math.abs(max) * 0.08, 1);
       min -= pad; max += pad;
@@ -5238,7 +5186,7 @@
         svg += '<path d="M' + segment.map(function(day) { return x(annualDay_(day.day)) + ',' + y(day.p50); }).join(' L') +
           '" fill="none" stroke="#2673bd" stroke-width="2"/>';
       });
-      ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Avg', 'Sep', 'Okt', 'Nov', 'Dec'].forEach(function(label, month) {
+      ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].forEach(function(label, month) {
         const position = annualDay_(String(month + 1).padStart(2, '0') + '-01');
         svg += '<text x="' + x(position) + '" y="325" text-anchor="middle" font-size="12" fill="#526985">' + label + '</text>';
       });
@@ -5250,7 +5198,7 @@
         const label = 'OBS: ' + utcLabel(data.currentTime) + ' · ' + fmt(data.currentValue, 2) + ' ' + data.unit;
         svg += '<circle data-annual-obs="true" cx="' + x(currentDay) + '" cy="' + y(data.currentValue) + '" r="6" fill="#c9423a" stroke="white" stroke-width="2" tabindex="0" aria-label="' + esc(label) + '"><title>' + esc(label) + '</title></circle>';
       }
-      svg += '<text x="75" y="358" font-size="12" fill="#526985">P10–P90 · P25–P75 · P50 (mediana) · OBS ●</text></svg>';
+      svg += '<text x="75" y="358" font-size="12" fill="#526985">P10–P90 · P25–P75 · P50 (median) · OBS ●</text></svg>';
       chart.innerHTML = svg;
       chart.querySelectorAll('[data-annual-day], [data-annual-obs]').forEach(function(point) {
         const show = function() { document.getElementById('annualDetail').textContent = point.getAttribute('aria-label'); };

@@ -35,7 +35,7 @@ assert.equal(backend.buildClimatology_({parameters: {lifted_index_c: {value: -3,
 
 const elements = new Map();
 const element = id => {
-  if (!elements.has(id)) elements.set(id, {innerHTML: '', textContent: '', classList: {toggle() {}}, querySelectorAll: () => []});
+  if (!elements.has(id)) elements.set(id, {innerHTML: '', textContent: '', classList: {toggle() {}}, querySelectorAll: () => [], addEventListener() {}});
   return elements.get(id);
 };
 const calls = [];
@@ -104,7 +104,7 @@ const path = element('potekChart').innerHTML.match(/<path d="([^"]*)"/)[1];
 assert.equal((path.match(/M/g) || []).length, 3);
 assert.equal((path.match(/L/g) || []).length, 1);
 vm.runInContext("timeseriesCache['7d'].records = []; renderTimeseries_();", browser);
-assert.match(element('potekChart').textContent, /ni podatkov/);
+assert.match(element('potekChart').textContent, /No data/);
 console.log('Gap and empty-window regression checks passed.');
 
 // Signed cross-barrier values drive the sounding cards, never clipped upslope.
@@ -216,9 +216,9 @@ vm.runInContext("delete annualCache.pwat_mm;", annualBrowser);
 annualBrowser.loadAnnualParameter_('pwat_mm');
 const pendingAnnual = calls.at(-1);
 annualBrowser.setMainView_('sounding');
-element('app').innerHTML = 'Sondaža';
+element('app').innerHTML = 'Sounding';
 pendingAnnual.success(annualResponses.get('pwat_mm'));
-assert.equal(element('app').innerHTML, 'Sondaža');
+assert.equal(element('app').innerHTML, 'Sounding');
 assert.equal(annualBrowser.annualDay_('02-29'), 59);
 assert.equal(annualBrowser.annualDay_('03-01'), 60);
 assert.equal(annualBrowser.annualDay_('02-30'), null);
@@ -267,3 +267,266 @@ element('app').innerHTML = 'Annual';
 overlayBrowser.renderComparison(withOverlay);
 assert.equal(element('app').innerHTML, 'Annual');
 console.log('Optional overlay metadata and comparison layout checks passed.');
+
+// Potek heatmap uses calendar-day compact references and shares browser caches.
+const heatElements = new Map();
+const heatElement = id => {
+  if (!heatElements.has(id)) heatElements.set(id, {
+    innerHTML: '', textContent: '', classList: {toggle() {}},
+    querySelectorAll(selector) {
+      const attribute = selector === '[data-heat-cell]' ? 'data-heat-cell' : selector === '[data-point]' ? 'data-point' : null;
+      if (!attribute) return [];
+      this.nodes = [...this.innerHTML.matchAll(new RegExp('<(?:button|circle)[^>]*' + attribute + '="(\\d+)"[^>]*>', 'g'))].map(match => ({
+        dataset: {heatCell: match[1]},
+        getAttribute: name => (match[0].match(new RegExp(name + '="([^"]*)"')) || [])[1]
+      }));
+      return this.nodes;
+    }
+  });
+  return heatElements.get(id);
+};
+const heatCalls = [];
+let heatSuccess, heatFailure;
+const heatRunner = {
+  withSuccessHandler(handler) { heatSuccess = handler; return this; },
+  withFailureHandler(handler) { heatFailure = handler; return this; },
+  getDashboardData() {},
+  getDashboardTimeseries(key) { heatCalls.push({type: 'series', key, success: heatSuccess, failure: heatFailure}); },
+  getDashboardClimatology(key) { heatCalls.push({type: 'climate', key, success: heatSuccess, failure: heatFailure}); }
+};
+const heatBrowser = vm.createContext({document: {getElementById: heatElement, querySelectorAll: () => []}, google: {script: {run: heatRunner}}});
+vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], heatBrowser);
+heatBrowser.showTimeseriesView();
+heatCalls[0].success(response);
+assert.equal(heatCalls.length, 1); // Graf never requests climate
+const lineMarkup = heatElement('potekChart').innerHTML;
+assert.match(lineMarkup, /potek-chart-viewport/);
+assert.match(lineMarkup, /min-width:680px/);
+assert.match(html, /\.potek-chart-viewport \{[^}]*max-width: 1000px;[^}]*overflow-x: auto/);
+assert.match(html, /\.potek-chart-inner \{[^}]*min-width: 680px/);
+assert.match(html, /@media \(pointer: coarse\)[^\n]*r: 18px/);
+const linePoint = heatElement('potekChart').nodes[0];
+linePoint.onclick();
+assert.match(heatElement('potekPoint').textContent, /UTC/);
+let prevented = false;
+linePoint.onkeydown({key: ' ', preventDefault() { prevented = true; }});
+assert.equal(prevented, true);
+vm.runInContext("timeseriesMode = 'heatmap'; renderTimeseries_(); renderTimeseries_();", heatBrowser);
+const climateRequests = heatCalls.filter(call => call.type === 'climate');
+assert.equal(climateRequests.length, 19); // deduplicated pending requests
+assert.ok(!climateRequests.some(call => call.key.includes('dinaric')));
+climateRequests.forEach(call => call.success(annualResponses.get(call.key)));
+assert.doesNotMatch(heatElement('potekChart').innerHTML, /NaN|undefined|Nalaganje reference/);
+const expectedGroups = [
+  ['Temperature', ['t850_c', 't700_c', 't500_c', 'freezing_level_msl_m']],
+  ['Moisture', ['pwat_mm', 'q_surface_gkg', 'q925_gkg', 'q850_gkg', 'ivt_kg_m1_s1']],
+  ['Stability', ['lifted_index_c', 'mucape_jkg', 'lapse_rate_850_500_c_per_km', 'lapse_rate_700_500_c_per_km']],
+  ['Wind / shear', ['shear_0_1km_ms', 'shear_0_3km_ms', 'shear_0_6km_ms', 'shear_sfc_700_ms']],
+  ['Dynamics', ['z500_m', 'thickness_925_500_m']]
+];
+const mappedRows = JSON.parse(vm.runInContext('JSON.stringify(heatmapRows)', heatBrowser));
+assert.deepEqual(mappedRows.map(row => row[0]), expectedGroups.flatMap(group => group[1]));
+const compactMappings = {t850_c: 't850', t700_c: 't700', t500_c: 't500', ivt_kg_m1_s1: 'ivt_kg_m_s'};
+for (const [group, keys] of expectedGroups) {
+  for (const key of keys) {
+    const row = mappedRows.find(row => row[0] === key);
+    assert.equal(row[1], compactMappings[key] || key);
+    assert.equal(row[2], group);
+    assert.ok(response.variables.includes(key));
+    assert.ok(annualIndex.parameters.some(def => def.key === row[1]));
+  }
+}
+// These are exactly the current series variables with compact references.
+assert.deepEqual(mappedRows.map(row => row[0]).sort(), response.variables.filter(key =>
+  annualIndex.parameters.some(def => def.key === (compactMappings[key] || key))).sort());
+const heatMarkup = heatElement('potekChart').innerHTML;
+assert.deepEqual([...heatMarkup.matchAll(/class="heat-group"><span>([^<]*)/g)].map(match => match[1]),
+  expectedGroups.map(group => group[0]));
+assert.equal((heatMarkup.match(/class="potek-heatmap"/g) || []).length, 1);
+assert.match(html, /\.heat-group \{[^}]*grid-column: 1 \/ -1/);
+assert.match(html, /\.heat-label \{[^}]*position: sticky; left: 0/);
+assert.doesNotMatch(html.match(/\.potek-heatmap \{([^}]*)/)[1], /height:|overflow-y:/);
+const slotCount = Number(heatMarkup.match(/repeat\((\d+),/)[1]);
+const renderedCells = [...heatMarkup.matchAll(/<button type="button" class="heat-cell ([^"]+)"[^>]*>/g)];
+assert.equal(renderedCells.length, slotCount * 19);
+// Verify every row's actual first observation is classified against its mapped day.
+mappedRows.forEach((row, index) => {
+  const record = response.records[0];
+  const day = annualResponses.get(row[1]).days.find(day => day.day === record.valid_time.slice(5, 10));
+  const band = heatBrowser.heatmapBand_(record[row[0]], day);
+  const expectedClass = band === null ? 'heat-missing' : ['heat-low', 'heat-lower', 'heat-normal', 'heat-upper', 'heat-high'][band];
+  assert.equal(renderedCells[index * slotCount][1], expectedClass);
+  heatElement('potekChart').nodes[index * slotCount].onclick();
+  const detail = heatElement('potekPoint').textContent;
+  assert.match(detail, /UTC/);
+  assert.match(detail, /P10:.*P50:.*P90:/);
+  if (record[row[0]] === null) assert.match(detail, /Missing value/);
+});
+
+assert.match(heatElement('potekChart').innerHTML, /heat-normal/);
+assert.match(heatElement('potekChart').innerHTML, /heat-missing/);
+const cell = heatElement('potekChart').nodes[0];
+cell.onclick();
+assert.match(heatElement('potekPoint').textContent, /T850.*UTC.*°C.*P10:.*P50:.*P90:/);
+cell.onfocus(); cell.onmouseenter();
+const thresholds = {p10: -4, p25: -2, p50: 0, p75: 2, p90: 4};
+for (const [value, band] of [[-5, 0], [-4, 1], [-2, 2], [0, 2], [2, 2], [3, 3], [4, 3], [5, 4], [null, null], [undefined, null]]) {
+  assert.equal(heatBrowser.heatmapBand_(value, thresholds), band);
+}
+assert.equal(heatBrowser.heatmapBand_(0, {p10: 0, p25: 0, p50: 0, p75: 0, p90: 0}), 2);
+assert.equal(heatBrowser.heatmapBand_(1, {...thresholds, p50: null}), null);
+assert.equal(heatBrowser.heatmapBand_(1, {...thresholds, p90: -10}), null);
+assert.equal(heatBrowser.heatmapBand_(-5, thresholds), 0); // LI is never inverted
+assert.equal(heatBrowser.heatmapBand_(1, null), null);
+for (const key of ['30d', '90d', '1y']) {
+  heatBrowser.loadTimeseriesWindow_(key);
+  const request = heatCalls.at(-1);
+  assert.equal(request.type, 'series');
+  request.success(backend.getDashboardTimeseries(key));
+  assert.match(heatElement('potekChart').innerHTML, /potek-heatmap/);
+  const count = heatCalls.length;
+  vm.runInContext("timeseriesMode = 'graph'; renderTimeseries_();", heatBrowser);
+  assert.match(heatElement('potekChart').innerHTML, /data-point/);
+  vm.runInContext("timeseriesMode = 'heatmap'; renderTimeseries_();", heatBrowser);
+  heatBrowser.loadTimeseriesWindow_(key);
+  assert.equal(heatCalls.length, count); // same windows and references reused
+}
+// Missing nominal terms create empty heatmap slots, not collapsed time.
+vm.runInContext(`timeseriesWindow = '7d'; timeseriesCache['7d'] = {
+  variables: ['t850_c'], records: [
+    {valid_time: '2026-01-01T00:00:00Z', t850_c: 0},
+    {valid_time: '2026-01-02T00:00:00Z', t850_c: null}
+  ]}; renderTimeseries_();`, heatBrowser);
+assert.match(heatElement('potekChart').innerHTML, /repeat\(3,/);
+assert.match(heatElement('potekChart').innerHTML, /2026-01-01 12:00 UTC/);
+// A request completed after leaving Potek must not overwrite the current view.
+vm.runInContext("delete annualCache.pwat_mm; renderTimeseries_();", heatBrowser);
+const staleClimate = heatCalls.at(-1);
+heatBrowser.setMainView_('sounding');
+heatElement('app').innerHTML = 'Sounding';
+staleClimate.success(annualResponses.get('pwat_mm'));
+assert.equal(heatElement('app').innerHTML, 'Sounding');
+assert.ok(climateFetches.every(path => path !== 'climatology/daily_climatology.json'));
+console.log('Potek heatmap, responsive viewport, cache and interaction checks passed.');
+
+// Main sounding climatology is a compact six-item summary; badges require numbers.
+const summaryKeys = ['t850', 'pwat_mm', 'freezing_level_msl_m', 'lifted_index_c', 'shear_0_6km_ms', 'z500_m'];
+const summaryFixture = {
+  climatology: [...summaryKeys, 't700', 'mucape_jkg', 'ivt_kg_m1_s1'].map((key, index) => ({
+    key, label: key, value: index, unit: '°C', percentile: index * 10,
+    historicalMin: -99999, historicalMax: 99999
+  }))
+};
+const summaryMarkup = browser.climatologyHtml(summaryFixture);
+assert.equal((summaryMarkup.match(/class="clim-summary-item"/g) || []).length, 6);
+assert.equal((summaryMarkup.match(/class="percentile-pill"/g) || []).length, 6);
+for (const label of ['T850', 'PWAT', 'Freezing level', 'Lifted Index', '0–6 km shear', 'Z500']) {
+  assert.ok(summaryMarkup.includes(label));
+}
+assert.doesNotMatch(summaryMarkup, /<table|pbar|pmark|Min \/ max|99999|mucape_jkg|ivt_kg_m1_s1|t700/);
+assert.match(summaryMarkup, /onclick="showClimatologyView\(\)"[^>]*>Open Climatology →/);
+const missingSummary = browser.climatologyHtml({climatology: [
+  {...summaryFixture.climatology[0], value: null},
+  {...summaryFixture.climatology[1], value: NaN},
+  {...summaryFixture.climatology[2], value: Infinity},
+  summaryFixture.climatology[3]
+]});
+assert.equal((missingSummary.match(/class="clim-summary-item"/g) || []).length, 1);
+assert.match(browser.climatologyHtml({}), /Open Climatology →/);
+for (const percentile of [null, undefined, NaN, Infinity, -Infinity, '50', 'bad']) {
+  assert.equal(browser.percentileBadge_(percentile), '');
+  const metric = browser.metricHtml({label: 'Total IVT', value: 42, unit: 'kg m⁻¹ s⁻¹', percentile});
+  assert.doesNotMatch(metric, /percentile-pill|PNaN|Pundefined|PInfinity/);
+  const summary = browser.climatologyHtml({climatology: [{...summaryFixture.climatology[0], percentile}]});
+  assert.doesNotMatch(summary, /percentile-pill|PNaN|Pundefined|PInfinity/);
+}
+for (const [percentile, label] of [[0, 'P0'], [50.4, 'P50'], [100, 'P100']]) {
+  assert.match(browser.percentileBadge_(percentile), new RegExp('>' + label + '<'));
+}
+assert.match(html, /\.dashboard\s*\{\s*align-items: start;/);
+assert.match(html, /\.clim-summary \{[^}]*repeat\(3, minmax\(0, 1fr\)\)/);
+assert.match(html, /@media \(max-width: 620px\) \{ \.clim-summary \{[^}]*repeat\(2,/);
+assert.match(html, /@media \(max-width: 380px\) \{ \.clim-summary \{[^}]*grid-template-columns: 1fr/);
+browser.setMainView_('sounding');
+browser.render({...dashboard, climatology: summaryFixture.climatology, climatologyMeta: {referencePeriod: '1996–2025'}});
+assert.match(element('app').innerHTML, /Climatological context[\s\S]*1996–2025/);
+assert.match(element('app').innerHTML, /clim-summary/);
+assert.doesNotMatch(element('app').innerHTML, /PNaN|class="clim-table"/);
+// The summary action uses the existing top-level view and full annual renderer.
+browser.showClimatologyView();
+assert.equal(vm.runInContext('currentView', browser), 'climatology');
+assert.equal(calls.at(-1).type, 'climatology');
+calls.at(-1).success(annualResponses.get('t850'));
+assert.match(element('annualChart').innerHTML, /<svg|P10–P90|P25–P75/);
+assert.match(element('annualChart').innerHTML, /P10–P90/);
+console.log('Compact sounding climatology, percentile safety and top alignment checks passed.');
+
+// Independent columns keep lower content directly below Skew-T on desktop.
+browser.setMainView_('sounding');
+browser.render(dashboard);
+const soundingMarkup = element('app').innerHTML;
+const stack = [], textParents = new Map();
+for (const match of soundingMarkup.matchAll(/<\/?([a-z][a-z0-9]*)\b[^>]*>|([^<]+)/gi)) {
+  if (match[2]) {
+    for (const label of ['Hodograph', 'Inversions', 'Recent changes', 'Current state']) {
+      if (match[2].trim() === label) textParents.set(label, stack.map(entry => entry.className));
+    }
+    continue;
+  }
+  const tag = match[1].toLowerCase();
+  if (match[0].startsWith('</')) {
+    assert.equal(stack.pop()?.tag, tag, 'Balanced sounding markup');
+  } else if (!['img', 'br', 'input', 'hr'].includes(tag)) {
+    stack.push({tag, className: (match[0].match(/class="([^"]*)"/) || [])[1]});
+  }
+}
+assert.equal(stack.length, 0);
+for (const label of ['Hodograph', 'Inversions']) assert.ok(textParents.get(label).includes('left-stack'));
+for (const label of ['Recent changes', 'Current state']) assert.ok(textParents.get(label).includes('right-stack'));
+assert.match(html, /\.left-stack,\s*\.right-stack\s*\{\s*display: grid/);
+assert.match(html, /\.lower-grid\s*\{\s*display: grid;\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+assert.match(html, /@media \(max-width: 1100px\)[\s\S]*?\.dashboard\s*\{\s*grid-template-columns: 1fr/);
+
+const countBeforeCurrent = calls.length;
+browser.setClimatologyMode_('current');
+assert.equal(calls.length, countBeforeCurrent); // already loaded sounding reused
+assert.match(element('app').innerHTML, /Annual cycle.*Current sounding/);
+assert.match(element('app').innerHTML, /currentClimateContent/);
+assert.match(element('app').innerHTML, /class="clim-table"/);
+const detailMarkup = browser.detailedClimatologyHtml_({...summaryFixture,
+  climatologyMeta: {referencePeriod: '1996–2025', window: '±15 calendar days', caveat: 'Historical time caveat'}});
+assert.equal((detailMarkup.match(/<tr>/g) || []).length, summaryFixture.climatology.length + 1);
+assert.match(detailMarkup, /pbar|pmark/);
+assert.match(detailMarkup, /99,999/);
+assert.match(detailMarkup, /Historical time caveat/);
+assert.match(detailMarkup, /1996–2025/);
+for (const percentile of [undefined, NaN, Infinity, null, '50']) {
+  const detail = browser.detailedClimatologyHtml_({climatology: [{...summaryFixture.climatology[0], percentile}]});
+  assert.doesNotMatch(detail, /PNaN|Pundefined|PInfinity|class="pmark"/);
+}
+browser.setClimatologyMode_('annual');
+assert.match(element('annualChart').innerHTML, /P10–P90/);
+assert.match(element('app').innerHTML, /annualParameter/);
+assert.doesNotMatch(element('app').innerHTML, /class="clim-table"/);
+// Initial sounding request supplies Current sounding without a second request.
+const pendingStart = calls.length;
+const pendingBrowser = vm.createContext({document: {getElementById: element, querySelectorAll: () => []}, google: {script: {run: runner}}});
+vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], pendingBrowser);
+const pendingSounding = calls.at(-1);
+pendingBrowser.setClimatologyMode_('current');
+assert.equal(calls.length, pendingStart + 1);
+assert.match(element('app').innerHTML, /Loading current sounding climatology/);
+pendingSounding.success(dashboard);
+assert.match(element('app').innerHTML, /class="clim-table"/);
+// Switching away prevents late annual results from replacing Current sounding.
+vm.runInContext("delete annualCache.t500;", browser);
+browser.loadAnnualParameter_('t500');
+const lateAnnual = calls.at(-1);
+browser.setClimatologyMode_('current');
+const currentMarkup = element('app').innerHTML;
+lateAnnual.success(annualResponses.get('t500'));
+assert.equal(element('app').innerHTML, currentMarkup);
+assert.doesNotMatch(html, /Sondaža|Klimatologija|Dodatna diagnostika|Odpri|Poskusi|Izberite|Manjkajo|Nalaganje|Nominalni|veljavni|dni|1 leto|mediana/);
+assert.match(html, />Time series<\/button>/);
+assert.match(html, /\? 'Graph' : 'Heatmap'/);
+console.log('English UI, independent columns and climatology subview checks passed.');
