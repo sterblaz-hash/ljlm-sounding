@@ -1,4 +1,4 @@
-"""Build compact OBS summaries; standard library only, no sounding calculations."""
+"""Build compact trajectory windows from existing profiles; no extraction calculations."""
 import argparse
 from datetime import datetime, timedelta, timezone
 import json
@@ -7,52 +7,43 @@ from pathlib import Path
 
 VERSION = 1
 STATION = {"station": 14015, "station_name": "Ljubljana"}
-BASE = Path("timeseries/ljlm")
-WINDOWS = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
-META = ("sounding_id", "nominal_date", "term", "launch_time", "processed_at")
-DIRECT = """pwat_mm freezing_level_msl_m lifted_index_c sbcape_jkg sbcin_jkg
-mlcape_jkg mlcin_jkg mucape_jkg mucin_jkg lapse_rate_850_500_c_per_km
-lapse_rate_700_500_c_per_km shear_0_1km_ms shear_0_3km_ms shear_0_6km_ms
-shear_sfc_700_ms z500_m thickness_925_500_m""".split()
-PATHS = {key: ("parameters", "metpy", key) for key in DIRECT}
-for level in (850, 700, 500):
-    for prefix in ("t", "td"):
-        PATHS[f"{prefix}{level}_c"] = ("parameters", "standard_levels", f"{prefix}{level}", "value")
-MOISTURE = ("parameters", "metpy", "moisture_transport")
-for level in ("surface", "925", "850", "700"):
-    key = "q_surface_gkg" if level == "surface" else f"q{level}_gkg"
-    PATHS[key] = (*MOISTURE, "humidity_profile", level, "specific_humidity_gkg")
-PATHS["ivt_kg_m1_s1"] = (*MOISTURE, "ivt", "magnitude_kg_m1_s1")
-PATHS["ivt_direction_deg"] = (*MOISTURE, "ivt", "transport_to_direction_deg")
-for barrier in ("dinaric_west", "julian_south", "julian_central", "kamnik_savinja"):
-    path = (*MOISTURE, "orographic_cross_barrier", "barriers", barrier, "terrain_capped_ivt")
-    PATHS[f"{barrier}_signed_ivt"] = (*path, "signed_cross_barrier_kg_m1_s1")
-    PATHS[f"{barrier}_signed_fraction"] = (*path, "signed_fraction")
-VARIABLES = list(PATHS)
+BASE = Path("trajectories/ljlm")
+WINDOWS = {"7d": 7, "30d": 30, "90d": 90}
+FIELDS = ("time_s", "pressure_hpa", "height_m", "latitude", "longitude")
 
 
-def metric(source, path):
-    for key in path:
-        if not isinstance(source, dict) or source.get("available") is False:
-            return None
-        source = source.get(key)
-    return source if isinstance(source, (int, float)) and not isinstance(source, bool) and math.isfinite(source) else None
+def finite_number(value):
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) else None
 
 
 def record_time(record):
-    """Use nominal UTC time: midnight launches often occur the previous day."""
+    if "valid_time" in record:
+        return datetime.fromisoformat(record["valid_time"].replace("Z", "+00:00"))
     return datetime.fromisoformat(f"{record['nominal_date']}T{record['term']}:00:00+00:00")
 
 
 def extract_record(source):
-    record = {key: source.get(key) for key in META}
-    if record["sounding_id"] is None and record["nominal_date"] and record["term"]:
-        record["sounding_id"] = record["nominal_date"].replace("-", "") + "_" + record["term"]
-    if not isinstance(record['sounding_id'], str) or not record['sounding_id']:
-        raise ValueError("Missing sounding_id")
-    record["valid_time"] = iso(record_time(record))
-    record.update({key: metric(source, path) for key, path in PATHS.items()})
-    return record
+    trajectory = source.get("trajectory") or {}
+    if not trajectory.get("available") or source.get("term") not in ("00", "12"):
+        return None
+    points = []
+    for point in trajectory.get("points", []):
+        if not all(isinstance(point.get(k), (int, float)) and not isinstance(point[k], bool)
+                   and math.isfinite(point[k]) for k in FIELDS):
+            continue
+        if abs(point["latitude"]) <= 90 and abs(point["longitude"]) <= 180:
+            points.append({k: point[k] for k in FIELDS})
+    if len(points) < 2:
+        return None
+    compact = [points[0]]
+    for point in points[1:-1]:
+        if point["time_s"] - compact[-1]["time_s"] >= 40:
+            compact.append(point)
+    compact.append(points[-1])
+    return {"sounding_id": source.get("sounding_id") or source["nominal_date"].replace("-", "") + "_" + source["term"],
+            "valid_time": iso(record_time(source)), "launch_time": source.get("launch_time"),
+            "term": source["term"], "duration_s": finite_number(trajectory.get("duration_s")),
+            "max_height_m": finite_number(trajectory.get("max_height_m")), "points": compact}
 
 
 def read_json(path):
@@ -86,6 +77,8 @@ def save_month(path, records):
 
 def update(root, source):
     record = extract_record(read_json(source))
+    if record is None:
+        return
     path = month_path(root, record)
     records = read_json(path)['records'] if path.exists() else []
     save_month(path, [*records, record])
@@ -118,7 +111,8 @@ def sync_recent(root, now, hours):
             if not start <= record_time(profile) <= now:
                 continue
             record = extract_record(profile)
-            groups.setdefault(month_path(root, record), []).append(record)
+            if record is not None:
+                groups.setdefault(month_path(root, record), []).append(record)
         day += timedelta(days=1)
     for path, recovered in groups.items():
         existing = read_json(path)["records"] if path.exists() else []
@@ -131,7 +125,8 @@ def backfill(root):
         groups = {}
         for source in sorted(directory.glob("*.json")):
             record = extract_record(read_json(source))
-            groups.setdefault(month_path(root, record), []).append(record)
+            if record is not None:
+                groups.setdefault(month_path(root, record), []).append(record)
         for path, records in groups.items():
             save_month(path, records)
     latest = root / "data/latest.json"
@@ -149,7 +144,7 @@ def filter_window(records, end, days):
 
 
 def build_windows(root, now):
-    start = now - timedelta(days=365)
+    start = now - timedelta(days=max(WINDOWS.values()))
     month = start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     records = []
     while month <= now:
@@ -167,29 +162,8 @@ def build_windows(root, now):
 
 
 def build_manifest(root):
-    def existing(candidates):
-        return {key: str(path) for key, path in candidates.items() if (root / path).is_file()}
-
-    diagnostics = existing({"index": Path("diagnostics/latest_products.json"), **{
-        name: Path(f"diagnostics/latest_{name}.png")
-        for name in ("skewt", "skewt_zoom", "lowlevel", "thetae", "hodograph")}})
-    obs = existing({"latest_profile": Path("data/latest.json"), "status": Path("data/status.json")})
-    obs['diagnostics'] = diagnostics
-    slots = {}
-    for term in ("00", "12"):
-        base = Path("models/icon-d2/latest") / term
-        products = existing({"profile": base / "sounding.json", "diagnostics": base / "latest_products.json"})
-        if products:
-            slots[term] = products
-    windows = existing({label: BASE / f"latest_{label}.json" for label in WINDOWS})
-    trajectory_windows = existing({label: Path("trajectories/ljlm") / f"latest_{label}.json" for label in ("7d", "30d", "90d")})
-    climatology_index = Path('climatology/dashboard/index.json')
-    return {"version": VERSION, **STATION, "observations": obs,
-            "climatology": {"available": (root / climatology_index).is_file(),
-                            **({"index": str(climatology_index)} if (root / climatology_index).is_file() else {})},
-            "icon_d2": {"lead_hours": 12, "slots": slots},
-            "trajectories": {"available": bool(trajectory_windows), "windows": trajectory_windows},
-            "timeseries": {"available": bool(windows), "windows": windows, "variables": VARIABLES}}
+    from build_dashboard_data import build_manifest as central_manifest
+    return central_manifest(root)
 
 
 def main():

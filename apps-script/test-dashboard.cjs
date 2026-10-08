@@ -5,6 +5,7 @@ const vm = require('node:vm');
 const read = path => JSON.parse(fs.readFileSync(path, 'utf8'));
 const backend = vm.createContext({});
 vm.runInContext(fs.readFileSync('apps-script/Code.gs', 'utf8'), backend);
+backend.PropertiesService = {getScriptProperties: () => ({getProperty: key => { assert.equal(key,'CARTO_BASEMAP_KEY'); return null; }})};
 const fetched = [], cached = new Map();
 backend.fetchJson_ = path => { fetched.push(path); return read(path); };
 backend.CacheService = {getScriptCache: () => ({get: key => cached.get(key), put: (key, value) => cached.set(key, value)})};
@@ -530,3 +531,229 @@ assert.doesNotMatch(html, /Sondaža|Klimatologija|Dodatna diagnostika|Odpri|Posk
 assert.match(html, />Time series<\/button>/);
 assert.match(html, /\? 'Graph' : 'Heatmap'/);
 console.log('English UI, independent columns and climatology subview checks passed.');
+
+// Trajectory data stays a sanitized pass-through of the extractor product.
+const trajectoryPoint = (time, pressure, latitude = 46, longitude = 14) => ({
+  time_s: time, pressure_hpa: pressure, height_m: time * 5, latitude, longitude
+});
+const trajectoryFixture = {
+  available: true, start: trajectoryPoint(0, 990), end: trajectoryPoint(1800, 490, 46.2, 14.3),
+  points: [trajectoryPoint(0,990), trajectoryPoint(600,850), trajectoryPoint(620,840),
+    trajectoryPoint(1200,700), trajectoryPoint(1220,690), trajectoryPoint(1800,490,46.2,14.3)],
+  standard_levels: {'925':trajectoryPoint(240,925), '850':trajectoryPoint(602,850), '700':trajectoryPoint(1201,700)},
+  duration_s: '1800', max_height_m: 9000, raw_point_count: 901, display_point_count: 6
+};
+const exposed = backend.buildDashboardView_({...latest, trajectory:trajectoryFixture},null,null,'data/latest.json',true).trajectory;
+assert.deepEqual(JSON.parse(JSON.stringify(exposed.points)),trajectoryFixture.points);
+for (const [camel, raw] of [['durationS','duration_s'],['maxHeightM','max_height_m'],['rawPointCount','raw_point_count'],['displayPointCount','display_point_count']]) {
+  assert.equal(exposed[camel],Number(trajectoryFixture[raw]));
+}
+assert.deepEqual(JSON.parse(JSON.stringify(exposed.start)),trajectoryFixture.start);
+assert.deepEqual(JSON.parse(JSON.stringify(exposed.end)),trajectoryFixture.end);
+assert.deepEqual(JSON.parse(JSON.stringify(exposed.standardLevels)),trajectoryFixture.standard_levels);
+const sanitized = backend.buildTrajectory_({duration_s:Infinity, points:[{latitude:'46',longitude:NaN,height_m:''}],standard_levels:{850:{time_s:undefined}}});
+assert.equal(sanitized.durationS,null);
+assert.equal(sanitized.points[0].latitude,46);
+assert.equal(sanitized.points[0].longitude,null);
+assert.equal(sanitized.points[0].height_m,null);
+assert.equal(sanitized.standardLevels[850].time_s,null);
+assert.equal(backend.buildTrajectory_().available,false);
+assert.match(html, /id="viewTrajectoriesBtn"[^>]*onclick="showTrajectoriesView\(\)">Trajectories/);
+assert.equal(browser.trajectorySegmentPoints_(exposed,'full').length,6);
+assert.deepEqual(Array.from(browser.trajectorySegmentPoints_(exposed,'10'),p=>p.time_s),[0,600]);
+assert.deepEqual(Array.from(browser.trajectorySegmentPoints_(exposed,'20'),p=>p.time_s),[0,600,620,1200]);
+assert.equal(browser.trajectorySegmentPoints_(exposed,'850').at(-1).time_s,600);
+assert.equal(browser.trajectorySegmentPoints_(exposed,'700').at(-1).time_s,1200);
+assert.equal(browser.trajectorySegmentPoints_(exposed,'500').at(-1).time_s,1800);
+assert.equal(browser.trajectorySegmentPoints_({...exposed,standardLevels:{}},'850').at(-1).pressure_hpa,850);
+assert.equal(browser.trajectoryDisplacement_(trajectoryPoint(0,990),trajectoryPoint(0,990)),0);
+assert.ok(Math.abs(browser.trajectoryDisplacement_({latitude:0,longitude:0},{latitude:0,longitude:1})-111.195)<0.01);
+assert.equal(browser.trajectoryDisplacement_(null,exposed.end),null);
+const mapEvents = [], markerPopups = [];
+const mapStub = {remove(){mapEvents.push('remove');},invalidateSize(){mapEvents.push('resize');},fitBounds(coords,options){mapEvents.push({coords,options});}};
+const layerStub = () => ({remove(){mapEvents.push('tile-remove');},addTo(){return this;},bindTooltip(){return this;},bindPopup(label){markerPopups.push(label);return this;}});
+browser.L = {map:()=>mapStub,tileLayer:(url,options)=>{assert.match(options.attribution,/OpenStreetMap/);return layerStub();},
+  polyline:(coords,style)=>{mapEvents.push({polyline:coords.slice(),style});return layerStub();},circleMarker:layerStub,latLngBounds:coords=>coords};
+let resizeCallback, disconnected = 0;
+browser.ResizeObserver = class {constructor(callback){resizeCallback=callback;}observe(){}disconnect(){disconnected++;}};
+browser.trajectoryFixture = {...dashboard,trajectory:exposed};
+vm.runInContext('currentData = trajectoryFixture;',browser);
+browser.showTrajectoriesView();
+assert.match(element('app').innerHTML,/trajectory-map/);
+assert.match(element('app').innerHTML,/Full ascent.*10 min.*20 min.*850 hPa.*700 hPa.*500 hPa/);
+assert.match(element('app').innerHTML,/Displacement from launch/);
+assert.ok(markerPopups.some(label=>/925 hPa.*m MSL.*since launch/.test(label)));
+assert.ok(markerPopups.some(label=>/Launch/.test(label)));
+assert.ok(markerPopups.some(label=>/Segment endpoint/.test(label)));
+assert.equal(mapEvents.find(event=>event.polyline).polyline.length,6);
+assert.equal(mapEvents.find(event=>event.coords).options.maxZoom,13);
+resizeCallback();
+assert.ok(mapEvents.filter(event=>event==='resize').length>=2);
+markerPopups.length=0;
+browser.selectTrajectorySegment_('10');
+assert.ok(markerPopups.some(label=>/925 hPa/.test(label)));
+assert.ok(!markerPopups.some(label=>/700 hPa/.test(label)));
+assert.ok(disconnected>0);
+browser.setMainView_('sounding');
+assert.equal(vm.runInContext('trajectoryMap',browser),null);
+browser.showTrajectoriesView(); // reopening initializes and resizes a fresh map
+assert.ok(mapEvents.filter(event=>event==='resize').length>=4);
+vm.runInContext('currentData = {trajectory:{available:false}};',browser);
+browser.renderTrajectories_();
+assert.match(element('app').innerHTML,/Trajectory not available/);
+vm.runInContext('currentData = {trajectory:{available:true,points:[]}};',browser);
+browser.renderTrajectories_();
+assert.match(element('app').innerHTML,/Trajectory not available/);
+// An initial sounding response arriving after opening Trajectories populates the view.
+const trajectoryBrowser = vm.createContext({document:{getElementById:element,querySelectorAll:()=>[]},google:{script:{run:runner}}});
+vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],trajectoryBrowser);
+const initialTrajectoryRequest = calls.at(-1), beforeTrajectory = calls.length;
+trajectoryBrowser.showTrajectoriesView();
+assert.equal(calls.length,beforeTrajectory);
+assert.match(element('app').innerHTML,/Loading trajectory/);
+initialTrajectoryRequest.success({...dashboard,trajectory:exposed});
+assert.match(element('app').innerHTML,/trajectory-summary/);
+assert.match(element('trajectoryMap').innerHTML,/Map could not load/);
+console.log('Trajectory exposure, navigation, filtering, markers, resizing and unavailable checks passed.');
+
+// Script Properties configure browser tiles; no key is embedded in source.
+assert.equal(dashboard.trajectoryViewConfig.cartoBasemapKey,'');
+backend.PropertiesService = {getScriptProperties:()=>({getProperty:key=>{
+  assert.equal(key,'CARTO_BASEMAP_KEY'); return ' test/key &value ';
+}})};
+const keyedDashboard = backend.buildDashboardView_({...latest,trajectory:trajectoryFixture},null,null,'data/latest.json',true);
+assert.equal(keyedDashboard.trajectoryViewConfig.cartoBasemapKey,'test/key &value');
+const lightConfig = browser.trajectoryBasemap_('light',keyedDashboard.trajectoryViewConfig);
+const darkConfig = browser.trajectoryBasemap_('dark',keyedDashboard.trajectoryViewConfig);
+assert.match(lightConfig.url,/\/rastertiles\/light_all\/\{z\}\/\{x\}\/\{y\}\.png\?key=test%2Fkey%20%26value$/);
+assert.match(darkConfig.url,/\/rastertiles\/dark_all\//);
+assert.match(lightConfig.options.attribution,/OpenStreetMap.*CARTO/);
+for (const config of [undefined,{}, {cartoBasemapKey:''}]) {
+  assert.equal(browser.trajectoryBasemap_('dark',config).url,'https://tile.openstreetmap.org/{z}/{x}/{y}.png');
+  assert.match(browser.trajectoryBasemap_('light',config).options.attribution,/OpenStreetMap/);
+}
+const tileCalls = [];
+browser.L.tileLayer = (url,options)=>{tileCalls.push({url,options});return layerStub();};
+browser.keyedDashboard = keyedDashboard;
+vm.runInContext("currentData = keyedDashboard; trajectorySegment = '20'; trajectoryBasemapMode = 'light';",browser);
+browser.showTrajectoriesView();
+assert.match(element('app').innerHTML,/data-trajectory-basemap="light"/);
+assert.match(element('app').innerHTML,/data-trajectory-basemap="dark"/);
+assert.match(tileCalls.at(-1).url,/light_all/);
+const sameMap = vm.runInContext('trajectoryMap',browser);
+const markupBeforeSwitch = element('app').innerHTML;
+const eventsBeforeSwitch = mapEvents.length;
+const markersBeforeSwitch = markerPopups.length;
+browser.selectTrajectoryBasemap_('dark');
+assert.equal(vm.runInContext('trajectoryMap',browser),sameMap);
+assert.equal(vm.runInContext('trajectorySegment',browser),'20');
+assert.equal(markerPopups.length,markersBeforeSwitch);
+assert.equal(element('app').innerHTML,markupBeforeSwitch);
+assert.deepEqual(mapEvents.slice(eventsBeforeSwitch),['tile-remove']); // no fitBounds, resize or map removal
+assert.match(tileCalls.at(-1).url,/dark_all/);
+browser.selectTrajectoryBasemap_('light');
+assert.match(tileCalls.at(-1).url,/light_all/);
+vm.runInContext('currentData = trajectoryFixture;',browser);
+browser.renderTrajectories_();
+assert.match(tileCalls.at(-1).url,/tile.openstreetmap.org/);
+assert.match(element('app').innerHTML,/data-trajectory-basemap="dark"[^>]* disabled/);
+const fallbackCalls = tileCalls.length;
+browser.selectTrajectoryBasemap_('dark');
+assert.equal(tileCalls.length,fallbackCalls);
+assert.equal(vm.runInContext('trajectoryBasemapMode',browser),'light');
+console.log('CARTO property configuration, Light/Dark switching and OSM fallback checks passed.');
+
+// Compact windows enforce allowlisted paths and expose real partial coverage.
+backend.fetchJson_ = path => read(path);
+for (const key of ['7d','30d','90d']) {
+  const window=backend.getDashboardTrajectories(key);
+  assert.equal(window.records.length,read(`trajectories/ljlm/latest_${key}.json`).record_count);
+  assert.ok(window.records.every(r=>r.points.every(p=>Number.isFinite(p.time_s))));
+}
+for (const key of ['1y','../latest','__proto__',null]) assert.throws(()=>backend.getDashboardTrajectories(key));
+backend.fetchJson_ = ()=>({trajectories:{available:true,windows:{'7d':'data/latest.json'}}});
+assert.throws(()=>backend.getDashboardTrajectories('7d'));
+backend.fetchJson_ = path=>read(path);
+const history = [
+  {valid_time:'2026-10-01T00:00:00Z',term:'00',points:trajectoryFixture.points},
+  {valid_time:'2026-10-02T00:00:00Z',term:'00',points:trajectoryFixture.points},
+  {valid_time:'2026-10-02T12:00:00Z',term:'12',points:trajectoryFixture.points.map(p=>({...p,longitude:p.longitude+0.05}))}
+];
+assert.deepEqual(Array.from(browser.trajectoryDates_(history)),['2026-10-02','2026-10-01']);
+assert.equal(browser.trajectoryDailyPair_(history,'2026-10-02').filter(Boolean).length,2);
+assert.equal(browser.trajectoryDailyPair_(history,'2026-10-01')[1],null);
+const historyRequests=[];
+runner.getDashboardTrajectories=key=>historyRequests.push({key,success,failure});
+const histBrowser=vm.createContext({document:{getElementById:element,querySelectorAll:()=>[]},google:{script:{run:runner}},L:browser.L});
+histBrowser.L.heatLayer=(points,options)=>{mapEvents.push({density:points,options});return layerStub();};
+vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],histBrowser);
+histBrowser.fixture={...dashboard,trajectory:exposed};
+vm.runInContext('currentData=fixture;',histBrowser);
+histBrowser.showTrajectoriesView();
+assert.equal(historyRequests.length,0);
+histBrowser.setTrajectoryMode_('daily');
+histBrowser.setTrajectoryMode_('daily');
+assert.equal(historyRequests.length,1);
+historyRequests[0].success({records:history});
+assert.equal(vm.runInContext('trajectoryDate',histBrowser),'2026-10-02');
+assert.match(element('app').innerHTML,/trajectory-date-nav/);
+assert.match(element('app').innerHTML,/trajectory-overview/);
+assert.match(html,/\.trajectory-overview \{[^}]*max-width:100%; overflow-x:auto/);
+assert.match(element('app').innerHTML,/00 UTC endpoint.*12 UTC endpoint/);
+histBrowser.navigateTrajectoryDate_(1);
+assert.equal(vm.runInContext('trajectoryDate',histBrowser),'2026-10-01');
+assert.match(element('app').innerHTML,/12 UTC · unavailable/);
+histBrowser.navigateTrajectoryDate_(-1);
+histBrowser.selectTrajectorySegment_('10');
+histBrowser.history=history;
+assert.ok(vm.runInContext('trajectoryFilteredRecords_(history).every(t=>t.points.at(-1).time_s===600)',histBrowser));
+histBrowser.selectTrajectoryDate_('1990-01-01');
+assert.equal(vm.runInContext('trajectoryDate',histBrowser),'2026-10-02');
+histBrowser.setTrajectoryPeriod_('30d');
+histBrowser.setTrajectoryMode_('tracks');
+assert.equal(historyRequests.length,2);
+historyRequests[1].success({records:history});
+assert.match(element('app').innerHTML,/3 available soundings/);
+assert.match(element('app').innerHTML,/Actual coverage/);
+histBrowser.setTrajectoryMode_('density');
+assert.equal(vm.runInContext('trajectoryPeriod',histBrowser),'30d');
+assert.equal(historyRequests.length,2);
+assert.ok(mapEvents.some(event=>event.density));
+assert.match(element('app').innerHTML,/Low.*High density/);
+assert.equal((element('app').innerHTML.match(/aria-label="Trajectory period"/g)||[]).length,1);
+histBrowser.setTrajectoryMode_('latest');
+assert.doesNotMatch(element('app').innerHTML,/aria-label="Trajectory period"/);
+histBrowser.setTrajectoryMode_('daily');
+assert.equal(vm.runInContext('trajectoryPeriod',histBrowser),'30d');
+assert.equal(historyRequests.length,2);
+histBrowser.setTrajectoryPeriod_('90d');
+historyRequests.at(-1).success({records:[]});
+assert.match(element('trajectoryMap').textContent,/Trajectory not available/);
+assert.deepEqual(Array.from(histBrowser.trajectoryDensityPoints_([{points:[trajectoryPoint(0,990)]}])),[]);
+assert.match(lightConfig.options.className,/trajectory-tiles-light/);
+assert.match(darkConfig.options.className,/trajectory-tiles-dark/);
+console.log('Daily pairing, dates, overview, shared periods, lazy archive cache, Tracks and Density checks passed.');
+
+// Older tracks are translucent; newest is drawn last and highlighted.
+histBrowser.setTrajectoryPeriod_('30d');
+histBrowser.setTrajectoryMode_('tracks');
+const trackEventsStart=mapEvents.length;
+histBrowser.renderTrajectories_();
+const drawnTracks=mapEvents.slice(trackEventsStart).filter(event=>event.polyline);
+assert.equal(drawnTracks.length,3);
+assert.equal(drawnTracks.at(-1).style.opacity,1);
+assert.equal(drawnTracks.at(-1).style.weight,3.5);
+assert.ok(drawnTracks.slice(0,-1).every(event=>event.style.opacity<0.3));
+// Pending responses for a different period never replace the active map.
+vm.runInContext("delete trajectoryWindows['7d']; delete trajectoryWindows['90d'];",histBrowser);
+histBrowser.setTrajectoryPeriod_('7d');
+const staleTrajectory=historyRequests.at(-1);
+histBrowser.setTrajectoryPeriod_('90d');
+const activeTrajectory=historyRequests.at(-1);
+activeTrajectory.success({records:history.slice(0,1)});
+const activeMarkup=element('app').innerHTML;
+staleTrajectory.success({records:history});
+assert.equal(element('app').innerHTML,activeMarkup);
+assert.equal(vm.runInContext('trajectoryPeriod',histBrowser),'90d');
+assert.match(element('app').innerHTML,/1 available soundings/);
+console.log('Historical latest highlight and stale trajectory-window checks passed.');

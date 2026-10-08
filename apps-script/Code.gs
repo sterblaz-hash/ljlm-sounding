@@ -399,29 +399,8 @@ function buildDashboardView_(
 
 
 
-    trajectory: {
-
-      available:
-
-        !!(profile.trajectory && profile.trajectory.available),
-
-      maxHeightM:
-
-        profile.trajectory
-
-          ? profile.trajectory.max_height_m
-
-          : null,
-
-      durationS:
-
-        profile.trajectory
-
-          ? profile.trajectory.duration_s
-
-          : null
-
-    }
+    trajectoryViewConfig: {cartoBasemapKey: (PropertiesService.getScriptProperties().getProperty('CARTO_BASEMAP_KEY') || '').trim()},
+    trajectory: buildTrajectory_(profile.trajectory)
 
   };
 
@@ -430,6 +409,30 @@ function buildDashboardView_(
 
 
 
+
+// Sanitize the existing extractor product without rebuilding the trajectory.
+function trajectoryPoint_(point) {
+  if (!point || typeof point !== 'object') return null;
+  const result = {};
+  ['time_s', 'pressure_hpa', 'height_m', 'latitude', 'longitude'].forEach(function(key) {
+    result[key] = finiteOrNull_(point[key]);
+  });
+  return result;
+}
+function buildTrajectory_(trajectory) {
+  const t = trajectory || {};
+  const levels = {};
+  [925,850,700,500,300,250,200].forEach(function(level) {
+    const p = trajectoryPoint_((t.standard_levels || {})[level]);
+    if (p) levels[level] = p;
+  });
+  return {
+    available: !!t.available, start: trajectoryPoint_(t.start), end: trajectoryPoint_(t.end),
+    points: Array.isArray(t.points) ? t.points.map(trajectoryPoint_).filter(Boolean) : [],
+    standardLevels: levels, durationS: finiteOrNull_(t.duration_s), maxHeightM: finiteOrNull_(t.max_height_m),
+    rawPointCount: finiteOrNull_(t.raw_point_count), displayPointCount: finiteOrNull_(t.display_point_count)
+  };
+}
 
 function metric_(label, value, unit, percentile) {
 
@@ -2793,4 +2796,25 @@ function comparisonOverlay_(obs, model, term, validTime) {
       !comparisonSameInstant_(manifest.valid_time, validTime) ||
       manifest.lead_hours !== 12 || manifest.skewt_overlay !== path || !manifest.rendered_at) return null;
   return {url: rawUrl_(path, manifest.rendered_at), renderedAt: manifest.rendered_at};
+}
+
+// Historical trajectories are fetched in compact windows, never individual profiles.
+function getDashboardTrajectories(windowKey) {
+  if (['7d','30d','90d'].indexOf(windowKey) === -1) throw new Error('Unknown trajectory window.');
+  const entry = fetchJson_(LJLM_CONFIG.MANIFEST_PATH).trajectories || {};
+  const path = (entry.windows || {})[windowKey];
+  if (!entry.available || path !== 'trajectories/ljlm/latest_' + windowKey + '.json') throw new Error('Trajectory window is unavailable.');
+  const cache = CacheService.getScriptCache(), key = 'ljlm-trajectories:' + windowKey;
+  const cached = cache.get(key);
+  if (cached) return JSON.parse(cached);
+  const data = fetchJson_(path);
+  if (!Array.isArray(data.records)) throw new Error('Invalid trajectory window.');
+  const result = {window:windowKey, generatedAt:data.generated_at, records:data.records.map(function(r) {
+    return {sounding_id:r.sounding_id, valid_time:r.valid_time, launch_time:r.launch_time, term:r.term,
+      durationS:finiteOrNull_(r.duration_s), maxHeightM:finiteOrNull_(r.max_height_m),
+      points:(r.points || []).map(trajectoryPoint_).filter(Boolean)};
+  })};
+  const encoded = JSON.stringify(result);
+  if (Utilities.newBlob(encoded).getBytes().length < 95000) cache.put(key,encoded,LJLM_CONFIG.CACHE_SECONDS);
+  return result;
 }

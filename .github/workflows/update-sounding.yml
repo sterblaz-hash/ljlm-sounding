@@ -39,6 +39,9 @@ jobs:
       - name: Render matching OBS and ICON-D2 overlay
         run: python render_icon_d2_verification.py
 
+      - name: Update trajectory data
+        run: python build_trajectory_data.py --sync-recent-hours 72
+
       - name: Update dashboard data
         run: python build_dashboard_data.py --sync-recent-hours 72
 
@@ -50,7 +53,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add -A climatology diagnostics timeseries 2>/dev/null || true
+          git add -A climatology diagnostics timeseries trajectories 2>/dev/null || true
 
           if [ -d verification ]; then
             git add -A -- verification
