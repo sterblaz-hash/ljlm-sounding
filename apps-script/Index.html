@@ -21,6 +21,7 @@
     .trajectory-overview { display:flex; gap:8px; max-width:100%; overflow-x:auto; margin-top:14px; padding-bottom:6px; }
     .trajectory-day { flex:0 0 100px; border:1px solid var(--line); border-radius:9px; background:#fff; padding:6px; cursor:pointer; color:var(--muted); font-size:11px; }
     .trajectory-day.active { border-color:var(--blue); background:var(--blue-soft); }
+    .trajectory-day-terms { display:flex; justify-content:center; gap:10px; margin-top:4px; font-size:10px; }
     .trajectory-day svg { display:block; width:88px; height:70px; }
     .trajectory-stat { min-width:0; overflow-wrap:anywhere; }
     .trajectory-density-legend i { width:90px; border-radius:3px; background:linear-gradient(90deg,#438ca9,#68b9ae,#e9c65b,#cf7248); }
@@ -4033,6 +4034,7 @@
     let trajectorySegment = 'full';
     let trajectoryBasemapMode = 'light';
     let trajectoryTileLayer = null;
+    let trajectoryHistoryLines = [];
     function trajectoryBasemap_(mode, config) {
       const key = config && config.cartoBasemapKey;
       const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
@@ -4062,6 +4064,7 @@
       if (mode === 'dark' && !(currentData && currentData.trajectoryViewConfig && currentData.trajectoryViewConfig.cartoBasemapKey)) return;
       trajectoryBasemapMode = mode;
       updateTrajectoryBasemap_();
+      trajectoryHistoryLines.forEach(item => item.layer.setStyle(trajectoryHistoryStyle_(item.highlight)));
       document.querySelectorAll('[data-trajectory-basemap]').forEach(button => {
         const active = button.dataset.trajectoryBasemap === mode;
         button.classList.toggle('active',active);
@@ -4072,6 +4075,7 @@
       if (trajectoryResizeObserver) trajectoryResizeObserver.disconnect();
       if (trajectoryMap) trajectoryMap.remove();
       trajectoryMap = trajectoryResizeObserver = trajectoryTileLayer = null;
+      trajectoryHistoryLines = [];
     }
     function trajectoryCoordinate_(p) {
       return p && Number.isFinite(p.latitude) && Number.isFinite(p.longitude) && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180;
@@ -4105,6 +4109,24 @@
       return '<strong>' + esc(title) + '</strong><br>' + fmt(p.pressure_hpa,1) + ' hPa · ' + fmt(p.height_m,0) + ' m MSL<br>' + trajectoryTime_(p.time_s) + ' since launch';
     }
     const trajectoryWindows = Object.create(null), trajectoryWindowPending = new Set(), trajectoryWindowErrors = Object.create(null);
+    let trajectoryTerm = 'all';
+    function trajectoryTermRecords_(records) {
+      return records.filter(r => trajectoryTerm === 'all' || r.term === trajectoryTerm);
+    }
+    function setTrajectoryTerm_(term) {
+      if (!['all','00','12'].includes(term)) return;
+      trajectoryTerm = term; renderTrajectories_();
+    }
+    function trajectoryHistoryStyle_(highlight) {
+      const dark = trajectoryBasemapMode === 'dark';
+      return {color:dark ? (highlight ? '#8ddfff' : '#61b7d6') : '#245eaa',
+        weight:highlight ? 3.5 : 1.2, opacity:highlight ? 1 : dark ? 0.48 : 0.22};
+    }
+    function trajectoryTermControls_() {
+      if (trajectoryMode === 'latest') return '';
+      return '<div class="trajectory-controls" aria-label="Trajectory term"><span class="panel-note">Term</span>' +
+        [['all','All'],['00','00 UTC'],['12','12 UTC']].map(item => '<button type="button" class="tab-btn '+(trajectoryTerm===item[0]?'active':'')+'" aria-pressed="'+(trajectoryTerm===item[0])+'" onclick="setTrajectoryTerm_(\''+item[0]+'\')">'+item[1]+'</button>').join('')+'</div>';
+    }
     let trajectoryMode = 'latest', trajectoryPeriod = '7d', trajectoryDate = null;
     const trajectoryTerms = {'00':'#336da9','12':'#b77536'};
     function trajectoryDates_(records) {
@@ -4153,7 +4175,7 @@
       return '<div class="trajectory-toolbar"><div class="trajectory-controls" aria-label="Trajectory view">' +
         ['latest','daily','tracks','density'].map(mode => '<button class="tab-btn '+(mode===trajectoryMode?'active':'')+'" type="button" aria-pressed="'+(mode===trajectoryMode)+'" onclick="setTrajectoryMode_(\''+mode+'\')">'+mode[0].toUpperCase()+mode.slice(1)+'</button>').join('') +
         '</div>' + (trajectoryMode === 'latest' ? '' : '<div class="trajectory-controls" aria-label="Trajectory period">'+['7d','30d','90d'].map(period =>
-          '<button type="button" class="tab-btn '+(period===trajectoryPeriod?'active':'')+'" aria-pressed="'+(period===trajectoryPeriod)+'" onclick="setTrajectoryPeriod_(\''+period+'\')">'+period.slice(0,-1)+' d</button>').join('')+'</div>') + trajectoryBasemapControls_() + '</div>';
+          '<button type="button" class="tab-btn '+(period===trajectoryPeriod?'active':'')+'" aria-pressed="'+(period===trajectoryPeriod)+'" onclick="setTrajectoryPeriod_(\''+period+'\')">'+period.slice(0,-1)+' d</button>').join('')+'</div>') + trajectoryTermControls_() + trajectoryBasemapControls_() + '</div>';
     }
     function trajectoryOverview_(records, dates) {
       return '<div class="trajectory-overview" aria-label="Recent daily trajectories">' + dates.map(date => {
@@ -4165,7 +4187,7 @@
         const coords = all.map(project), xs=coords.map(p=>p[0]), ys=coords.map(p=>p[1]);
         const left=Math.min(...xs), top=Math.min(...ys), scale=72/Math.max(Math.max(...xs)-left,Math.max(...ys)-top,0.005);
         const paths = tracks.map(t=>'<polyline fill="none" stroke="'+trajectoryTerms[t.record.term]+'" stroke-width="2" points="'+t.points.map(p=>{const xy=project(p);return (8+(xy[0]-left)*scale).toFixed(1)+','+(8+(xy[1]-top)*scale).toFixed(1);}).join(' ')+'"/>').join('');
-        return '<button type="button" class="trajectory-day '+(date===trajectoryDate?'active':'')+'" onclick="selectTrajectoryDate_(\''+date+'\')" aria-label="Open '+date+'" aria-pressed="'+(date===trajectoryDate)+'"><svg viewBox="0 0 88 88" aria-hidden="true">'+paths+'</svg><span>'+date+'</span></button>';
+        return '<button type="button" class="trajectory-day '+(date===trajectoryDate?'active':'')+'" onclick="selectTrajectoryDate_(\''+date+'\')" aria-label="Open '+date+'" aria-pressed="'+(date===trajectoryDate)+'"><svg viewBox="0 0 88 88" aria-hidden="true">'+paths+'</svg><span>'+date+'</span><span class="trajectory-day-terms">'+['00','12'].map((term,i)=>'<span style="color:'+(pair[i]?trajectoryTerms[term]:'var(--muted)')+'" aria-label="'+term+' UTC '+(pair[i]?'available':'unavailable')+'">'+term+' '+(pair[i]?'●':'—')+'</span>').join('')+'</span></button>';
       }).join('') + '</div>';
     }
     function trajectoryDensityPoints_(tracks) {
@@ -4182,23 +4204,24 @@
     function renderTrajectoryHistory_() {
       const app=document.getElementById('app'), data=trajectoryWindows[trajectoryPeriod];
       const records=data ? data.records.slice().sort((a,b)=>a.valid_time.localeCompare(b.valid_time)) : [];
+      const selectedRecords=trajectoryTermRecords_(records);
       const dates=trajectoryDates_(records);
       if (!dates.includes(trajectoryDate)) trajectoryDate=dates[0] || null;
       const daily=trajectoryMode==='daily', pair=trajectoryDailyPair_(records,trajectoryDate);
-      const tracks=trajectoryFilteredRecords_(daily ? pair.filter(Boolean) : records);
+      const tracks=trajectoryFilteredRecords_(daily ? trajectoryTermRecords_(pair.filter(Boolean)) : selectedRecords);
       const label={'full':'Full ascent','10':'10 min','20':'20 min','850':'850 hPa','700':'700 hPa','500':'500 hPa'}[trajectorySegment];
       const displacements=tracks.map(t=>trajectoryDisplacement_(t.record.points[0],t.points.at(-1))).filter(Number.isFinite).sort((a,b)=>a-b);
       const middle=Math.floor(displacements.length/2), median=displacements.length ? (displacements.length%2 ? displacements[middle] : (displacements[middle-1]+displacements[middle])/2) : null;
       const stats=daily ? [['Selected date',trajectoryDate || '—'],...['00','12'].map((term,i)=> {
         const t=tracks.find(t=>t.record.term===term), end=t && t.points.at(-1);
-        return [term+' UTC endpoint', end ? fmt(trajectoryDisplacement_(t.record.points[0],end),1)+' km · '+fmt(end.height_m,0)+' m MSL' : 'Unavailable'];
-      })] : [['Soundings',String(records.length)],['Actual coverage',records.length ? records[0].valid_time.slice(0,16).replace('T',' ')+' → '+records.at(-1).valid_time.slice(0,16).replace('T',' ')+' UTC' : '—'],['Segment',label],['Median displacement',fmt(median,1)+' km']];
+        return [term+' UTC endpoint', end ? fmt(trajectoryDisplacement_(t.record.points[0],end),1)+' km · '+fmt(end.height_m,0)+' m MSL' : trajectoryTerm !== 'all' && trajectoryTerm !== term ? 'Filtered out' : 'Unavailable'];
+      })] : [['Soundings',String(selectedRecords.length)],['Actual coverage',selectedRecords.length ? selectedRecords[0].valid_time.slice(0,16).replace('T',' ')+' → '+selectedRecords.at(-1).valid_time.slice(0,16).replace('T',' ')+' UTC' : '—'],['Segment',label],['Median displacement',fmt(median,1)+' km']];
       const segments=[['full','Full ascent'],['10','10 min'],['20','20 min'],['850','850 hPa'],['700','700 hPa'],['500','500 hPa']];
-      app.innerHTML='<section class="panel"><div class="panel-head"><div class="panel-title">Trajectories · LJLM</div><div class="panel-note">'+(data ? 'Archive · '+records.length+' available soundings' : 'Archive')+'</div></div><div class="trajectory-body">'+trajectoryToolbar_()+
+      app.innerHTML='<section class="panel"><div class="panel-head"><div class="panel-title">Trajectories · LJLM</div><div class="panel-note">'+(data ? 'Archive · '+(daily ? tracks.length : selectedRecords.length)+' available soundings' : 'Archive')+'</div></div><div class="trajectory-body">'+trajectoryToolbar_()+
         '<div class="trajectory-controls" aria-label="Trajectory segment">'+segments.map(item=>'<button class="tab-btn '+(trajectorySegment===item[0]?'active':'')+'" type="button" onclick="selectTrajectorySegment_(\''+item[0]+'\')">'+item[1]+'</button>').join('')+'</div>'+
         (daily && dates.length ? '<div class="trajectory-date-nav"><button class="tab-btn" type="button" onclick="navigateTrajectoryDate_(1)" '+(dates.indexOf(trajectoryDate)===dates.length-1?'disabled':'')+'>← Earlier</button><label for="trajectoryDate">Date</label><select id="trajectoryDate" onchange="selectTrajectoryDate_(this.value)">'+dates.map(date=>'<option '+(date===trajectoryDate?'selected':'')+'>'+date+'</option>').join('')+'</select><button class="tab-btn" type="button" onclick="navigateTrajectoryDate_(-1)" '+(dates.indexOf(trajectoryDate)===0?'disabled':'')+'>Later →</button></div>'+trajectoryOverview_(records,dates) : '')+
         '<div class="trajectory-summary">'+stats.map(item=>'<div class="trajectory-stat"><span>'+esc(item[0])+'</span><strong>'+esc(item[1])+'</strong></div>').join('')+'</div><div id="trajectoryMap" class="trajectory-map"></div><div class="trajectory-legend">'+
-        (daily ? ['00','12'].map((term,i)=>'<span><i style="background:'+trajectoryTerms[term]+'"></i>'+term+' UTC'+(!pair[i]?' · unavailable':'')+'</span>').join('') : trajectoryMode==='density' ? '<span class="trajectory-density-legend">Low <i></i> High density</span><span>Latest trajectory reference</span>' : '<span>Older tracks · Latest track highlighted</span>')+'</div></div></section>';
+        (daily ? ['00','12'].map((term,i)=>'<span><i style="background:'+trajectoryTerms[term]+'"></i>'+term+' UTC'+(!pair[i]?' · unavailable':trajectoryTerm !== 'all' && trajectoryTerm !== term ? ' · filtered out':'')+'</span>').join('') : trajectoryMode==='density' ? '<span class="trajectory-density-legend">Low <i></i> High density</span><span>Latest trajectory reference</span>' : '<span>Older tracks · Latest track highlighted</span>')+'</div></div></section>';
       if (!data) {
         document.getElementById('trajectoryMap').innerHTML=trajectoryWindowErrors[trajectoryPeriod] ? '<div class="caveat">'+esc(trajectoryWindowErrors[trajectoryPeriod])+' <button class="tab-btn" onclick="loadTrajectoryWindow_()">Try again</button></div>' : '<div class="loading">Loading trajectory archive …</div>'; return;
       }
@@ -4211,8 +4234,12 @@
       }
       const latest=tracks.at(-1);
       tracks.forEach(t=> {
-        const highlight=t===latest, color=daily ? trajectoryTerms[t.record.term] : '#245eaa';
-        if (trajectoryMode!=='density' || highlight) L.polyline(t.points.map(p=>[p.latitude,p.longitude]),{color,weight:daily?3:highlight?3.5:1.2,opacity:daily?0.9:highlight?1:0.22}).addTo(trajectoryMap).bindTooltip(esc(t.record.valid_time+' · '+t.record.term+' UTC'));
+        const highlight=t===latest, color=daily ? trajectoryTerms[t.record.term] : trajectoryHistoryStyle_(highlight).color;
+        if (trajectoryMode!=='density' || highlight) {
+          const style=daily ? {color,weight:3,opacity:0.9} : trajectoryHistoryStyle_(highlight);
+          const layer=L.polyline(t.points.map(p=>[p.latitude,p.longitude]),style).addTo(trajectoryMap).bindTooltip(esc(t.record.valid_time+' · '+t.record.term+' UTC'));
+          if (!daily) trajectoryHistoryLines.push({layer,highlight});
+        }
         if (daily) [[t.points[0],'Launch'],[t.points.at(-1),'Endpoint']].forEach(item=>L.circleMarker([item[0].latitude,item[0].longitude],{radius:5,color:'#fff',weight:1.5,fillColor:color,fillOpacity:1}).addTo(trajectoryMap).bindPopup(trajectoryPointLabel_(item[0],t.record.term+' UTC '+item[1])));
       });
       trajectoryMap.invalidateSize();
