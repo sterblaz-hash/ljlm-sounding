@@ -1,0 +1,62 @@
+name: Update C-LAEF LJLM point forecast
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "25 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: claef-point-publisher-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # The point builder and its parsing helper use only the standard library.
+      # Do not install the repository's meteorological/rendering dependencies.
+      - name: Run offline point-cache tests
+        run: python test_claef_point_forecast.py
+
+      - name: Refresh central point cache
+        run: python claef_point_forecast.py
+
+      - name: Publish intentional point-cache outputs only
+        env:
+          PUBLISH_BRANCH: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- models/claef/latest/point.json models/claef/latest/status.json
+          if git diff --cached --quiet; then
+            echo "C-LAEF point forecast is unchanged; nothing to publish."
+            exit 0
+          fi
+          git diff --cached --check
+          git commit -m "Update C-LAEF LJLM point forecast"
+          # Other publishers can advance this branch; conflicts fail safely.
+          # No force push and no automatic resolution of conflicting products.
+          for attempt in 1 2 3; do
+            git pull --rebase origin "$PUBLISH_BRANCH"
+            if git push origin "HEAD:$PUBLISH_BRANCH"; then
+              exit 0
+            fi
+          done
+          echo "Unable to publish after rebasing; no force push attempted." >&2
+          exit 1

@@ -1,0 +1,1966 @@
+{
+  "deterministic": {
+    "listing_url": "https://public.hub.geosphere.at/datahub/?list-type=2&max-keys=100&delimiter=/&prefix=resources/nwp-v2-1h-1km/filelisting/",
+    "file_count": 3,
+    "selected_file": {
+      "key": "resources/nwp-v2-1h-1km/filelisting/nwp_2026100900.nc",
+      "bytes": 9454655152,
+      "etag": "b31c3d3c8bb15f1bfb4f1db71278da5b-181"
+    },
+    "header_bytes_read": 1048576,
+    "variables": [
+      {
+        "name": "plev",
+        "shape": [
+          11
+        ],
+        "dimensions": [
+          []
+        ],
+        "long_name": "pressure",
+        "units": "hPa",
+        "standard_name": "air_pressure"
+      },
+      {
+        "name": "latitude",
+        "shape": [
+          945
+        ],
+        "dimensions": [
+          []
+        ],
+        "long_name": "latitude",
+        "units": "degrees_north",
+        "standard_name": "latitude"
+      },
+      {
+        "name": "longitude",
+        "shape": [
+          1300
+        ],
+        "dimensions": [
+          []
+        ],
+        "long_name": "longitude",
+        "units": "degrees_east",
+        "standard_name": "longitude"
+      },
+      {
+        "name": "u",
+        "shape": [
+          61,
+          11,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "plev"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "wind speed in eastward direction on pressure level",
+        "units": "m s-1",
+        "description": "wind speed in eastward direction on pressure level",
+        "standard_name": "eastward_wind"
+      },
+      {
+        "name": "v",
+        "shape": [
+          61,
+          11,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "plev"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "wind speed in northward direction on pressure level",
+        "units": "m s-1",
+        "description": "wind speed in northward direction on pressure level",
+        "standard_name": "northward_wind"
+      },
+      {
+        "name": "t",
+        "shape": [
+          61,
+          11,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "plev"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "air temperature on pressure level",
+        "units": "degree Celsius",
+        "description": "air temperature on pressure level",
+        "standard_name": "air_temperature"
+      },
+      {
+        "name": "z",
+        "shape": [
+          61,
+          11,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "plev"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "geopotential on pressure level",
+        "units": "m2 s-2",
+        "description": "geopotential on pressure level",
+        "standard_name": "geopotential"
+      },
+      {
+        "name": "r",
+        "shape": [
+          61,
+          11,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "plev"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "relative humidity on pressure level",
+        "units": "%",
+        "description": "relative humidity on pressure level",
+        "standard_name": "relative_humidity"
+      },
+      {
+        "name": "w",
+        "shape": [
+          61,
+          11,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "plev"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "omega (vertical velocity) on pressure level",
+        "units": "Pa s-1",
+        "description": "the lagrangian tendency of air pressure, often called omega, plays the role of the upward component of air velocity when air pressure is being used as the vertical coordinate.",
+        "standard_name": "lagrangian_tendency_of_air_pressure"
+      },
+      {
+        "name": "tp",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "total precipitation amount in the last forecast interval",
+        "units": "kg m-2",
+        "description": "total amount of liquid and solid precipitation in the last forecast interval",
+        "standard_name": "precipitation_amount"
+      },
+      {
+        "name": "rain",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "rainfall amount in the last forecast interval",
+        "units": "kg m-2",
+        "description": "rainfall amount in the last forecast interval",
+        "standard_name": "rainfall_amount"
+      },
+      {
+        "name": "sf",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "snowfall amount in the last forecast interval",
+        "units": "kg m-2",
+        "description": "snowfall amount in the last forecast interval",
+        "standard_name": "snowfall_amount"
+      },
+      {
+        "name": "sund",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "sunshine duration in the last forecast interval",
+        "units": "s",
+        "description": "length of time for which surface incident radiative flux from solar beam exceeds 120 W m-2 in the last forecast interval",
+        "standard_name": "duration_of_sunshine"
+      },
+      {
+        "name": "ssr",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "surface net downward shortwave flux",
+        "units": "W m-2",
+        "description": "hourly mean surface net downward shortwave flux",
+        "standard_name": "surface_net_downward_shortwave_flux"
+      },
+      {
+        "name": "ssrd",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "surface global radiation",
+        "units": "W m-2",
+        "description": "surface downwelling shortwave is the sum of direct and diffuse solar radiation incident on the surface, and is sometimes called global radiation",
+        "standard_name": "surface_downwelling_shortwave_flux_in_air"
+      },
+      {
+        "name": "str",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "surface net upward longwave flux",
+        "units": "W m-2",
+        "description": "hourly mean surface net upward longwave flux",
+        "standard_name": "surface_net_upward_longwave_flux"
+      },
+      {
+        "name": "strd",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "surface downward longwave radiation flux",
+        "units": "W m-2",
+        "description": "hourly mean surface downward longwave radiation flux",
+        "standard_name": "surface_downwelling_longwave_flux_in_air"
+      },
+      {
+        "name": "sd",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "surface snow amount",
+        "units": "kg m-2",
+        "description": "surface snow amount refers to the amount on the solid ground or on surface ice cover, but excludes, for example, falling snowflakes and snow on plants",
+        "standard_name": "surface_snow_amount"
+      },
+      {
+        "name": "lcc",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "Low cloud cover",
+        "units": "%",
+        "description": "low cloud cover",
+        "standard_name": "low_type_cloud_area_fraction"
+      },
+      {
+        "name": "mcc",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "Medium cloud cover",
+        "units": "%",
+        "description": "medium cloud cover",
+        "standard_name": "medium_type_cloud_area_fraction"
+      },
+      {
+        "name": "hcc",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "High cloud cover",
+        "units": "%",
+        "description": "high cloud cover",
+        "standard_name": "high_type_cloud_area_fraction"
+      },
+      {
+        "name": "tcc",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "total cloud cover",
+        "units": "%",
+        "description": "total cloud cover",
+        "standard_name": "cloud_area_fraction"
+      },
+      {
+        "name": "sai",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "Showalter Index",
+        "units": "K",
+        "description": "the atmosphere_stability_showalter_index is an index used to determine convective and thunderstorm potential and is often referred to as simply the showalter index.",
+        "standard_name": "atmosphere_stability_showalter_index"
+      },
+      {
+        "name": "snowlmt",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "snowlimit",
+        "units": "m",
+        "description": "height above ground where falling snow melts",
+        "standard_name": "snowlimit"
+      },
+      {
+        "name": "sp",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "Surface pressure",
+        "units": "Pa",
+        "description": "surface pressure",
+        "standard_name": "surface_air_pressure"
+      },
+      {
+        "name": "msl",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "mean sea level pressure",
+        "units": "Pa",
+        "description": "air pressure at mean sea level",
+        "standard_name": "air_pressure_at_mean_sea_level"
+      },
+      {
+        "name": "tsurf",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "temperature of surface",
+        "units": "degree Celsius",
+        "description": "temperature of surface",
+        "standard_name": "surface_temperature"
+      },
+      {
+        "name": "zsurf",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "Geopotential at model surface",
+        "units": "m2 s-2",
+        "description": "geopotential at model surface",
+        "standard_name": "surface_geopotential"
+      },
+      {
+        "name": "cape",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "convective available potential energy",
+        "units": "m2 s-2",
+        "description": "convectively available potential energy",
+        "standard_name": "atmosphere_convective_available_potential_energy"
+      },
+      {
+        "name": "cin",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "Convective inhibition",
+        "units": "m2 s-2",
+        "description": "convective inhibition",
+        "standard_name": "atmosphere_convective_inhibition"
+      },
+      {
+        "name": "sy",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "weather symbol",
+        "units": "1",
+        "description": "codes for GeoSphere Austria weather symbol",
+        "standard_name": "weather_symbol"
+      },
+      {
+        "name": "2t",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "2m temperature",
+        "units": "degree Celsius",
+        "description": "air temperature 2m above ground",
+        "standard_name": "air_temperature"
+      },
+      {
+        "name": "2r",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "relative humidity 2m above ground",
+        "units": "%",
+        "description": "relative humidity 2m above ground",
+        "standard_name": "relative_humidity"
+      },
+      {
+        "name": "max_2t",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "maximum 2m temperature in the last forecast interval",
+        "units": "degree Celsius",
+        "description": "maximum 2m temperature in the last forecast interval",
+        "standard_name": "air_temperature"
+      },
+      {
+        "name": "min_2t",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "minimum 2m temperature in the last forecast interval",
+        "units": "degree Celsius",
+        "description": "minimum 2m temperature in the last forecast interval",
+        "standard_name": "air_temperature"
+      },
+      {
+        "name": "10u",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "10m wind speed in eastward direction",
+        "units": "m s-1",
+        "description": "wind speed in eastward direction 10m above ground",
+        "standard_name": "eastward_wind"
+      },
+      {
+        "name": "10v",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "10m wind speed in northward direction",
+        "units": "m s-1",
+        "description": "wind speed in northward direction 10m above ground",
+        "standard_name": "northward_wind"
+      },
+      {
+        "name": "max_10efg",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "U component of maximum wind gust in the last forecast interval",
+        "units": "m s-1",
+        "description": "U component of maximum wind gust in the last forecast interval",
+        "standard_name": "x_wind_gust"
+      },
+      {
+        "name": "max_10nfg",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "V component of maximum wind gust in the last forecast interval",
+        "units": "m s-1",
+        "description": "V component of maximum wind gust in the last forecast interval",
+        "standard_name": "y_wind_gust"
+      },
+      {
+        "name": "10fg",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "maximum 10 metre wind gust in the last forecast interval",
+        "units": "m s-1",
+        "description": "maximum 10 metre wind gust in the last forecast interval",
+        "standard_name": "wind_speed_of_gust"
+      },
+      {
+        "name": "pt",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "precipitation type",
+        "units": "1",
+        "description": "Severe precipitation type in the last forecast interval",
+        "standard_name": "predominant_precipitation_type_at_surface"
+      },
+      {
+        "name": "litotint",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "lightning density",
+        "units": "flash km-2",
+        "description": "Lightning density in the last forecast interval",
+        "standard_name": "lightening_intensity"
+      },
+      {
+        "name": "time",
+        "shape": [
+          61
+        ],
+        "dimensions": [
+          []
+        ],
+        "long_name": "time",
+        "units": "hours since 2026-10-09 00:00:00",
+        "standard_name": "time"
+      }
+    ],
+    "pressure_levels_hpa": [
+      1000.0,
+      950.0,
+      925.0,
+      900.0,
+      850.0,
+      800.0,
+      700.0,
+      600.0,
+      500.0,
+      400.0,
+      300.0
+    ]
+  },
+  "ensemble": {
+    "listing_url": "https://public.hub.geosphere.at/datahub/?list-type=2&max-keys=100&delimiter=/&prefix=resources/ensemble-v2-1h-1km/filelisting/",
+    "file_count": 54,
+    "selected_file": {
+      "key": "resources/ensemble-v2-1h-1km/filelisting/ensemble_stats_2026100900.nc",
+      "bytes": 7417979064,
+      "etag": "05fd39282ebacb9e0336d9a066f99152-142"
+    },
+    "header_bytes_read": 1048576,
+    "variables": [
+      {
+        "name": "latitude",
+        "shape": [
+          945
+        ],
+        "dimensions": [
+          []
+        ],
+        "long_name": "latitude",
+        "units": "degrees_north"
+      },
+      {
+        "name": "longitude",
+        "shape": [
+          1300
+        ],
+        "dimensions": [
+          []
+        ],
+        "long_name": "longitude",
+        "units": "degrees_east"
+      },
+      {
+        "name": "time",
+        "shape": [
+          61
+        ],
+        "dimensions": [
+          []
+        ],
+        "long_name": "time",
+        "units": "hours since 2026-10-09 00:00:00"
+      },
+      {
+        "name": "cape_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "convective available potential energy (10th percentile)",
+        "units": "m2 s-2",
+        "description": "convectively available potential energy (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "cape_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "convective available potential energy (50th percentile)",
+        "units": "m2 s-2",
+        "description": "convectively available potential energy (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "cape_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "convective available potential energy (90th percentile)",
+        "units": "m2 s-2",
+        "description": "convectively available potential energy (90th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "2r_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "relative humidity 2m above ground (10th percentile)",
+        "units": "%",
+        "description": "relative humidity 2m above ground (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "2r_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "relative humidity 2m above ground (50th percentile)",
+        "units": "%",
+        "description": "relative humidity 2m above ground (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "2r_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "relative humidity 2m above ground (90th percentile)",
+        "units": "%",
+        "description": "relative humidity 2m above ground (90th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "snowlmt_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "snowlimit (10th percentile)",
+        "units": "m",
+        "description": "height above ground where falling snow melts (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "snowlmt_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "snowlimit (50th percentile)",
+        "units": "m",
+        "description": "height above ground where falling snow melts (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "snowlmt_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "snowlimit (90th percentile)",
+        "units": "m",
+        "description": "height above ground where falling snow melts (90th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "2t_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "2m temperature (10th percentile)",
+        "units": "degree Celsius",
+        "description": "air temperature 2m above ground (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "2t_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "2m temperature (50th percentile)",
+        "units": "degree Celsius",
+        "description": "air temperature 2m above ground (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "2t_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "2m temperature (90th percentile)",
+        "units": "degree Celsius",
+        "description": "air temperature 2m above ground (90th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "tcc_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "total cloud cover (10th percentile)",
+        "units": "1",
+        "description": "total cloud cover (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "tcc_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "total cloud cover (50th percentile)",
+        "units": "1",
+        "description": "total cloud cover (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "tcc_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "total cloud cover (90th percentile)",
+        "units": "1",
+        "description": "total cloud cover (90th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "10u_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "10m wind speed in eastward direction (10th percentile)",
+        "units": "m s-1",
+        "description": "wind speed in eastward direction 10m above ground (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "10u_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "10m wind speed in eastward direction (50th percentile)",
+        "units": "m s-1",
+        "description": "wind speed in eastward direction 10m above ground (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "10u_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "10m wind speed in eastward direction (90th percentile)",
+        "units": "m s-1",
+        "description": "wind speed in eastward direction 10m above ground (90th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "10v_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "10m wind speed in northward direction (10th percentile)",
+        "units": "m s-1",
+        "description": "wind speed in northward direction 10m above ground (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "10v_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "10m wind speed in northward direction (50th percentile)",
+        "units": "m s-1",
+        "description": "wind speed in northward direction 10m above ground (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "10v_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "10m wind speed in northward direction (90th percentile)",
+        "units": "m s-1",
+        "description": "wind speed in northward direction 10m above ground (90th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "10fg_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "maximum 10 metre wind gust (10th percentile)",
+        "units": "m s-1",
+        "description": "maximum 10 metre wind gust in the last forecast interval (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "10fg_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "maximum 10 metre wind gust (50th percentile)",
+        "units": "m s-1",
+        "description": "maximum 10 metre wind gust in the last forecast interval (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "10fg_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "maximum 10 metre wind gust (90th percentile)",
+        "units": "m s-1",
+        "description": "maximum 10 metre wind gust in the last forecast interval (90th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "msl_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "mean sea level pressure (10th percentile)",
+        "units": "Pa",
+        "description": "air pressure at mean sea level (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "msl_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "mean sea level pressure (50th percentile)",
+        "units": "Pa",
+        "description": "air pressure at mean sea level (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "msl_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "mean sea level pressure (90th percentile)",
+        "units": "Pa",
+        "description": "air pressure at mean sea level (90th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "tp_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "total precipitation amount in the last forecast interval (10th percentile)",
+        "units": "kg m-2",
+        "description": "total amount of liquid and solid precipitation in the last forecast interval (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "tp_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "total precipitation amount in the last forecast interval (50th percentile)",
+        "units": "kg m-2",
+        "description": "total amount of liquid and solid precipitation in the last forecast interval (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "tp_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "total precipitation amount in the last forecast interval (90th percentile)",
+        "units": "kg m-2",
+        "description": "total amount of liquid and solid precipitation in the last forecast interval (90th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "rain_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "rainfall amount in the last forecast interval (10th percentile)",
+        "units": "kg m-2",
+        "description": "rainfall amount in the last forecast interval (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "rain_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "rainfall amount in the last forecast interval (50th percentile)",
+        "units": "kg m-2",
+        "description": "rainfall amount in the last forecast interval (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "rain_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "rainfall amount in the last forecast interval (90th percentile)",
+        "units": "kg m-2",
+        "description": "rainfall amount in the last forecast interval (90th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "sf_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "snowfall amount in the last forecast interval (10th percentile)",
+        "units": "kg m-2",
+        "description": "snowfall amount in the last forecast interval (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "sf_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "snowfall amount in the last forecast interval (50th percentile)",
+        "units": "kg m-2",
+        "description": "snowfall amount in the last forecast interval (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "sf_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "snowfall amount in the last forecast interval (90th percentile)",
+        "units": "kg m-2",
+        "description": "snowfall amount in the last forecast interval (90th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "sund_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "sunshine duration in the last forecast interval (10th percentile)",
+        "units": "s",
+        "description": "length of time for which surface incident radiative flux from solar beam exceeds 120 W m-2 in the last forecast interval (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "sund_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "sunshine duration in the last forecast interval (50th percentile)",
+        "units": "s",
+        "description": "length of time for which surface incident radiative flux from solar beam exceeds 120 W m-2 in the last forecast interval (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "sund_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "sunshine duration in the last forecast interval(90th percentile)",
+        "units": "s",
+        "description": "length of time for which surface incident radiative flux from solar beam exceeds 120 W m-2 in the last forecast interval (90th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "ssrd_p10",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "surface global radiation (10th percentile)",
+        "units": "W m-2",
+        "description": "surface downwelling shortwave is the sum of direct and diffuse solar radiation incident on the surface, and is sometimes called global radiation (10th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "ssrd_p50",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "surface global radiation (50th percentile)",
+        "units": "W m-2",
+        "description": "surface downwelling shortwave is the sum of direct and diffuse solar radiation incident on the surface, and is sometimes called global radiation (50th percentile of an ensemble forecast)"
+      },
+      {
+        "name": "ssrd_p90",
+        "shape": [
+          61,
+          945,
+          1300
+        ],
+        "dimensions": [
+          [
+            "time"
+          ],
+          [
+            "latitude"
+          ],
+          [
+            "longitude"
+          ]
+        ],
+        "long_name": "surface global radiation (90th percentile)",
+        "units": "W m-2",
+        "description": "surface downwelling shortwave is the sum of direct and diffuse solar radiation incident on the surface, and is sometimes called global radiation (90th percentile of an ensemble forecast)"
+      }
+    ],
+    "pressure_levels_hpa": null
+  }
+}
