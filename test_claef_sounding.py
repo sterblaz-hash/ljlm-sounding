@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch
 
 import claef_pressure_profile as p
 import extract_claef as c
+from claef_sounding_run import choose_run
 from icon_d2_forecast import publish_latest
 
 
@@ -20,6 +21,35 @@ def product(run='2026-10-09T00:00:00Z'):
     for row in data['levels']:
         row['omega_pa_s'] = -0.25
     return data
+
+
+class RunSelectionTests(unittest.TestCase):
+    def test_schedules_select_current_utc_day_and_explicit_cycle(self):
+        for schedule, hour in [('5 7 * * *', 0), ('5 19 * * *', 12)]:
+            for start_hour in (7 if hour == 0 else 19, 23):
+                now = c.datetime(2026, 10, 11, start_hour, 5, tzinfo=c.timezone.utc)
+                self.assertEqual(choose_run('12' if hour == 0 else '00', schedule=schedule, now=now),
+                                 now.replace(hour=hour, minute=0))
+        now = c.datetime(2026, 10, 12, 1, tzinfo=c.timezone.utc)
+        self.assertEqual(choose_run(schedule='5 7 * * *', now=now), now.replace(hour=0))
+        with self.assertRaises(ValueError):
+            choose_run(schedule='5 19 * * *', now=now)
+
+    def test_manual_exact_date_and_default_recent_chosen_cycle(self):
+        now = c.datetime(2026, 10, 11, 7, tzinfo=c.timezone.utc)
+        for cycle in ('00', '12'):
+            self.assertEqual(choose_run(cycle, '2026-10-09', now=now),
+                             c.datetime(2026, 10, 9, int(cycle), tzinfo=c.timezone.utc))
+        self.assertEqual(choose_run('12', now=now),
+                         c.datetime(2026, 10, 10, 12, tzinfo=c.timezone.utc))
+        self.assertEqual(choose_run('00', now=now), now.replace(hour=0))
+        for kwargs in ({'cycle': '03'}, {'cycle': '12', 'run_date': '2026-10-11'},
+                       {'cycle': '00', 'run_date': '20261009'},
+                       {'cycle': '00', 'run_date': '2026-02-30'},
+                       {'schedule': 'unexpected'},
+                       {'schedule': '5 7 * * *', 'run_date': '2026-10-09'}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                choose_run(now=now, **kwargs)
 
 
 class SoundingTests(unittest.TestCase):
