@@ -33,6 +33,16 @@ METADATA_BLOCK = 64 * 1024
 VARIABLES = {'t': ('air_temperature', 'degree Celsius'), 'r': ('relative_humidity', '%'),
              'u': ('eastward_wind', 'm s-1'), 'v': ('northward_wind', 'm s-1'),
              'z': ('geopotential', 'm2 s-2')}
+SOUNDING_VARIABLES = {**VARIABLES, 'w': ('lagrangian_tendency_of_air_pressure', 'Pa s-1')}
+SURFACE_VARIABLES = {
+    'sp': ('surface_air_pressure', 'Pa'),
+    'zsurf': ('surface_geopotential', 'm2 s-2'),
+    '2t': ('air_temperature', 'degree Celsius'),
+    '2r': ('relative_humidity', '%'),
+    '10u': ('eastward_wind', 'm s-1'),
+    '10v': ('northward_wind', 'm s-1'),
+}
+EXPECTED_PRESSURES = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300]
 STANDARD_GRAVITY = 9.80665
 
 
@@ -234,14 +244,42 @@ def reference_from_time(units, calendar):
     return utc(origin)
 
 
-def inspect_and_extract(remote, lead_hours):
+def inspect_and_extract(remote, lead_hours, *, sounding=False):
     try:
         import h5py
         import numpy as np
     except ImportError as error:
         raise ProbeError('Install optional h5py and NumPy for the profile experiment.') from error
     with h5py.File(remote, 'r') as nc:
-        metadata = {name: metadata_for(nc[name]) for name in (*VARIABLES, 'plev', 'time', 'latitude', 'longitude', 'sp')}
+        fields = SOUNDING_VARIABLES if sounding else VARIABLES
+        surfaces = SURFACE_VARIABLES if sounding else {'sp': SURFACE_VARIABLES['sp']}
+        names = (*fields, 'plev', 'time', 'latitude', 'longitude', *surfaces)
+        if any(name not in nc for name in names):
+            raise ProbeError('Required NetCDF variable is missing.')
+        metadata = {name: metadata_for(nc[name]) for name in names}
+        if sounding:
+            for name, (standard_name, units) in {**fields, **surfaces}.items():
+                meta = metadata[name]
+                dimensions = ['time', 'plev', 'latitude', 'longitude'] if name in fields else ['time', 'latitude', 'longitude']
+                if meta.get('units') != units or meta.get('standard_name') != standard_name or meta['dimensions'] != dimensions:
+                    raise ProbeError(f'Unexpected metadata for {name}.')
+                if meta['scale_factor'] != 1 or meta['add_offset'] != 0:
+                    raise ProbeError(f'Packed variable refused: {name}.')
+                variable = nc[name]
+                if not variable.chunks or math.prod(variable.chunks) * variable.dtype.itemsize > MAX_DECODED_CHUNK:
+                    raise SafetyRefusal(f'Unsupported or excessive decoded chunk for {name}.')
+            for name in ('plev', 'time', 'latitude', 'longitude'):
+                meta = metadata[name]
+                # HDF5 dimension scales need not attach themselves as dimensions.
+                valid_dimension = meta['dimensions'] == [name] or (
+                    meta['dimensions'] == [None] and nc[name].is_scale)
+                if (len(meta['shape']) != 1 or not valid_dimension
+                        or meta['scale_factor'] != 1 or meta['add_offset'] != 0):
+                    raise ProbeError(f'Unsupported coordinate dimensions/packing: {name}.')
+            for name in (*fields, *surfaces):
+                dims = metadata[name]['dimensions']
+                if metadata[name]['shape'] != [metadata[d]['shape'][0] for d in dims]:
+                    raise ProbeError(f'Coordinate shape mismatch: {name}.')
         globals_ = {name: text(nc.attrs[name]) for name in ('crs', 'grid_mapping', 'date', 'run', 'spatial_resolution', 'freq', 'forecast_freq') if name in nc.attrs}
         if globals_.get('crs') != 'EPSG:4326': raise ProbeError('Unsupported grid CRS.')
         if metadata['latitude']['units'] != 'degrees_north' or metadata['longitude']['units'] != 'degrees_east':
@@ -257,6 +295,10 @@ def inspect_and_extract(remote, lead_hours):
         if not nc['sp'].chunks or math.prod(nc['sp'].chunks) * nc['sp'].dtype.itemsize > MAX_DECODED_CHUNK:
             raise SafetyRefusal('Surface-pressure chunk is too large.')
         pressures, times = nc['plev'][:].tolist(), nc['time'][:].tolist()
+        if sounding and sorted(pressures, reverse=True) != EXPECTED_PRESSURES:
+            raise ProbeError('Expected public 11-level pressure product; no invented levels.')
+        if sounding and any(number(value) is None for value in times):
+            raise ProbeError('Invalid time coordinate.')
         reference = reference_from_time(metadata['time']['units'], text(nc['time'].attrs.get('calendar', 'standard')))
         stamp = datetime.strptime(Path(remote.selected['key']).stem.replace('nwp_', ''), '%Y%m%d%H').replace(tzinfo=timezone.utc)
         if utc(stamp.isoformat()) != reference or globals_.get('date') != stamp.strftime('%Y%m%d') or globals_.get('run') != stamp.strftime('%H'):
@@ -276,7 +318,20 @@ def inspect_and_extract(remote, lead_hours):
         levels = build_levels(pressures, values, metadata, surface_pressure)
         if any(not any(level[name] is not None for level in levels) for name in ('temperature', 'relative_humidity', 'u', 'v', 'geopotential')):
             raise ProbeError('Empty required profile field; previous output preserved.')
-        return {'schema_version': 1, 'dataset': DATASET, 'model': 'C-LAEF AlpeAdria',
+        extra = {}
+        if sounding:
+            omega = native_values(nc['w'], nc['w'][ti, :, yi, xi].tolist())
+            by_pressure = dict(zip(pressures, omega))
+            for level in levels:
+                level['omega_pa_s'] = by_pressure[level['pressure_hpa']]
+            surface = {name: native_values(nc[name], [nc[name][ti, yi, xi]])[0] for name in surfaces if name != 'sp'}
+            surface['sp'] = surface_pressure
+            if any(value is None for value in surface.values()) or surface_pressure <= 0:
+                raise ProbeError('Missing or invalid model surface state.')
+            if all(value is None for value in omega):
+                raise ProbeError('Empty required omega profile.')
+            extra['surface'] = surface
+        return {**extra, 'schema_version': 1, 'dataset': DATASET, 'model': 'C-LAEF AlpeAdria',
                 'station': {'icao': 'LJLM', 'wmo': 14015, 'name': 'Ljubljana'},
                 'reference_time': reference, 'valid_time': utc((parse_time(reference) + timedelta(hours=lead_hours)).isoformat()),
                 'lead_hours': lead_hours, 'requested_location': {'latitude': 46.0656, 'longitude': 14.5122},
@@ -294,7 +349,7 @@ def inspect_and_extract(remote, lead_hours):
                 'limitations': ['11-level sparse pressure product; no pressure interpolation', 'No CAPE/CIN, detailed inversion, tropopause or full parcel/Skew-T diagnostics', 'Geopotential height uses standard gravity; dew point is an approximation with phase uncertainty']}
 
 
-def extract(output=DEFAULT_OUTPUT, lead_hours=12, client=None, discovery=None, prefix=None, reference_time=None):
+def extract_product(lead_hours=12, client=None, discovery=None, prefix=None, reference_time=None, *, sounding=False):
     if not isinstance(lead_hours, int) or not 0 <= lead_hours <= 60: raise ProbeError('Lead must be an integer 0–60 h.')
     client = client or TransferClient()
     if discovery is None:
@@ -317,7 +372,7 @@ def extract(output=DEFAULT_OUTPUT, lead_hours=12, client=None, discovery=None, p
         prefix = client.get(BULK + selected['key'], 0, 1024 * 1024 - 1, selected['bytes'], selected['etag'])
     remote = RangeFile(client, selected, prefix)
     try:
-        product = inspect_and_extract(remote, lead_hours)
+        product = inspect_and_extract(remote, lead_hours, sounding=True) if sounding else inspect_and_extract(remote, lead_hours)
     finally:
         remote.close()
     product['retrieved_at'] = utc(datetime.now(timezone.utc).isoformat())
@@ -327,10 +382,15 @@ def extract(output=DEFAULT_OUTPUT, lead_hours=12, client=None, discovery=None, p
                                 'http_requests': client.requests, 'body_bytes_transferred': client.bytes,
                                 'ranges': client.range_log,
                                 'hard_limits': {'body_bytes': MAX_TOTAL, 'requests': MAX_REQUESTS, 'range_bytes': MAX_RANGE, 'decoded_chunk_bytes': MAX_DECODED_CHUNK}}
+    return product
+
+
+def extract(output=DEFAULT_OUTPUT, lead_hours=12, client=None, discovery=None, prefix=None, reference_time=None):
+    product = extract_product(lead_hours, client, discovery, prefix, reference_time)
     size = atomic_json(output, product)
     return {'reference_time': product['reference_time'], 'valid_time': product['valid_time'],
-            'pressure_level_count': len(product['levels']), 'http_requests': client.requests,
-            'body_bytes_transferred': client.bytes, 'json_bytes': size}
+            'pressure_level_count': len(product['levels']), 'http_requests': product['remote_access']['http_requests'],
+            'body_bytes_transferred': product['remote_access']['body_bytes_transferred'], 'json_bytes': size}
 
 
 def main(argv=None):

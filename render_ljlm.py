@@ -524,7 +524,7 @@ def render_skewt(data: dict, output: Path):
             & np.isfinite(profile.t_c)
             & np.isfinite(profile.td_c)
         )
-        if parcel_mask.sum() >= 4:
+        if data.get("diagnostics_available", {}).get("parcel", True) and parcel_mask.sum() >= 4:
             p_all = profile.p_hpa[parcel_mask] * units.hPa
             t_all = profile.t_c[parcel_mask] * units.degC
             td_all = profile.td_c[parcel_mask] * units.degC
