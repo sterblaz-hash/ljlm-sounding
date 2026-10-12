@@ -1760,6 +1760,16 @@
     @media (pointer: coarse) { .potek-chart-inner [data-point] { r: 18px; } }
     @media (max-width: 620px) { .potek-chart { padding: 0 8px 12px; } .heat-label { font-size: 11px; } }
     .potek-note { padding: 12px 16px; color: #526985; font-size: 13px; }
+    .verification-charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:16px; padding:16px; }
+    .verification-chart { min-width:0; border:1px solid var(--line); border-radius:12px; padding:12px; }
+    .verification-chart h3 { font-size:14px; margin:0 0 10px; }
+    .verification-chart svg { display:block; width:100%; height:auto; }
+    .verification-chart svg text { font-size:12px; fill:#526985; }
+    .verification-grid { stroke:#e2e8f0; }
+    .verification-zero { stroke:#64748b; stroke-dasharray:4 3; }
+    .verification-legend { display:flex; flex-wrap:wrap; gap:20px; padding:0 16px; font-size:13px; }
+    .verification-icon { color:#2563eb; }
+    .verification-claef { color:#d97706; }
   </style>
 
 </head>
@@ -1788,6 +1798,8 @@
       >
         ICON-D2 +12 h
       </button>
+      <button id="viewModelVerificationBtn" class="view-tab" type="button"
+        onclick="showModelVerificationView()">Model verification</button>
       <button id="viewTimeseriesBtn" class="view-tab" type="button"
         onclick="showTimeseriesView()">Time series</button>
       <button id="viewClimatologyBtn" class="view-tab" type="button"
@@ -4003,6 +4015,7 @@
     function setMainView_(view) {
       disposeTrajectoryMap_();
       currentView = view;
+      document.getElementById('viewModelVerificationBtn').classList.toggle('active', view === 'modelVerification');
       document.getElementById('viewTrajectoriesBtn').classList.toggle('active', view === 'trajectories');
       document.getElementById('viewClimatologyBtn').classList.toggle('active', view === 'climatology');
 
@@ -5105,6 +5118,115 @@
         timeseriesDefinitions[barrier[0] + '_signed_ivt'] = [barrier[1] + ' · signed IVT', 'kg m⁻¹ s⁻¹'];
         timeseriesDefinitions[barrier[0] + '_signed_fraction'] = [barrier[1] + ' · signed fraction', '%'];
       });
+
+    const modelVerificationCache = Object.create(null);
+    const modelVerificationPending = new Set();
+    const modelVerificationErrors = Object.create(null);
+    let modelVerificationWindow = '30d';
+    const modelVerificationPeriods = [['7d', '7 d'], ['30d', '30 d'], ['90d', '90 d'], ['1y', '1 y']];
+
+    function showModelVerificationView() {
+      setMainView_('modelVerification');
+      loadModelVerificationWindow_(modelVerificationWindow);
+    }
+
+    function loadModelVerificationWindow_(key) {
+      if (!modelVerificationPeriods.some(function(period) { return period[0] === key; })) return;
+      modelVerificationWindow = key;
+      renderModelVerification_();
+      if (modelVerificationCache[key] || modelVerificationPending.has(key)) return;
+      delete modelVerificationErrors[key];
+      modelVerificationPending.add(key);
+      renderModelVerification_();
+      google.script.run.withSuccessHandler(function(data) {
+        modelVerificationPending.delete(key);
+        modelVerificationCache[key] = data;
+        if (currentView === 'modelVerification' && modelVerificationWindow === key) renderModelVerification_();
+      }).withFailureHandler(function() {
+        modelVerificationPending.delete(key);
+        modelVerificationErrors[key] = true;
+        if (currentView === 'modelVerification' && modelVerificationWindow === key) renderModelVerification_();
+      }).getDashboardModelVerification(key);
+    }
+
+    function modelVerificationChart_(data, metric, statistic, label, unit) {
+      const models = [['ICON-D2', '#2563eb'], ['C-LAEF', '#d97706']];
+      const pressures = [925, 850, 700, 500, 300];
+      const series = models.map(function(model) {
+        return {model: model[0], color: model[1], points: pressures.map(function(pressure) {
+          const summary = (((data.statistics || {})[model[0]] || {})[pressure] || {})[metric] || {};
+          const value = summary[statistic];
+          return {pressure: pressure, n: summary.n, value:
+            typeof value === 'number' && Number.isFinite(value) && (statistic === 'bias' || value >= 0) ? value : null};
+        })};
+      });
+      const values = series.flatMap(function(line) { return line.points.filter(function(p) { return p.value !== null; }).map(function(p) { return Math.abs(p.value); }); });
+      if (!values.length) return '<div class="verification-chart"><h3>' + esc(label) + '</h3><p>No statistics available for this metric.</p></div>';
+      const magnitude = Math.max.apply(null, values) || 1;
+      const limit = Number.isFinite(magnitude * 1.15) ? magnitude * 1.15 : magnitude;
+      const min = statistic === 'bias' ? -limit : 0;
+      const width = 360, height = 350, left = 54, right = 20, top = 24, bottom = 54;
+      // Increasing log pressure goes down: 300 hPa at the top, 925 at the bottom.
+      const y = function(p) { return top + Math.log(p / 300) / Math.log(925 / 300) * (height - top - bottom); };
+      const x = function(v) { return left + ((v / limit) - (min / limit)) / (1 - min / limit) * (width - left - right); };
+      let svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(label) + '"><title>' + esc(label + ' · ICON-D2 and C-LAEF') + '</title>';
+      pressures.forEach(function(p) {
+        svg += '<line class="verification-grid" x1="' + left + '" x2="' + (width-right) + '" y1="' + y(p) + '" y2="' + y(p) + '"/>' +
+          '<text x="' + (left-8) + '" y="' + (y(p)+4) + '" text-anchor="end">' + p + '</text>';
+      });
+      for (let i = 0; i <= 4; i++) {
+        const value = limit * (statistic === 'bias' ? -1 + i / 2 : i / 4);
+        svg += '<text x="' + x(value) + '" y="' + (height-bottom+22) + '" text-anchor="middle">' + esc(value.toFixed(1)) + '</text>';
+      }
+      svg += '<line class="verification-zero" x1="' + x(0) + '" x2="' + x(0) + '" y1="' + top + '" y2="' + (height-bottom) + '"/>' +
+        '<text x="' + (width/2) + '" y="' + (height-8) + '" text-anchor="middle">' + esc(unit) + '</text>' +
+        '<text x="12" y="12">hPa</text>';
+      series.forEach(function(line) {
+        let path = '', previous = false;
+        line.points.forEach(function(point) {
+          if (point.value === null) { previous = false; return; }
+          path += (previous ? ' L ' : ' M ') + x(point.value) + ' ' + y(point.pressure);
+          previous = true;
+        });
+        svg += '<path d="' + path.trim() + '" fill="none" stroke="' + line.color + '" stroke-width="2.5"/>';
+        line.points.forEach(function(point) {
+          if (point.value === null) return;
+          const n = typeof point.n === 'number' && Number.isFinite(point.n) ? point.n : 'unavailable';
+          const detail = line.model + ' · ' + point.pressure + ' hPa · ' + statistic.toUpperCase() + ' ' + point.value.toFixed(2) + ' ' + unit + ' · N=' + n;
+          svg += '<circle cx="' + x(point.value) + '" cy="' + y(point.pressure) + '" r="4.5" fill="' + line.color + '" tabindex="0" aria-label="' + esc(detail) + '"><title>' + esc(detail) + '</title></circle>';
+        });
+      });
+      return '<div class="verification-chart"><h3>' + esc(label) + '</h3>' + svg + '</svg></div>';
+    }
+
+    function renderModelVerification_() {
+      if (currentView !== 'modelVerification') return;
+      const data = modelVerificationCache[modelVerificationWindow];
+      const period = modelVerificationPeriods.find(function(p) { return p[0] === modelVerificationWindow; })[1];
+      let content = '<p class="potek-note" role="status">Loading model verification statistics …</p>';
+      if (modelVerificationErrors[modelVerificationWindow]) content = '<p class="potek-note" role="status">Model verification statistics are not available yet.</p>';
+      if (data) {
+        content = '<div class="potek-note">Selected period: ' + esc(period) + ' · ' + esc(data.startTime || 'Unknown start') +
+          ' → ' + esc(data.endTime || 'Unknown end') + ' UTC · <strong>' + esc(data.recordCount) + ' verification cases</strong>' +
+          (data.generatedAt ? ' · Generated: ' + esc(data.generatedAt) : '') + '</div>';
+        if (data.recordCount === 0) content += '<p class="potek-note" role="status">No verification cases in this period.</p>';
+        else content += '<div class="verification-legend"><span class="verification-icon">● ICON-D2</span><span class="verification-claef">● C-LAEF</span></div>' +
+          '<div class="verification-charts">' +
+          modelVerificationChart_(data, 'temperature_c', 'bias', 'Temperature bias (°C)', '°C') +
+          modelVerificationChart_(data, 'temperature_c', 'rmse', 'Temperature RMSE (°C)', '°C') +
+          modelVerificationChart_(data, 'wind_vector_error_ms', 'rmse', 'Wind-vector RMSE (m/s)', 'm/s') + '</div>' +
+          '<p class="potek-note">Point details show N, the number of available values for each statistic. Small samples may not represent long-term performance.</p>';
+      }
+      document.getElementById('app').innerHTML = '<section class="panel"><div class="panel-head"><div class="panel-title">Model verification</div></div>' +
+        '<div class="potek-controls" aria-label="Model verification period">' + modelVerificationPeriods.map(function(p) {
+          return '<button type="button" class="tab-btn ' + (modelVerificationWindow === p[0] ? 'active' : '') +
+            '" aria-pressed="' + (modelVerificationWindow === p[0]) + '" data-verification-window="' + p[0] + '">' + p[1] + '</button>';
+        }).join('') + '</div>' + content +
+        '<p class="potek-note">Statistics use exact +12 h ICON-D2 and C-LAEF forecasts verified against the same LJLM sounding.</p></section>';
+      document.querySelectorAll('[data-verification-window]').forEach(function(button) {
+        button.onclick = function() { loadModelVerificationWindow_(button.dataset.verificationWindow); };
+      });
+    }
 
     function showTimeseriesView() {
       setMainView_('timeseries');
