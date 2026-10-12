@@ -830,3 +830,140 @@ assert.equal(vm.runInContext('trajectoryTerm',histBrowser),'12');
 histBrowser.setTrajectoryTerm_('invalid');
 assert.equal(vm.runInContext('trajectoryTerm',histBrowser),'12');
 console.log('Shared term filtering, filtered statistics, Daily availability and Dark historical visibility checks passed.');
+
+// Model verification uses only allowlisted aggregate products, never records.
+const verificationStats = () => Object.fromEntries(['ICON-D2','C-LAEF'].map((model,index) => [model,
+  Object.fromEntries([925,850,700,500,300].map((pressure,i) => [pressure, {
+    temperature_c:{n:3,bias:(index ? -1 : 1)*(i+1)/2,mae:2,rmse:2+i/2},
+    wind_vector_error_ms:{n:2,mae:3,rmse:4+i}
+  }]))]));
+const verificationProduct = () => ({record_count:3,generated_at:'2026-10-12T12:00:00Z',
+  start_time:'2026-09-12T12:00:00Z',end_time:'2026-10-12T12:00:00Z',
+  records:[{mustNotReachBrowser:true}],statistics:verificationStats()});
+const verificationManifest = key => ({model_verification:{available:true,windows:{[key]:`verification/models/timeseries/latest_${key}.json`}}});
+let verificationFetched=[];
+backend.fetchJson_=path=>{verificationFetched.push(path);return {};};
+for(const key of [null,'../latest','__proto__','2d','30d/../90d',{},30]) {
+  assert.throws(()=>backend.getDashboardModelVerification(key));
+}
+assert.equal(verificationFetched.length,0);
+for(const path of ['data/latest.json','verification/models/timeseries/../latest_30d.json','verification/models/timeseries/latest_7d.json']) {
+  backend.fetchJson_=()=>({model_verification:{available:true,windows:{'30d':path}}});
+  assert.throws(()=>backend.getDashboardModelVerification('30d'));
+}
+for(const manifest of [{},{model_verification:{available:false,windows:{}}}]) {
+  backend.fetchJson_=()=>manifest;
+  assert.throws(()=>backend.getDashboardModelVerification('30d'),/not available yet/);
+}
+for(const key of ['7d','30d','90d','1y']) {
+  cached.delete('ljlm-model-verification:'+key);
+  verificationFetched=[];
+  backend.fetchJson_=path=>{verificationFetched.push(path);return path==='data/dashboard_manifest.json'?verificationManifest(key):verificationProduct();};
+  const response=backend.getDashboardModelVerification(key);
+  assert.equal(response.window,key);
+  assert.equal(response.recordCount,3);
+  assert.equal(response.generatedAt,'2026-10-12T12:00:00Z');
+  assert.equal(response.startTime,'2026-09-12T12:00:00Z');
+  assert.equal(response.endTime,'2026-10-12T12:00:00Z');
+  assert.deepEqual(Object.keys(response).sort(),['window','generatedAt','startTime','endTime','recordCount','statistics'].sort());
+  assert.equal(response.records,undefined);
+  assert.equal(response.statistics['ICON-D2']['850'].wind_vector_error_ms.bias,undefined);
+  assert.deepEqual(verificationFetched,['data/dashboard_manifest.json',`verification/models/timeseries/latest_${key}.json`]);
+  backend.getDashboardModelVerification(key);
+  assert.equal(verificationFetched.length,3); // revalidate manifest, use separate aggregate cache
+  backend.fetchJson_=()=>({});
+  assert.throws(()=>backend.getDashboardModelVerification(key)); // cache cannot bypass manifest availability
+}
+for(const mutate of [
+  data=>{data.statistics=[];},data=>{data.statistics=null;},
+  data=>{data.statistics.OBS={};},data=>{delete data.statistics['C-LAEF'];},
+  data=>{data.statistics['ICON-D2']=[];},
+  data=>{data.record_count=-1;},data=>{data.record_count=Infinity;},data=>{data.record_count='3';},
+  data=>{data.generated_at=12;},data=>{data.start_time=null;},data=>{data.end_time={};},
+  data=>{data.statistics['ICON-D2']['925'].temperature_c.bias=NaN;},
+  data=>{data.statistics['ICON-D2']['925'].temperature_c.rmse=-1;},
+  data=>{data.statistics['ICON-D2']['925'].temperature_c.n=4;}
+]) {
+  cached.delete('ljlm-model-verification:30d');
+  const invalid=verificationProduct();mutate(invalid);
+  backend.fetchJson_=path=>path==='data/dashboard_manifest.json'?verificationManifest('30d'):invalid;
+  assert.throws(()=>backend.getDashboardModelVerification('30d'));
+}
+console.log('Model verification backend allowlist, schema, compact payload and cache checks passed.');
+
+const verificationRequests=[];
+runner.getDashboardModelVerification=key=>verificationRequests.push({key,success,failure});
+const verificationBrowser=vm.createContext({document:{getElementById:element,querySelectorAll:()=>[]},google:{script:{run:runner}}});
+vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],verificationBrowser);
+assert.equal(verificationRequests.length,0);
+assert.match(html,/id="viewModelVerificationBtn"[^>]*[\s\S]*?onclick="showModelVerificationView\(\)">Model verification/);
+assert.ok(html.indexOf('id="viewComparisonBtn"')<html.indexOf('id="viewModelVerificationBtn"'));
+assert.ok(html.indexOf('id="viewModelVerificationBtn"')<html.indexOf('id="viewTimeseriesBtn"'));
+verificationBrowser.showModelVerificationView();
+verificationBrowser.showModelVerificationView();
+assert.equal(verificationRequests.length,1);
+assert.equal(verificationRequests[0].key,'30d');
+assert.match(element('app').innerHTML,/Loading model verification/);
+verificationBrowser.loadModelVerificationWindow_('90d');
+assert.equal(verificationRequests.length,2);
+const verificationResponse=key=>({window:key,generatedAt:'2026-10-12T12:00:00Z',startTime:'2026-09-12T12:00:00Z',endTime:'2026-10-12T12:00:00Z',recordCount:3,statistics:verificationStats()});
+verificationRequests[1].success(verificationResponse('90d'));
+const activeVerificationMarkup=element('app').innerHTML;
+verificationRequests[0].success(verificationResponse('30d'));
+assert.equal(element('app').innerHTML,activeVerificationMarkup);
+assert.equal(vm.runInContext('modelVerificationWindow',verificationBrowser),'90d');
+verificationBrowser.setMainView_('sounding');
+verificationBrowser.showModelVerificationView();
+verificationBrowser.loadModelVerificationWindow_('30d');
+assert.equal(verificationRequests.length,2); // both cached windows reused
+assert.match(element('app').innerHTML,/Selected period: 30 d/);
+assert.match(element('app').innerHTML,/3 verification cases/);
+assert.match(element('app').innerHTML,/2026-09-12T12:00:00Z.*2026-10-12T12:00:00Z UTC/);
+assert.equal((element('app').innerHTML.match(/<svg /g)||[]).length,3);
+assert.match(element('app').innerHTML,/ICON-D2/);assert.match(element('app').innerHTML,/C-LAEF/);
+assert.match(element('app').innerHTML,/Temperature bias.*Temperature RMSE.*Wind-vector RMSE/s);
+assert.match(element('app').innerHTML,/N=3/);assert.match(element('app').innerHTML,/N=2/);
+assert.doesNotMatch(element('app').innerHTML,/NaN|undefined/);
+const chartData=verificationResponse('30d');
+let biasChart=verificationBrowser.modelVerificationChart_(chartData,'temperature_c','bias','Bias','°C');
+assert.match(biasChart,/BIAS 0.50/);assert.match(biasChart,/BIAS -0.50/);
+assert.match(biasChart,/verification-zero/);
+// Opposite signs fall on opposite sides of a centered zero; pressure decreases upward.
+const circles=Array.from(biasChart.matchAll(/<circle cx="([^"]+)" cy="([^"]+)"/g),m=>[Number(m[1]),Number(m[2])]);
+assert.ok(circles[0][0]>197 && circles[5][0]<197);
+assert.ok(circles[0][1]>circles[1][1] && circles[1][1]>circles[4][1]);
+const logarithmicRatio=(circles[0][1]-circles[1][1])/(circles[0][1]-circles[4][1]);
+assert.ok(Math.abs(logarithmicRatio-Math.log(925/850)/Math.log(925/300))<1e-10);
+chartData.statistics['ICON-D2']['700'].temperature_c.bias=null;
+biasChart=verificationBrowser.modelVerificationChart_(chartData,'temperature_c','bias','Bias','°C');
+assert.equal((biasChart.match(/<circle /g)||[]).length,9);
+const iconPath=biasChart.match(/<path d="([^"]*)"/)[1];
+assert.equal((iconPath.match(/M /g)||[]).length,2); // missing pressure breaks the line
+assert.doesNotMatch(biasChart,/NaN|undefined/);
+const windChart=verificationBrowser.modelVerificationChart_(chartData,'wind_vector_error_ms','rmse','Wind','m/s');
+assert.match(windChart,/RMSE 4.00 m\/s/);
+assert.doesNotMatch(windChart,/BIAS/);
+assert.match(windChart,/>0.0<\/text>/); // nonnegative axis starts at zero
+chartData.statistics['ICON-D2']['925'].temperature_c.bias=Number.MAX_VALUE;
+assert.doesNotMatch(verificationBrowser.modelVerificationChart_(chartData,'temperature_c','bias','Bias','°C'),/NaN|Infinity|undefined/);
+verificationBrowser.loadModelVerificationWindow_('7d');
+verificationRequests.at(-1).failure(new Error('Unavailable manifest'));
+assert.match(element('app').innerHTML,/Model verification statistics are not available yet/);
+assert.doesNotMatch(element('app').innerHTML,/<svg/);
+verificationBrowser.loadModelVerificationWindow_('1y');
+const zero={...verificationResponse('1y'),recordCount:0};
+verificationRequests.at(-1).success(zero);
+assert.match(element('app').innerHTML,/No verification cases in this period/);
+assert.doesNotMatch(element('app').innerHTML,/<svg/);
+const requestCount=verificationRequests.length;
+verificationBrowser.loadModelVerificationWindow_('../30d');
+assert.equal(verificationRequests.length,requestCount);
+// A response arriving after navigation must not replace another dashboard view.
+vm.runInContext("delete modelVerificationCache['7d'];",verificationBrowser);
+verificationBrowser.loadModelVerificationWindow_('7d');
+const leavingRequest=verificationRequests.at(-1);
+verificationBrowser.setMainView_('sounding');
+element('app').innerHTML='Other view';
+leavingRequest.success(verificationResponse('7d'));
+assert.equal(element('app').innerHTML,'Other view');
+console.log('Model verification lazy loading, stale protection, aggregate charts, gaps, N and empty/unavailable checks passed.');

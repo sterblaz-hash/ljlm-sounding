@@ -2818,3 +2818,65 @@ function getDashboardTrajectories(windowKey) {
   if (Utilities.newBlob(encoded).getBytes().length < 95000) cache.put(key,encoded,LJLM_CONFIG.CACHE_SECONDS);
   return result;
 }
+
+// Aggregate verification only: records never cross the browser boundary.
+function getDashboardModelVerification(windowKey) {
+  if (['7d', '30d', '90d', '1y'].indexOf(windowKey) === -1) {
+    throw new Error('Unknown model verification window.');
+  }
+  const manifest = fetchJson_(LJLM_CONFIG.MANIFEST_PATH);
+  const entry = manifest.model_verification || {};
+  const path = (entry.windows || {})[windowKey];
+  if (entry.available !== true || path !== 'verification/models/timeseries/latest_' + windowKey + '.json') {
+    throw new Error('Model verification statistics are not available yet.');
+  }
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'ljlm-model-verification:' + windowKey;
+  const cached = cache.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+  const data = fetchJson_(path);
+  const object = function(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); };
+  const numeric = function(value) { return typeof value === 'number' && Number.isFinite(value); };
+  if (!object(data) || !object(data.statistics) || !numeric(data.record_count) ||
+      data.record_count < 0 || !Number.isInteger(data.record_count)) {
+    throw new Error('Invalid model verification statistics.');
+  }
+  ['generated_at', 'start_time', 'end_time'].forEach(function(key) {
+    if (data[key] !== undefined && typeof data[key] !== 'string') throw new Error('Invalid verification timestamp.');
+  });
+  const models = ['ICON-D2', 'C-LAEF'];
+  if (Object.keys(data.statistics).some(function(key) { return models.indexOf(key) === -1; })) {
+    throw new Error('Unexpected verification model.');
+  }
+  const statistics = {};
+  models.forEach(function(model) {
+    if (!object(data.statistics[model])) throw new Error('Missing verification model.');
+    statistics[model] = {};
+    ['925', '850', '700', '500', '300'].forEach(function(pressure) {
+      const row = data.statistics[model][pressure];
+      if (row !== undefined && !object(row)) throw new Error('Invalid verification pressure row.');
+      statistics[model][pressure] = {};
+      ['temperature_c', 'dewpoint_c', 'relative_humidity_pct', 'height_m', 'u_ms', 'v_ms', 'wind_vector_error_ms'].forEach(function(metric) {
+        const summary = (row || {})[metric];
+        if (summary === undefined) return;
+        if (!object(summary) || !numeric(summary.n) || summary.n < 0 || !Number.isInteger(summary.n) || summary.n > data.record_count) {
+          throw new Error('Invalid verification sample count.');
+        }
+        const compact = {n: summary.n};
+        (metric === 'wind_vector_error_ms' ? ['mae', 'rmse'] : ['bias', 'mae', 'rmse']).forEach(function(stat) {
+          const value = summary[stat];
+          if (value !== undefined && value !== null && (!numeric(value) || (stat !== 'bias' && value < 0))) {
+            throw new Error('Invalid verification statistic.');
+          }
+          compact[stat] = value === undefined ? null : value;
+        });
+        statistics[model][pressure][metric] = compact;
+      });
+    });
+  });
+  const result = {window: windowKey, generatedAt: data.generated_at || '', startTime: data.start_time || '',
+    endTime: data.end_time || '', recordCount: data.record_count, statistics: statistics};
+  const encoded = JSON.stringify(result);
+  if (Utilities.newBlob(encoded).getBytes().length < 95000) cache.put(cacheKey, encoded, LJLM_CONFIG.CACHE_SECONDS);
+  return result;
+}
