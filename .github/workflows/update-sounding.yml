@@ -42,6 +42,9 @@ jobs:
       - name: Render matching OBS, ICON-D2 and C-LAEF verification
         run: python render_model_verification.py
 
+      - name: Update model verification data
+        run: python build_model_verification_data.py --sync-recent-hours 72
+
       - name: Update trajectory data
         run: python build_trajectory_data.py --sync-recent-hours 72
 

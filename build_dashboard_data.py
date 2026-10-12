@@ -183,12 +183,15 @@ def build_manifest(root):
             slots[term] = products
     windows = existing({label: BASE / f"latest_{label}.json" for label in WINDOWS})
     trajectory_windows = existing({label: Path("trajectories/ljlm") / f"latest_{label}.json" for label in ("7d", "30d", "90d")})
+    verification_windows = existing({label: Path("verification/models/timeseries") / f"latest_{label}.json"
+                                     for label in ("7d", "30d", "90d", "1y")})
     climatology_index = Path('climatology/dashboard/index.json')
     return {"version": VERSION, **STATION, "observations": obs,
             "climatology": {"available": (root / climatology_index).is_file(),
                             **({"index": str(climatology_index)} if (root / climatology_index).is_file() else {})},
             "icon_d2": {"lead_hours": 12, "slots": slots},
             "trajectories": {"available": bool(trajectory_windows), "windows": trajectory_windows},
+            "model_verification": {"available": bool(verification_windows), "windows": verification_windows},
             "timeseries": {"available": bool(windows), "windows": windows, "variables": VARIABLES}}
 
 
