@@ -232,6 +232,50 @@ class DashboardTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 builder.sync_recent(self.root, now, hours)
 
+    def test_model_verification_manifest_without_windows(self):
+        # Other verification products must not imply rolling-window availability.
+        self.put('verification/models/latest/00/comparison.json', {})
+        self.put('verification/models/timeseries/archive/2026/10.json', {})
+        self.put('verification/models/timeseries/latest_2d.json', {})
+        self.assertEqual(builder.build_manifest(self.root)['model_verification'],
+                         {'available': False, 'windows': {}})
+
+    def test_model_verification_manifest_one_window(self):
+        self.put('verification/models/timeseries/latest_30d.json', {'statistics': {'example': 1}})
+        manifest = builder.build_manifest(self.root)['model_verification']
+        self.assertEqual(manifest, {'available': True, 'windows': {
+            '30d': 'verification/models/timeseries/latest_30d.json'}})
+        self.assertNotIn('statistics', manifest)
+
+    def test_model_verification_manifest_all_windows_exact_paths(self):
+        expected = {label: f'verification/models/timeseries/latest_{label}.json'
+                    for label in ('7d', '30d', '90d', '1y')}
+        for path in expected.values():
+            self.put(path, {})
+        self.put('verification/models/timeseries/latest_2d.json', {})
+        self.put('verification/models/latest_7d.json', {})
+        manifest = builder.build_manifest(self.root)['model_verification']
+        self.assertEqual(manifest, {'available': True, 'windows': expected})
+        for path in manifest['windows'].values():
+            self.assertTrue((self.root / path).is_file())
+
+    def test_obs_workflow_verification_builder_once_and_in_order(self):
+        workflows = Path(__file__).resolve().parent / '.github/workflows'
+        workflow = (workflows / 'update-sounding.yml').read_text()
+        command = 'python build_model_verification_data.py --sync-recent-hours 72'
+        self.assertEqual(workflow.count('build_model_verification_data.py'), 1)
+        self.assertIn(command, workflow)
+        self.assertLess(workflow.index('run: python render_model_verification.py'),
+                        workflow.index('run: ' + command))
+        self.assertLess(workflow.index('run: ' + command),
+                        workflow.index('run: python build_dashboard_data.py'))
+        # Existing persistence covers the statistics tree and manifest unchanged.
+        self.assertIn('git add -A -- verification', workflow)
+        self.assertIn('find data -type f -name "*.json" -print0 | xargs -0 -r git add -f --', workflow)
+        for path in workflows.glob('*.yml'):
+            if path.name != 'update-sounding.yml':
+                self.assertNotIn('build_model_verification_data.py', path.read_text(), path.name)
+
     def test_manifest_only_existing_products(self):
         empty = builder.build_manifest(self.root)
         self.assertFalse(empty['timeseries']['available'])
