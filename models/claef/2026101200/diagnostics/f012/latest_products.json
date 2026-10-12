@@ -6,8 +6,8 @@
   "nominal_date": "2026-10-12",
   "term": "12",
   "launch_time": null,
-  "processed_at": "2026-10-12T07:26:45.450345Z",
-  "rendered_at": "2026-10-12T07:26:47.658109Z",
+  "processed_at": "2026-10-12T10:15:15.098085Z",
+  "rendered_at": "2026-10-12T10:15:18.071586Z",
   "latest": {
     "skewt": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026101200/diagnostics/f012/latest_skewt.png",
     "lowlevel": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026101200/diagnostics/f012/latest_lowlevel.png",
