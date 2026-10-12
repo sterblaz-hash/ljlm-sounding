@@ -53,6 +53,25 @@ class RunSelectionTests(unittest.TestCase):
 
 
 class SoundingTests(unittest.TestCase):
+    def test_supersaturated_pressure_and_surface_preserve_source_rh(self):
+        data = product()
+        data['surface']['2r'] = 100.01
+        values = {'t': [-18.798294067382812], 'r': [100.01],
+                  'u': [3], 'v': [4], 'z': [980.665]}
+        metadata = {name: {'units': unit, 'standard_name': standard_name}
+                    for name, (standard_name, unit) in p.VARIABLES.items()}
+        metadata['plev'] = {'units': 'hPa'}
+        data['levels'] = p.build_levels([500], values, metadata)
+        data['levels'][0]['omega_pa_s'] = None
+        self.assertIs(c.dew_point_c, p.dew_point_c)
+        result = c.build_sounding(data)
+        for row in result['levels']:
+            self.assertEqual(row['relative_humidity_pct'], 100.01)
+            self.assertAlmostEqual(row['dewpoint_c'], row['temperature_c'], places=7)
+        self.assertEqual([row['level_type'] for row in result['levels']], ['model_surface', 'pressure'])
+        self.assertEqual(data['surface']['2r'], 100.01)
+        self.assertEqual(data['levels'][0]['relative_humidity'], 100.01)
+
     def test_exact_verification_rules(self):
         for stamp in ('2026-10-09T00:00Z', '2026-10-09T12:00Z'):
             c.validate_run(c.parse_time(stamp), 12, True)

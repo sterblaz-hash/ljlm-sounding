@@ -190,10 +190,11 @@ def native_values(variable, values):
 
 
 def dew_point_c(temperature, humidity):
-    """Magnus approximation over liquid water; no RH clipping or ice correction."""
-    if temperature is None or humidity is None or not -80 <= temperature <= 60 or not 0 < humidity <= 100:
+    """Magnus over liquid water; cap RH at 100% only for Td, preserving source RH; no ice correction."""
+    if temperature is None or humidity is None or not -80 <= temperature <= 60 or not math.isfinite(humidity) or humidity <= 0:
         return None
-    gamma = math.log(humidity / 100) + 17.625 * temperature / (243.04 + temperature)
+    effective_rh = min(humidity, 100.0)
+    gamma = math.log(effective_rh / 100) + 17.625 * temperature / (243.04 + temperature)
     return 243.04 * gamma / (17.625 - gamma)
 
 
@@ -343,7 +344,7 @@ def inspect_and_extract(remote, lead_hours, *, sounding=False):
                     'wind_speed': {'unit': 'm s-1', 'method': 'hypot(u, v)'},
                     'wind_direction': {'unit': 'degree', 'method': 'meteorological FROM direction: atan2(-u,-v) modulo 360; calm is null'},
                     'height_m': {'unit': 'm', 'method': 'geopotential / 9.80665 m s-2; geopotential height, not geometric altitude'},
-                    'dew_point': {'unit': 'degree Celsius', 'method': 'Magnus over liquid water, a=17.625 b=243.04 C; -80<=T<=60 C, 0<RH<=100%; outside domain -> null; no ice correction'},
+                    'dew_point': {'unit': 'degree Celsius', 'method': 'Magnus over liquid water, a=17.625 b=243.04 C; -80<=T<=60 C, positive finite RH; RH capped at 100% for dew-point calculation only, source RH preserved; outside domain -> null; no ice correction'},
                     'below_model_surface': {'method': 'pressure_hpa * 100 > model surface pressure in Pa; native values retained; exclude flagged levels from comparisons'}},
                 'source': {'url': remote.url, 'etag': remote.selected['etag'], 'file_size_bytes': remote.size},
                 'limitations': ['11-level sparse pressure product; no pressure interpolation', 'No CAPE/CIN, detailed inversion, tropopause or full parcel/Skew-T diagnostics', 'Geopotential height uses standard gravity; dew point is an approximation with phase uncertainty']}
