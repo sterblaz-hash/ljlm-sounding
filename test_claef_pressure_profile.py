@@ -49,8 +49,23 @@ class DerivedTests(unittest.TestCase):
     def test_magnus_dewpoint(self):
         self.assertAlmostEqual(p.dew_point_c(20, 50), 9.2611, places=3)
         self.assertAlmostEqual(p.dew_point_c(-10, 100), -10, places=7)
-        for temperature, humidity in [(20, 0), (20, 101), (None, 80), (20, None), (-90, 80)]:
+        for temperature, humidity in [(20, 0), (20, -1), (20, float('nan')),
+                                      (20, float('inf')), (None, 80), (20, None), (-90, 80), (61, 80)]:
             self.assertIsNone(p.dew_point_c(temperature, humidity))
+
+    def test_saturated_and_supersaturated_dewpoint(self):
+        for humidity in (100, 100.01, 100.010009765625, 101):
+            with self.subTest(humidity=humidity):
+                self.assertAlmostEqual(p.dew_point_c(-18.798294067382812, humidity),
+                                       -18.798294067382812, places=7)
+
+    def test_supersaturated_pressure_level_preserves_source_rh(self):
+        values = sample_values(1)
+        values['r'] = [100.01]
+        level = p.build_levels([500], values, source_metadata())[0]
+        self.assertEqual(level['relative_humidity'], 100.01)
+        self.assertEqual(values['r'], [100.01])
+        self.assertAlmostEqual(level['dew_point'], level['temperature'], places=7)
 
     def test_meteorological_wind_and_calm(self):
         self.assertAlmostEqual(p.wind_from_uv(3, 4)[0], 5)
@@ -213,6 +228,9 @@ class HDFIntegrationTests(unittest.TestCase):
         self.assertEqual(data['levels'][0]['wind_speed'], 5)
         self.assertAlmostEqual(data['levels'][0]['height_m'], 100)
         self.assertAlmostEqual(data['levels'][0]['dew_point'], 9.2611, places=3)
+        method = data['derived_fields']['dew_point']['method']
+        self.assertIn('RH capped at 100% for dew-point calculation only', method)
+        self.assertIn('source RH preserved', method)
         self.assertEqual(data['grid_point']['latitude_index'], 1)
 
 
