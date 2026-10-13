@@ -267,6 +267,42 @@ overlayBrowser.setMainView_('climatology');
 element('app').innerHTML = 'Annual';
 overlayBrowser.renderComparison(withOverlay);
 assert.equal(element('app').innerHTML, 'Annual');
+// C-LAEF uses the same +12 h comparison contract but exposes a sparse profile.
+backend.fetchJsonOptional_ = path => path.startsWith('verification/') ? null : read(path);
+backend.fetchJson_ = path => read(path);
+const claefComparison = backend.getClaefSoundingComparison();
+assert.equal(claefComparison.available, true);
+assert.equal(claefComparison.model.model, 'C-LAEF');
+assert.equal(claefComparison.modelLabel, 'C-LAEF');
+assert.equal(claefComparison.overlay, null);
+assert.equal(claefComparison.sparseProfile, true);
+assert.match(claefComparison.profileNote, /Sparse public pressure-level profile/);
+assert.equal(claefComparison.diagnostics.length, 0);
+assert.equal(claefComparison.levels.length, 5);
+assert.ok(claefComparison.levels.every(row => row.available === true));
+assert.ok(Number.isFinite(claefComparison.rmse.temperatureC));
+assert.ok(Number.isFinite(claefComparison.rmse.dewpointC));
+assert.ok(Number.isFinite(claefComparison.rmse.windSpeedMs));
+assert.match(claefComparison.images.model.full,
+  new RegExp('models/claef/latest/' + observed.term + '/skewt\\.png'));
+assert.match(claefComparison.images.model.zoom,
+  new RegExp('models/claef/latest/' + observed.term + '/lowlevel\\.png'));
+assert.match(claefComparison.images.model.thetae,
+  new RegExp('models/claef/latest/' + observed.term + '/thetae\\.png'));
+assert.match(claefComparison.images.model.hodograph,
+  new RegExp('models/claef/latest/' + observed.term + '/hodograph\\.png'));
+console.log('C-LAEF sparse +12 h comparison backend checks passed.');
+overlayBrowser.setMainView_('claefComparison');
+overlayBrowser.renderComparison(claefComparison);
+assert.match(element('app').innerHTML, /C-LAEF \+12 h/);
+assert.match(element('app').innerHTML, /Profile limitations/);
+assert.match(element('app').innerHTML, /synthetic surface plus 10 usable pressure levels/);
+assert.doesNotMatch(element('app').innerHTML, /Key diagnostics/);
+assert.doesNotMatch(element('app').innerHTML, /comparison-overlay/);
+console.log('C-LAEF comparison card and limitation rendering checks passed.');
+
+
+
 console.log('Optional overlay metadata and comparison layout checks passed.');
 
 // Potek heatmap uses calendar-day compact references and shares browser caches.
@@ -897,7 +933,14 @@ const verificationBrowser=vm.createContext({document:{getElementById:element,que
 vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],verificationBrowser);
 assert.equal(verificationRequests.length,0);
 assert.match(html,/id="viewModelVerificationBtn"[^>]*[\s\S]*?onclick="showModelVerificationView\(\)">Model verification/);
-assert.ok(html.indexOf('id="viewComparisonBtn"')<html.indexOf('id="viewModelVerificationBtn"'));
+assert.ok(
+  html.indexOf('id="viewComparisonBtn"') <
+  html.indexOf('id="viewClaefComparisonBtn"')
+);
+assert.ok(
+  html.indexOf('id="viewClaefComparisonBtn"') <
+  html.indexOf('id="viewModelVerificationBtn"')
+);
 assert.ok(html.indexOf('id="viewModelVerificationBtn"')<html.indexOf('id="viewTimeseriesBtn"'));
 verificationBrowser.showModelVerificationView();
 verificationBrowser.showModelVerificationView();

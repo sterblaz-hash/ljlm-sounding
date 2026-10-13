@@ -1821,6 +1821,31 @@ function fetchJsonResponse_(path) {
 // ============================================================
 
 function getSoundingComparison() {
+  return getModelSoundingComparison_({
+    modelLabel: 'ICON-D2',
+    modelRoot: 'models/icon-d2',
+    overlay: true,
+    fullDiagnostics: true,
+    sparseProfile: false,
+    profileNote: ''
+  });
+}
+
+
+function getClaefSoundingComparison() {
+  return getModelSoundingComparison_({
+    modelLabel: 'C-LAEF',
+    modelRoot: 'models/claef',
+    overlay: false,
+    fullDiagnostics: false,
+    sparseProfile: true,
+    profileNote:
+      'Sparse public pressure-level profile: synthetic surface plus 10 usable pressure levels at LJLM; parcel and full-column diagnostics unavailable.'
+  });
+}
+
+
+function getModelSoundingComparison_(config) {
   const obs = fetchJson_(LJLM_CONFIG.LATEST_PATH);
 
   const term = String(obs.term || '').padStart(2, '0');
@@ -1839,7 +1864,8 @@ function getSoundingComparison() {
     comparisonObservationValidTime_(obs);
 
   const modelPath =
-    'models/icon-d2/latest/' +
+    config.modelRoot +
+    '/latest/' +
     term +
     '/sounding.json';
 
@@ -1850,7 +1876,7 @@ function getSoundingComparison() {
       available: false,
       status: 'model_missing',
       message:
-        'The matching ICON-D2 +12 h forecast is not available yet.',
+        'The matching ' + config.modelLabel + ' +12 h forecast is not available yet.',
       observationValidTime: obsValidTime,
       observation: comparisonObservationMeta_(obs)
     };
@@ -1871,7 +1897,7 @@ function getSoundingComparison() {
       available: false,
       status: 'time_mismatch',
       message:
-        'The latest observation and ICON-D2 forecast do not verify at the same time yet.',
+        'The latest observation and ' + config.modelLabel + ' forecast do not verify at the same time yet.',
       observationValidTime: obsValidTime,
       modelValidTime: modelValidTime,
       observation: comparisonObservationMeta_(obs),
@@ -1879,7 +1905,7 @@ function getSoundingComparison() {
     };
   }
 
-  const overlay = comparisonOverlay_(obs, model, term, obsValidTime);
+  const overlay = config.overlay ? comparisonOverlay_(obs, model, term, obsValidTime) : null;
 
   const pressures = [925, 850, 700, 500, 300];
 
@@ -1976,7 +2002,7 @@ function getSoundingComparison() {
       ).metpy || {}
     );
 
-  const diagnostics = [
+  const diagnostics = config.fullDiagnostics ? [
     comparisonMetric_(
       'PWAT',
       obsMetpy.pwat_mm,
@@ -2046,7 +2072,7 @@ function getSoundingComparison() {
       ),
       'kg m⁻¹ s⁻¹'
     )
-  ];
+  ] : [];
 
   const obsVersion =
     (
@@ -2067,7 +2093,7 @@ function getSoundingComparison() {
     available: true,
     status: 'matched',
     overlay: overlay,
-    convention: 'Difference = ICON-D2 − OBS',
+    convention: 'Difference = ' + config.modelLabel + ' − OBS',
     validTime: obsValidTime,
 
     observation:
@@ -2099,6 +2125,10 @@ function getSoundingComparison() {
         )
     },
 
+    modelLabel: config.modelLabel,
+    sparseProfile: config.sparseProfile === true,
+    profileNote: config.profileNote || '',
+
     images: {
       observation: {
         full:
@@ -2129,7 +2159,8 @@ function getSoundingComparison() {
       model: {
         full:
           rawUrl_(
-            'models/icon-d2/latest/' +
+            config.modelRoot +
+            '/latest/' +
             term +
             '/skewt.png',
             modelVersion
@@ -2137,7 +2168,8 @@ function getSoundingComparison() {
 
         zoom:
           rawUrl_(
-            'models/icon-d2/latest/' +
+            config.modelRoot +
+            '/latest/' +
             term +
             '/lowlevel.png',
             modelVersion
@@ -2145,7 +2177,8 @@ function getSoundingComparison() {
 
         thetae:
           rawUrl_(
-            'models/icon-d2/latest/' +
+            config.modelRoot +
+            '/latest/' +
             term +
             '/thetae.png',
             modelVersion
@@ -2153,7 +2186,8 @@ function getSoundingComparison() {
 
         hodograph:
           rawUrl_(
-            'models/icon-d2/latest/' +
+            config.modelRoot +
+            '/latest/' +
             term +
             '/hodograph.png',
             modelVersion

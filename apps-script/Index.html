@@ -1798,6 +1798,14 @@
       >
         ICON-D2 +12 h
       </button>
+      <button
+        id="viewClaefComparisonBtn"
+        class="view-tab"
+        type="button"
+        onclick="showClaefComparisonView()"
+      >
+        C-LAEF +12 h
+      </button>
       <button id="viewModelVerificationBtn" class="view-tab" type="button"
         onclick="showModelVerificationView()">Model verification</button>
       <button id="viewTimeseriesBtn" class="view-tab" type="button"
@@ -4025,6 +4033,9 @@
       const comparisonButton =
         document.getElementById('viewComparisonBtn');
 
+      const claefComparisonButton =
+        document.getElementById('viewClaefComparisonBtn');
+
       document.getElementById('viewTimeseriesBtn').classList.toggle('active', view === 'timeseries');
 
       if (soundingButton) {
@@ -4038,6 +4049,13 @@
         comparisonButton.classList.toggle(
           'active',
           view === 'comparison'
+        );
+      }
+
+      if (claefComparisonButton) {
+        claefComparisonButton.classList.toggle(
+          'active',
+          view === 'claefComparison'
         );
       }
     }
@@ -4339,7 +4357,9 @@
 
       google.script.run
         .withSuccessHandler(
-          renderComparison
+          function(data) {
+            if (currentView === 'comparison') renderComparison(data);
+          }
         )
         .withFailureHandler(
           function(error) {
@@ -4347,6 +4367,32 @@
           }
         )
         .getSoundingComparison();
+    }
+
+
+    function showClaefComparisonView() {
+      setMainView_('claefComparison');
+      currentComparePlot = 'full';
+
+      document.getElementById(
+        'app'
+      ).innerHTML =
+        '<div class="loading">' +
+        'Loading C-LAEF verification …' +
+        '</div>';
+
+      google.script.run
+        .withSuccessHandler(
+          function(data) {
+            if (currentView === 'claefComparison') renderComparison(data);
+          }
+        )
+        .withFailureHandler(
+          function(error) {
+            if (currentView === 'claefComparison') showError(error);
+          }
+        )
+        .getClaefSoundingComparison();
     }
 
 
@@ -4669,10 +4715,29 @@
 
     function renderComparison(data) {
       if (
-        currentView !== 'comparison'
+        currentView !== 'comparison' &&
+        currentView !== 'claefComparison'
       ) {
         return;
       }
+
+      const modelLabel =
+        (
+          data &&
+          (
+            data.modelLabel ||
+            (
+              data.model &&
+              data.model.model
+            )
+          )
+        ) ||
+        'ICON-D2';
+
+      const modelShortLabel =
+        modelLabel === 'ICON-D2'
+          ? 'ICON'
+          : modelLabel;
 
       if (
         !data ||
@@ -4698,7 +4763,7 @@
           data.modelValidTime
             ? (
                 '<br><span class="time-sub">' +
-                'ICON-D2 valid: ' +
+                esc(modelLabel) + ' valid: ' +
                 esc(
                   utcLabel(
                     data.modelValidTime
@@ -4735,7 +4800,7 @@
 
           '<div class="comparison-status">' +
             '<strong>' +
-              'ICON-D2 +12 h forecast matched with LJLM observation.' +
+              esc(modelLabel) + ' +12 h forecast matched with LJLM observation.' +
             '</strong>' +
             '<br>' +
             'Valid: ' +
@@ -4770,7 +4835,7 @@
             ) +
 
             comparisonMetaCard_(
-              'ICON-D2 run',
+              modelLabel + ' run',
               utcLabel(
                 data.model.runTime
               )
@@ -4800,7 +4865,7 @@
                 'Profile comparison' +
               '</div>' +
               '<div class="panel-note">' +
-                'OBS and ICON-D2 +12 h · ' +
+                'OBS and ' + esc(modelLabel) + ' +12 h · ' +
                 esc(
                   comparisonPlotLabel_()
                 ) +
@@ -4829,7 +4894,7 @@
           '</div>' +
 
           (currentComparePlot === 'overlay' && data.overlay
-            ? '<div class="comparison-overlay">' + comparisonImagePanel_('OBS vs ICON-D2 +12 h', data.overlay.url) + '</div>'
+            ? '<div class="comparison-overlay">' + comparisonImagePanel_('OBS vs ' + modelLabel + ' +12 h', data.overlay.url) + '</div>'
             : (
           '<div class="comparison-plots">' +
             comparisonImagePanel_(
@@ -4841,7 +4906,7 @@
             ) +
 
             comparisonImagePanel_(
-              'ICON-D2 +12 h',
+              modelLabel + ' +12 h',
               comparisonImageUrl_(
                 data,
                 'model'
@@ -4852,28 +4917,60 @@
         '</section>' +
 
 
-        '<section class="panel" style="margin-top:14px;">' +
-          '<div class="panel-head">' +
-            '<div>' +
-              '<div class="panel-title">' +
-                'Key diagnostics' +
-              '</div>' +
-              '<div class="panel-note">' +
-                'Difference = ICON-D2 − OBS' +
-              '</div>' +
-            '</div>' +
-          '</div>' +
+        (
+          (
+            data.diagnostics || []
+          ).length
+            ? (
+                '<section class="panel" style="margin-top:14px;">' +
+                  '<div class="panel-head">' +
+                    '<div>' +
+                      '<div class="panel-title">' +
+                        'Key diagnostics' +
+                      '</div>' +
+                      '<div class="panel-note">' +
+                        esc(
+                          data.convention ||
+                          (
+                            'Difference = ' +
+                            modelLabel +
+                            ' − OBS'
+                          )
+                        ) +
+                      '</div>' +
+                    '</div>' +
+                  '</div>' +
 
-          '<div class="comparison-metrics">' +
-            (
-              data.diagnostics || []
-            )
-              .map(
-                comparisonMetricHtml_
+                  '<div class="comparison-metrics">' +
+                    (
+                      data.diagnostics || []
+                    )
+                      .map(
+                        comparisonMetricHtml_
+                      )
+                      .join('') +
+                  '</div>' +
+                '</section>'
               )
-              .join('') +
-          '</div>' +
-        '</section>' +
+            : (
+                data.profileNote
+                  ? (
+                      '<section class="panel" style="margin-top:14px;">' +
+                        '<div class="panel-head">' +
+                          '<div>' +
+                            '<div class="panel-title">' +
+                              'Profile limitations' +
+                            '</div>' +
+                            '<div class="panel-note">' +
+                              esc(data.profileNote) +
+                            '</div>' +
+                          '</div>' +
+                        '</div>' +
+                      '</section>'
+                    )
+                  : ''
+              )
+        ) +
 
 
         '<section class="panel" style="margin-top:14px;">' +
@@ -4943,13 +5040,13 @@
                 '<tr>' +
                   '<th>Level</th>' +
                   '<th>OBS T</th>' +
-                  '<th>ICON T</th>' +
+                  '<th>' + esc(modelShortLabel) + ' T</th>' +
                   '<th>ΔT</th>' +
                   '<th>OBS Td</th>' +
-                  '<th>ICON Td</th>' +
+                  '<th>' + esc(modelShortLabel) + ' Td</th>' +
                   '<th>ΔTd</th>' +
                   '<th>OBS wind</th>' +
-                  '<th>ICON wind</th>' +
+                  '<th>' + esc(modelShortLabel) + ' wind</th>' +
                   '<th>Vector error</th>' +
                 '</tr>' +
               '</thead>' +
@@ -4963,7 +5060,7 @@
         '</section>' +
 
         '<div class="footer">' +
-          'LJLM 14015 · OBS vs DWD ICON-D2 native +12 h forecast' +
+          'LJLM 14015 · OBS vs ' + esc(modelLabel) + ' +12 h forecast' +
         '</div>';
 
       document.getElementById(
