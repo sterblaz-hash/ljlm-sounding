@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch
 
 import claef_pressure_profile as p
 import extract_claef as c
+import render_ljlm as r
 from claef_sounding_run import choose_run
 from icon_d2_forecast import publish_latest
 
@@ -113,6 +114,35 @@ class SoundingTests(unittest.TestCase):
         self.assertFalse(result['parameters']['inversions']['available'])
         self.assertFalse(result['diagnostics_available']['parcel'])
         self.assertEqual(result['parameters']['standard_levels']['t850'], data['levels'][4]['temperature'])
+
+    def test_lowlevel_wind_barbs_use_native_claef_levels_only(self):
+        sounding = c.build_sounding(product())
+        profile = r._clean_profile(sounding['levels'])
+        surface_p = max(profile.p_hpa)
+
+        claef = r._lowlevel_wind_targets(
+            sounding, profile, surface_p, 700.0
+        )
+        self.assertEqual(
+            claef,
+            [980.0, 950.0, 925.0, 900.0, 850.0, 800.0, 700.0],
+        )
+
+        expected_dense = r._lowlevel_barb_pressures(surface_p, 700.0)
+
+        obs = dict(sounding)
+        obs.pop('model', None)
+        self.assertEqual(
+            r._lowlevel_wind_targets(obs, profile, surface_p, 700.0),
+            expected_dense,
+        )
+
+        icon = dict(sounding)
+        icon['model'] = 'ICON-D2'
+        self.assertEqual(
+            r._lowlevel_wind_targets(icon, profile, surface_p, 700.0),
+            expected_dense,
+        )
 
     def test_missing_levels_never_interpolated(self):
         data = product()

@@ -348,6 +348,26 @@ def _lowlevel_barb_pressures(surface_p: float, top_p: float = 700.0):
     return sorted(set(round(x, 2) for x in result), reverse=True)
 
 
+def _lowlevel_wind_targets(data: dict, profile: Profile, surface_p: float, top_p: float = 700.0):
+    if str(data.get("model", "")).strip().upper() == "C-LAEF":
+        # The public C-LAEF sounding is a sparse pressure-level product.
+        # Use only native available levels so the plot does not imply
+        # a finer vertical wind resolution than the source has.
+        return sorted(
+            {
+                round(float(level), 2)
+                for level in profile.p_hpa
+                if (
+                    np.isfinite(level)
+                    and top_p <= float(level) <= surface_p + 0.5
+                )
+            },
+            reverse=True,
+        )
+
+    return _lowlevel_barb_pressures(surface_p, top_p)
+
+
 def _dense_barb_pressures(surface_p: float, top_p: float):
     """Denser wind sampling: 25 hPa in the lower troposphere, 50 hPa aloft."""
     result = [surface_p]
@@ -760,7 +780,10 @@ def render_lowlevel(data: dict, output: Path):
         ax.set_ylim(p_bottom, p_top)
 
     u_ms, v_ms = _wind_components(profile)
-    wind_targets = _lowlevel_barb_pressures(surface_p, p_top)
+    wind_targets = _lowlevel_wind_targets(
+        data, profile, surface_p, p_top
+    )
+
     ui = _interp_logp(profile.p_hpa, u_ms, wind_targets)
     vi = _interp_logp(profile.p_hpa, v_ms, wind_targets)
     good = np.isfinite(ui) & np.isfinite(vi)
