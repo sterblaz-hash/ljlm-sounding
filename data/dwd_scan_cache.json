@@ -1,169 +1,5 @@
 {
   "packages": {
-    "Z__C_EDZW_20261013114600_bda01%2Ctemp_bufr_999999_999999__MW_248.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:14:05.033849Z"
-    },
-    "Z__C_EDZW_20261013115300_bda01%2Ctemp_bufr_999999_999999__MW_249.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:14:03.706758Z"
-    },
-    "Z__C_EDZW_20261013115800_bda01%2Ctemp_bufr_999999_999999__MW_250.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:14:02.338267Z"
-    },
-    "Z__C_EDZW_20261013120301_bda01%2Ctemp_bufr_999999_999999__MW_251.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:59.423147Z"
-    },
-    "Z__C_EDZW_20261013120802_bda01%2Ctemp_bufr_999999_999999__MW_252.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:56.621465Z"
-    },
-    "Z__C_EDZW_20261013121103_bda01%2Ctemp_bufr_999999_999999__MW_253.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:53.105112Z"
-    },
-    "Z__C_EDZW_20261013121307_bda01%2Ctemp_bufr_999999_999999__MW_254.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:50.231123Z"
-    },
-    "Z__C_EDZW_20261013121515_bda01%2Ctemp_bufr_999999_999999__MW_255.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:47.359264Z"
-    },
-    "Z__C_EDZW_20261013121713_bda01%2Ctemp_bufr_999999_999999__MW_256.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:44.526375Z"
-    },
-    "Z__C_EDZW_20261013121810_bda01%2Ctemp_bufr_999999_999999__MW_257.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:41.343407Z"
-    },
-    "Z__C_EDZW_20261013122104_bda01%2Ctemp_bufr_999999_999999__MW_258.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:38.360018Z"
-    },
-    "Z__C_EDZW_20261013122507_bda01%2Ctemp_bufr_999999_999999__MW_259.bin": {
-      "contains_ljlm": true,
-      "launch_time": "2026-10-13T11:30:00Z",
-      "profile_level_count": 1682,
-      "scanned_at": "2026-10-13T14:09:37.831739Z"
-    },
-    "Z__C_EDZW_20261013122800_bda01%2Ctemp_bufr_999999_999999__MW_260.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:30.000961Z"
-    },
-    "Z__C_EDZW_20261013123103_bda01%2Ctemp_bufr_999999_999999__MW_261.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:27.124111Z"
-    },
-    "Z__C_EDZW_20261013123405_bda01%2Ctemp_bufr_999999_999999__MW_262.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:23.583484Z"
-    },
-    "Z__C_EDZW_20261013123800_bda01%2Ctemp_bufr_999999_999999__MW_263.bin": {
-      "contains_ljlm": true,
-      "launch_time": "2026-10-13T11:30:00Z",
-      "profile_level_count": 2005,
-      "scanned_at": "2026-10-13T14:09:32.085022Z"
-    },
-    "Z__C_EDZW_20261013124202_bda01%2Ctemp_bufr_999999_999999__MW_264.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:16.202314Z"
-    },
-    "Z__C_EDZW_20261013124403_bda01%2Ctemp_bufr_999999_999999__MW_265.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:13.302423Z"
-    },
-    "Z__C_EDZW_20261013124630_bda01%2Ctemp_bufr_999999_999999__MW_266.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:10.291516Z"
-    },
-    "Z__C_EDZW_20261013124900_bda01%2Ctemp_bufr_999999_999999__MW_267.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:07.381932Z"
-    },
-    "Z__C_EDZW_20261013125009_bda01%2Ctemp_bufr_999999_999999__MW_268.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:04.239270Z"
-    },
-    "Z__C_EDZW_20261013125303_bda01%2Ctemp_bufr_999999_999999__MW_269.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:13:01.259371Z"
-    },
-    "Z__C_EDZW_20261013125500_bda01%2Ctemp_bufr_999999_999999__MW_270.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:12:58.207249Z"
-    },
-    "Z__C_EDZW_20261013125700_bda01%2Ctemp_bufr_999999_999999__MW_271.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:12:55.203093Z"
-    },
-    "Z__C_EDZW_20261013125802_bda01%2Ctemp_bufr_999999_999999__MW_272.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:12:52.190508Z"
-    },
-    "Z__C_EDZW_20261013130004_bda01%2Ctemp_bufr_999999_999999__MW_273.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:12:49.324009Z"
-    },
-    "Z__C_EDZW_20261013130203_bda01%2Ctemp_bufr_999999_999999__MW_274.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:12:46.422189Z"
-    },
-    "Z__C_EDZW_20261013130303_bda01%2Ctemp_bufr_999999_999999__MW_275.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:12:43.371699Z"
-    },
-    "Z__C_EDZW_20261013130505_bda01%2Ctemp_bufr_999999_999999__MW_276.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:12:40.260648Z"
-    },
-    "Z__C_EDZW_20261013130703_bda01%2Ctemp_bufr_999999_999999__MW_277.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:12:37.301885Z"
-    },
-    "Z__C_EDZW_20261013130818_bda01%2Ctemp_bufr_999999_999999__MW_278.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:12:34.449755Z"
-    },
-    "Z__C_EDZW_20261013131005_bda01%2Ctemp_bufr_999999_999999__MW_279.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T13:12:31.458164Z"
-    },
-    "Z__C_EDZW_20261013131205_bda01%2Ctemp_bufr_999999_999999__MW_280.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T14:09:27.121552Z"
-    },
-    "Z__C_EDZW_20261013131400_bda01%2Ctemp_bufr_999999_999999__MW_281.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T14:09:23.948195Z"
-    },
-    "Z__C_EDZW_20261013131601_bda01%2Ctemp_bufr_999999_999999__MW_282.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T14:09:20.639987Z"
-    },
-    "Z__C_EDZW_20261013131604_bda01%2Ctemp_bufr_999999_999999__MW_283.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T14:09:17.480512Z"
-    },
-    "Z__C_EDZW_20261013131706_bda01%2Ctemp_bufr_999999_999999__MW_284.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T14:09:13.917786Z"
-    },
-    "Z__C_EDZW_20261013131801_bda01%2Ctemp_bufr_999999_999999__MW_285.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T14:09:10.891947Z"
-    },
-    "Z__C_EDZW_20261013132003_bda01%2Ctemp_bufr_999999_999999__MW_286.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T14:09:07.529596Z"
-    },
-    "Z__C_EDZW_20261013132600_bda01%2Ctemp_bufr_999999_999999__MW_287.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-13T14:09:04.380483Z"
-    },
     "Z__C_EDZW_20261013133101_bda01%2Ctemp_bufr_999999_999999__MW_288.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-10-13T14:09:01.245972Z"
@@ -1315,8 +1151,172 @@
     "Z__C_EDZW_20261016020705_bda01%2Ctemp_bufr_999999_999999__MW_832.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-10-16T02:14:09.773947Z"
+    },
+    "Z__C_EDZW_20261016114837_bda01%2Ctemp_bufr_999999_999999__MW_884.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:28:29.865647Z"
+    },
+    "Z__C_EDZW_20261016115401_bda01%2Ctemp_bufr_999999_999999__MW_885.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:28:28.250745Z"
+    },
+    "Z__C_EDZW_20261016115902_bda01%2Ctemp_bufr_999999_999999__MW_886.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:28:26.380963Z"
+    },
+    "Z__C_EDZW_20261016120402_bda01%2Ctemp_bufr_999999_999999__MW_887.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:28:24.031444Z"
+    },
+    "Z__C_EDZW_20261016120900_bda01%2Ctemp_bufr_999999_999999__MW_888.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:28:20.363122Z"
+    },
+    "Z__C_EDZW_20261016121115_bda01%2Ctemp_bufr_999999_999999__MW_889.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:28:16.770211Z"
+    },
+    "Z__C_EDZW_20261016121305_bda01%2Ctemp_bufr_999999_999999__MW_890.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:28:13.108359Z"
+    },
+    "Z__C_EDZW_20261016121505_bda01%2Ctemp_bufr_999999_999999__MW_891.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:28:09.385223Z"
+    },
+    "Z__C_EDZW_20261016121801_bda01%2Ctemp_bufr_999999_999999__MW_892.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:28:05.916645Z"
+    },
+    "Z__C_EDZW_20261016122005_bda01%2Ctemp_bufr_999999_999999__MW_893.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:28:02.348699Z"
+    },
+    "Z__C_EDZW_20261016122300_bda01%2Ctemp_bufr_999999_999999__MW_894.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:27:58.846793Z"
+    },
+    "Z__C_EDZW_20261016122502_bda01%2Ctemp_bufr_999999_999999__MW_895.bin": {
+      "contains_ljlm": true,
+      "launch_time": "2026-10-16T11:30:00Z",
+      "profile_level_count": 1682,
+      "scanned_at": "2026-10-16T13:27:55.205644Z"
+    },
+    "Z__C_EDZW_20261016122804_bda01%2Ctemp_bufr_999999_999999__MW_896.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:27:49.253480Z"
+    },
+    "Z__C_EDZW_20261016123139_bda01%2Ctemp_bufr_999999_999999__MW_897.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:27:45.342459Z"
+    },
+    "Z__C_EDZW_20261016123510_bda01%2Ctemp_bufr_999999_999999__MW_898.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:27:41.744984Z"
+    },
+    "Z__C_EDZW_20261016124002_bda01%2Ctemp_bufr_999999_999999__MW_899.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:27:38.167950Z"
+    },
+    "Z__C_EDZW_20261016124301_bda01%2Ctemp_bufr_999999_999999__MW_900.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:27:34.799676Z"
+    },
+    "Z__C_EDZW_20261016124403_bda01%2Ctemp_bufr_999999_999999__MW_901.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:27:31.141556Z"
+    },
+    "Z__C_EDZW_20261016124503_bda01%2Ctemp_bufr_999999_999999__MW_902.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:27:27.664432Z"
+    },
+    "Z__C_EDZW_20261016124800_bda01%2Ctemp_bufr_999999_999999__MW_903.bin": {
+      "contains_ljlm": true,
+      "launch_time": "2026-10-16T11:30:00Z",
+      "profile_level_count": 2348,
+      "scanned_at": "2026-10-16T13:27:23.919475Z"
+    },
+    "Z__C_EDZW_20261016125007_bda01%2Ctemp_bufr_999999_999999__MW_904.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:27:17.335280Z"
+    },
+    "Z__C_EDZW_20261016125112_bda01%2Ctemp_bufr_999999_999999__MW_905.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:27:12.828478Z"
+    },
+    "Z__C_EDZW_20261016125306_bda01%2Ctemp_bufr_999999_999999__MW_906.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:27:09.176796Z"
+    },
+    "Z__C_EDZW_20261016125525_bda01%2Ctemp_bufr_999999_999999__MW_907.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:27:05.620360Z"
+    },
+    "Z__C_EDZW_20261016125700_bda01%2Ctemp_bufr_999999_999999__MW_908.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:27:02.035401Z"
+    },
+    "Z__C_EDZW_20261016125912_bda01%2Ctemp_bufr_999999_999999__MW_909.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:58.358431Z"
+    },
+    "Z__C_EDZW_20261016130100_bda01%2Ctemp_bufr_999999_999999__MW_910.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:54.769263Z"
+    },
+    "Z__C_EDZW_20261016130304_bda01%2Ctemp_bufr_999999_999999__MW_911.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:50.968341Z"
+    },
+    "Z__C_EDZW_20261016130404_bda01%2Ctemp_bufr_999999_999999__MW_912.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:47.565541Z"
+    },
+    "Z__C_EDZW_20261016130711_bda01%2Ctemp_bufr_999999_999999__MW_913.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:44.677864Z"
+    },
+    "Z__C_EDZW_20261016130900_bda01%2Ctemp_bufr_999999_999999__MW_914.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:40.962290Z"
+    },
+    "Z__C_EDZW_20261016130909_bda01%2Ctemp_bufr_999999_999999__MW_915.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:37.470439Z"
+    },
+    "Z__C_EDZW_20261016131100_bda01%2Ctemp_bufr_999999_999999__MW_916.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:33.914736Z"
+    },
+    "Z__C_EDZW_20261016131203_bda01%2Ctemp_bufr_999999_999999__MW_917.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:30.168728Z"
+    },
+    "Z__C_EDZW_20261016131303_bda01%2Ctemp_bufr_999999_999999__MW_918.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:26.506769Z"
+    },
+    "Z__C_EDZW_20261016131500_bda01%2Ctemp_bufr_999999_999999__MW_919.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:22.841420Z"
+    },
+    "Z__C_EDZW_20261016131602_bda01%2Ctemp_bufr_999999_999999__MW_920.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:19.136920Z"
+    },
+    "Z__C_EDZW_20261016131715_bda01%2Ctemp_bufr_999999_999999__MW_921.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:15.653208Z"
+    },
+    "Z__C_EDZW_20261016131803_bda01%2Ctemp_bufr_999999_999999__MW_922.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:12.328626Z"
+    },
+    "Z__C_EDZW_20261016132200_bda01%2Ctemp_bufr_999999_999999__MW_923.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-16T13:26:08.232545Z"
     }
   },
-  "updated_at": "2026-10-16T02:14:46.148571Z",
+  "updated_at": "2026-10-16T13:28:29.865793Z",
   "version": 1
 }
