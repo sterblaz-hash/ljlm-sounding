@@ -2,15 +2,15 @@
   "version": 1,
   "station": 14015,
   "station_name": "Ljubljana",
-  "valid_time": "2026-10-16T00:00:00Z",
-  "verification_date": "2026-10-16",
+  "valid_time": "2026-10-17T00:00:00Z",
+  "verification_date": "2026-10-17",
   "verification_term": "00",
-  "observation_sounding_id": "20261016_00",
-  "model_sounding_id": "icon-d2_2026101512_f012",
+  "observation_sounding_id": "20261017_00",
+  "model_sounding_id": "icon-d2_2026101612_f012",
   "model": "ICON-D2",
-  "model_run_time": "2026-10-15T12:00:00Z",
+  "model_run_time": "2026-10-16T12:00:00Z",
   "lead_hours": 12,
-  "rendered_at": "2026-10-16T02:14:52.326221Z",
+  "rendered_at": "2026-10-17T01:23:07.955296Z",
   "skewt_overlay": "verification/icon-d2/latest/00/skewt_overlay.png",
-  "archive_skewt_overlay": "verification/icon-d2/2026/10/20261016_00_skewt_overlay.png"
+  "archive_skewt_overlay": "verification/icon-d2/2026/10/20261017_00_skewt_overlay.png"
 }
