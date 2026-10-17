@@ -2,12 +2,12 @@
   "version": 2,
   "station": 14015,
   "station_name": "Ljubljana",
-  "sounding_id": "icon-d2_2026101612_f012",
-  "nominal_date": "2026-10-17",
+  "sounding_id": "icon-d2_2026101712_f012",
+  "nominal_date": "2026-10-18",
   "term": "00",
   "launch_time": null,
-  "processed_at": "2026-10-16T14:00:54Z",
-  "rendered_at": "2026-10-16T14:00:58.243094Z",
+  "processed_at": "2026-10-17T13:49:10Z",
+  "rendered_at": "2026-10-17T13:49:13.707018Z",
   "latest": {
     "skewt": "models/icon-d2/latest/00/skewt.png",
     "lowlevel": "models/icon-d2/latest/00/lowlevel.png",
@@ -16,11 +16,11 @@
     "hodograph": "models/icon-d2/latest/00/hodograph.png"
   },
   "archive": {
-    "skewt": "models/icon-d2/2026101612/diagnostics/f012/2026/10/20261017_00_skewt.png",
-    "lowlevel": "models/icon-d2/2026101612/diagnostics/f012/2026/10/20261017_00_lowlevel.png",
-    "skewt_zoom": "models/icon-d2/2026101612/diagnostics/f012/2026/10/20261017_00_skewt_zoom.png",
-    "thetae": "models/icon-d2/2026101612/diagnostics/f012/2026/10/20261017_00_thetae.png",
-    "hodograph": "models/icon-d2/2026101612/diagnostics/f012/2026/10/20261017_00_hodograph.png"
+    "skewt": "models/icon-d2/2026101712/diagnostics/f012/2026/10/20261018_00_skewt.png",
+    "lowlevel": "models/icon-d2/2026101712/diagnostics/f012/2026/10/20261018_00_lowlevel.png",
+    "skewt_zoom": "models/icon-d2/2026101712/diagnostics/f012/2026/10/20261018_00_skewt_zoom.png",
+    "thetae": "models/icon-d2/2026101712/diagnostics/f012/2026/10/20261018_00_thetae.png",
+    "hodograph": "models/icon-d2/2026101712/diagnostics/f012/2026/10/20261018_00_hodograph.png"
   },
   "skewt": "models/icon-d2/latest/00/skewt.png",
   "skewt_zoom": "models/icon-d2/latest/00/skewt_zoom.png",
@@ -29,8 +29,8 @@
   "hodograph": "models/icon-d2/latest/00/hodograph.png",
   "profile_type": "model",
   "model": "ICON-D2",
-  "run_time": "2026-10-16T12:00:00Z",
-  "valid_time": "2026-10-17T00:00:00Z",
+  "run_time": "2026-10-17T12:00:00Z",
+  "valid_time": "2026-10-18T00:00:00Z",
   "lead_hours": 12,
   "requested_latitude": 46.06562,
   "requested_longitude": 14.51221,
@@ -38,6 +38,6 @@
   "grid_longitude": 14.52,
   "source": "dwd-open-data-native",
   "sounding": "models/icon-d2/latest/00/sounding.json",
-  "verification_date": "2026-10-17",
+  "verification_date": "2026-10-18",
   "verification_term": "00"
 }
