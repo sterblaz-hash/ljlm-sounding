@@ -1,0 +1,44 @@
+{
+  "version": 2,
+  "station": 14015,
+  "station_name": "Ljubljana",
+  "sounding_id": "claef_2026102000_f012",
+  "nominal_date": "2026-10-20",
+  "term": "12",
+  "launch_time": null,
+  "processed_at": "2026-10-20T07:42:31.004290Z",
+  "rendered_at": "2026-10-20T07:42:34.092549Z",
+  "latest": {
+    "skewt": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/latest_skewt.png",
+    "lowlevel": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/latest_lowlevel.png",
+    "skewt_zoom": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/latest_skewt_zoom.png",
+    "thetae": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/latest_thetae.png",
+    "hodograph": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/latest_hodograph.png"
+  },
+  "archive": {
+    "skewt": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/2026/10/20261020_12_skewt.png",
+    "lowlevel": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/2026/10/20261020_12_lowlevel.png",
+    "skewt_zoom": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/2026/10/20261020_12_skewt_zoom.png",
+    "thetae": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/2026/10/20261020_12_thetae.png",
+    "hodograph": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/2026/10/20261020_12_hodograph.png"
+  },
+  "skewt": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/latest_skewt.png",
+  "skewt_zoom": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/latest_skewt_zoom.png",
+  "lowlevel": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/latest_lowlevel.png",
+  "thetae": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/latest_thetae.png",
+  "hodograph": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/claef/2026102000/diagnostics/f012/latest_hodograph.png",
+  "profile_type": "model",
+  "model": "C-LAEF",
+  "run_time": "2026-10-20T00:00:00Z",
+  "valid_time": "2026-10-20T12:00:00Z",
+  "lead_hours": 12,
+  "requested_latitude": 46.0656,
+  "requested_longitude": 14.5122,
+  "grid_latitude": 46.06199999999979,
+  "grid_longitude": 14.508700000000164,
+  "source": {
+    "url": "https://public.hub.geosphere.at/datahub/resources/nwp-v2-1h-1km/filelisting/nwp_2026102000.nc",
+    "etag": "9cf253610b0e82153cd35c52f4873832-179",
+    "file_size_bytes": 9370089293
+  }
+}
