@@ -2255,8 +2255,52 @@
     "Z__C_EDZW_20261022145000_bda01%2Ctemp_bufr_999999_999999__MW_175.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-10-22T14:58:05.410435Z"
+    },
+    "Z__C_EDZW_20261022150624_bda01%2Ctemp_bufr_999999_999999__MW_176.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-22T17:41:13.748413Z"
+    },
+    "Z__C_EDZW_20261022152200_bda01%2Ctemp_bufr_999999_999999__MW_177.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-22T17:41:11.715485Z"
+    },
+    "Z__C_EDZW_20261022153500_bda01%2Ctemp_bufr_999999_999999__MW_178.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-22T17:41:09.802797Z"
+    },
+    "Z__C_EDZW_20261022154300_bda01%2Ctemp_bufr_999999_999999__MW_179.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-22T17:41:08.851968Z"
+    },
+    "Z__C_EDZW_20261022154716_bda01%2Ctemp_bufr_999999_999999__MW_180.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-22T17:41:04.094255Z"
+    },
+    "Z__C_EDZW_20261022160102_bda01%2Ctemp_bufr_999999_999999__MW_181.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-22T17:40:54.245505Z"
+    },
+    "Z__C_EDZW_20261022161801_bda01%2Ctemp_bufr_999999_999999__MW_182.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-22T17:40:52.737830Z"
+    },
+    "Z__C_EDZW_20261022163611_bda01%2Ctemp_bufr_999999_999999__MW_183.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-22T17:40:51.480363Z"
+    },
+    "Z__C_EDZW_20261022165010_bda01%2Ctemp_bufr_999999_999999__MW_184.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-22T17:40:49.977698Z"
+    },
+    "Z__C_EDZW_20261022171730_bda01%2Ctemp_bufr_999999_999999__MW_185.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-22T17:40:48.272944Z"
+    },
+    "Z__C_EDZW_20261022172801_bda01%2Ctemp_bufr_999999_999999__MW_186.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-22T17:40:46.291900Z"
     }
   },
-  "updated_at": "2026-10-22T15:02:34.492353Z",
+  "updated_at": "2026-10-22T17:41:13.748558Z",
   "version": 1
 }
