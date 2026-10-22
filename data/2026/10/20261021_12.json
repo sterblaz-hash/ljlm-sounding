@@ -3739,7 +3739,7 @@
   "source": "DWD Open Data BUFR",
   "source_file": "Z__C_EDZW_20261021115120_bda01,temp_bufr_999999_999999__MW_906.bin",
   "retrieved_at": "2026-10-21T13:29:33.242193Z",
-  "processed_at": "2026-10-21T13:29:36.323434Z",
+  "processed_at": "2026-10-22T05:12:53.102036Z",
   "term": "12",
   "nominal_date": "2026-10-21",
   "sounding_classification": {
