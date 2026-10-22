@@ -4,7 +4,10 @@ on:
   workflow_dispatch:
 
   schedule:
+    # Primary + reserve checks. GitHub scheduled events can occasionally be
+    # delayed or dropped, so add independent staggered catch-up runs.
     - cron: "50 0,1,12,13 * * *"
+    - cron: "20 1,2,3,13,14,15 * * *"
 
 permissions:
   contents: write
