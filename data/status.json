@@ -2,7 +2,7 @@
   "current_expected": {
     "key": "2026-10-25_12",
     "nominal_date": "2026-10-25",
-    "status": "waiting",
+    "status": "missing",
     "term": "12"
   },
   "special_soundings": {},
@@ -375,7 +375,7 @@
     },
     "2026-10-24_00": {
       "archive_file": "data/2026/10/20261024_00.json",
-      "checked_at": "2026-10-25T13:31:03.861075Z",
+      "checked_at": "2026-10-25T14:04:14.834791Z",
       "first_seen_at": "2026-10-24T05:06:59.250898Z",
       "launch_time": "2026-10-23T23:30:00Z",
       "missing_after": "2026-10-24T01:50:00Z",
@@ -389,7 +389,7 @@
     },
     "2026-10-24_12": {
       "archive_file": "data/2026/10/20261024_12.json",
-      "checked_at": "2026-10-25T13:31:03.861075Z",
+      "checked_at": "2026-10-25T14:04:14.834791Z",
       "first_seen_at": "2026-10-24T13:44:21.037517Z",
       "launch_time": "2026-10-24T11:30:00Z",
       "missing_after": "2026-10-24T13:50:00Z",
@@ -403,12 +403,12 @@
     },
     "2026-10-25_00": {
       "archive_file": "data/2026/10/20261025_00.json",
-      "checked_at": "2026-10-25T13:31:03.861075Z",
+      "checked_at": "2026-10-25T14:04:14.834791Z",
       "first_seen_at": "2026-10-25T04:42:16.794058Z",
       "launch_time": "2026-10-24T23:30:00Z",
       "missing_after": "2026-10-25T01:50:00Z",
       "nominal_date": "2026-10-25",
-      "processed_at": "2026-10-25T13:33:27.355383Z",
+      "processed_at": "2026-10-25T14:05:13.287842Z",
       "profile_level_count": 1856,
       "retrieved_at": "2026-10-25T04:46:32.415126Z",
       "status": "ok",
@@ -416,15 +416,16 @@
       "waiting_from": "2026-10-25T00:50:00Z"
     },
     "2026-10-25_12": {
-      "checked_at": "2026-10-25T13:31:03.861075Z",
+      "checked_at": "2026-10-25T14:04:14.834791Z",
       "first_seen_at": "2026-10-25T13:31:03.861075Z",
       "missing_after": "2026-10-25T13:50:00Z",
+      "missing_since": "2026-10-25T13:50:00Z",
       "nominal_date": "2026-10-25",
-      "status": "waiting",
+      "status": "missing",
       "term": "12",
       "waiting_from": "2026-10-25T12:50:00Z"
     }
   },
-  "updated_at": "2026-10-25T13:31:03.861075Z",
+  "updated_at": "2026-10-25T14:04:14.834791Z",
   "version": 1
 }
