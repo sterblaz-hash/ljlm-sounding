@@ -35,7 +35,13 @@ class SearchWindowTests(unittest.TestCase):
         with patch.dict(extract.os.environ, {"GITHUB_EVENT_NAME": event}), \
                 patch.object(extract, "load_status_file", return_value={
                     "terms": {str(i): entry for i, entry in enumerate(entries)}
-                }), patch.object(extract, "get_directory_listing", return_value=html), \
+                }), \
+                patch.object(
+                    extract,
+                    "archive_status_metadata",
+                    return_value={"archive_file": "dummy.json"},
+                ), \
+                patch.object(extract, "get_directory_listing", return_value=html), \
                 redirect_stdout(output):
             selected = extract.find_candidate_files(now=self.now)
         self.assertEqual(set(selected), {name for age, name in files.items() if age <= hours})
@@ -62,6 +68,54 @@ class SearchWindowTests(unittest.TestCase):
                 }):
             self.assertEqual(extract.dwd_search_mode(self.now + timedelta(seconds=1)),
                              ("scheduled", 3))
+
+    def test_catch_up_when_expected_term_never_entered_status(self):
+        """A dropped cron must not make an already-due sounding invisible."""
+        def archive(nominal_date, term):
+            if nominal_date == self.now.date() and term == "00":
+                return None
+            return {"archive_file": "dummy.json"}
+
+        with patch.dict(extract.os.environ, {"GITHUB_EVENT_NAME": "schedule"}), \
+                patch.object(extract, "load_status_file", return_value={
+                    "terms": {}
+                }), \
+                patch.object(
+                    extract,
+                    "archive_status_metadata",
+                    side_effect=archive,
+                ):
+            self.assertEqual(
+                extract.dwd_search_mode(self.now),
+                ("scheduled catch-up", 48),
+            )
+
+    def test_catch_up_when_status_says_ok_but_archive_is_missing(self):
+        """The archive, not a stale ok status, is the final source of truth."""
+        entry = {
+            "nominal_date": self.now.date().isoformat(),
+            "term": "00",
+            "status": "ok",
+        }
+
+        def archive(nominal_date, term):
+            if nominal_date == self.now.date() and term == "00":
+                return None
+            return {"archive_file": "dummy.json"}
+
+        with patch.dict(extract.os.environ, {"GITHUB_EVENT_NAME": "schedule"}), \
+                patch.object(extract, "load_status_file", return_value={
+                    "terms": {"2026-10-05_00": entry}
+                }), \
+                patch.object(
+                    extract,
+                    "archive_status_metadata",
+                    side_effect=archive,
+                ):
+            self.assertEqual(
+                extract.dwd_search_mode(self.now),
+                ("scheduled catch-up", 48),
+            )
 
     def test_manual_always_uses_72_hours(self):
         for entries in ([], [self.entry(12)], [self.entry(60)]):
