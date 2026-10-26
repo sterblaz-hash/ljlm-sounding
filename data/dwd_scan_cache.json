@@ -1,25 +1,5 @@
 {
   "packages": {
-    "Z__C_EDZW_20261023185613_bda01%2Ctemp_bufr_999999_999999__MW_406.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-24T06:03:30.121788Z"
-    },
-    "Z__C_EDZW_20261023190500_bda01%2Ctemp_bufr_999999_999999__MW_407.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-24T06:03:28.831815Z"
-    },
-    "Z__C_EDZW_20261023191125_bda01%2Ctemp_bufr_999999_999999__MW_408.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-24T06:03:27.374909Z"
-    },
-    "Z__C_EDZW_20261023191713_bda01%2Ctemp_bufr_999999_999999__MW_409.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-24T06:03:25.600402Z"
-    },
-    "Z__C_EDZW_20261023192501_bda01%2Ctemp_bufr_999999_999999__MW_410.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-24T06:03:24.727925Z"
-    },
     "Z__C_EDZW_20261023193009_bda01%2Ctemp_bufr_999999_999999__MW_411.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-10-24T06:03:23.152421Z"
@@ -958,7 +938,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-10-24T23:30:00Z",
       "profile_level_count": 1522,
-      "scanned_at": "2026-10-26T18:54:12.519133Z"
+      "scanned_at": "2026-10-26T19:26:20.170929Z"
     },
     "Z__C_EDZW_20261025002400_bda01%2Ctemp_bufr_999999_999999__MW_644.bin": {
       "contains_ljlm": false,
@@ -976,7 +956,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-10-24T23:30:00Z",
       "profile_level_count": 1856,
-      "scanned_at": "2026-10-26T18:54:09.650212Z"
+      "scanned_at": "2026-10-26T19:26:15.425087Z"
     },
     "Z__C_EDZW_20261025003510_bda01%2Ctemp_bufr_999999_999999__MW_648.bin": {
       "contains_ljlm": false,
@@ -1766,7 +1746,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-10-25T23:30:00Z",
       "profile_level_count": 1637,
-      "scanned_at": "2026-10-26T18:54:06.236764Z"
+      "scanned_at": "2026-10-26T19:26:10.075777Z"
     },
     "Z__C_EDZW_20261026003811_bda01%2Ctemp_bufr_999999_999999__MW_845.bin": {
       "contains_ljlm": false,
@@ -2168,7 +2148,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-10-26T11:30:00Z",
       "profile_level_count": 1888,
-      "scanned_at": "2026-10-26T18:54:03.533803Z"
+      "scanned_at": "2026-10-26T19:26:05.832711Z"
     },
     "Z__C_EDZW_20261026123626_bda01%2Ctemp_bufr_999999_999999__MW_945.bin": {
       "contains_ljlm": false,
@@ -2254,7 +2234,7 @@
       "contains_ljlm": true,
       "launch_time": "2026-10-26T11:30:00Z",
       "profile_level_count": 3134,
-      "scanned_at": "2026-10-26T18:54:00.097317Z"
+      "scanned_at": "2026-10-26T19:26:00.633632Z"
     },
     "Z__C_EDZW_20261026131606_bda01%2Ctemp_bufr_999999_999999__MW_966.bin": {
       "contains_ljlm": false,
@@ -2419,8 +2399,32 @@
     "Z__C_EDZW_20261026184500_bda01%2Ctemp_bufr_999999_999999__MW_006.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-10-26T18:53:38.817487Z"
+    },
+    "Z__C_EDZW_20261026185117_bda01%2Ctemp_bufr_999999_999999__MW_007.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-26T19:25:53.613732Z"
+    },
+    "Z__C_EDZW_20261026185627_bda01%2Ctemp_bufr_999999_999999__MW_008.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-26T19:25:51.828458Z"
+    },
+    "Z__C_EDZW_20261026190130_bda01%2Ctemp_bufr_999999_999999__MW_009.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-26T19:25:48.492422Z"
+    },
+    "Z__C_EDZW_20261026190805_bda01%2Ctemp_bufr_999999_999999__MW_010.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-26T19:25:46.466747Z"
+    },
+    "Z__C_EDZW_20261026191308_bda01%2Ctemp_bufr_999999_999999__MW_011.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-26T19:25:45.597677Z"
+    },
+    "Z__C_EDZW_20261026191841_bda01%2Ctemp_bufr_999999_999999__MW_012.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-26T19:25:43.561370Z"
     }
   },
-  "updated_at": "2026-10-26T18:54:12.519493Z",
+  "updated_at": "2026-10-26T19:26:20.171326Z",
   "version": 1
 }
