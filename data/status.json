@@ -1,9 +1,9 @@
 {
   "current_expected": {
-    "key": "2026-10-26_00",
+    "key": "2026-10-26_12",
     "nominal_date": "2026-10-26",
     "status": "ok",
-    "term": "00"
+    "term": "12"
   },
   "special_soundings": {},
   "station": 14015,
@@ -375,12 +375,12 @@
     },
     "2026-10-25_00": {
       "archive_file": "data/2026/10/20261025_00.json",
-      "checked_at": "2026-10-26T06:25:57.932939Z",
+      "checked_at": "2026-10-26T16:18:49.182383Z",
       "first_seen_at": "2026-10-25T04:42:16.794058Z",
       "launch_time": "2026-10-24T23:30:00Z",
       "missing_after": "2026-10-25T01:50:00Z",
       "nominal_date": "2026-10-25",
-      "processed_at": "2026-10-26T05:32:13.419316Z",
+      "processed_at": "2026-10-26T16:24:36.454203Z",
       "profile_level_count": 1856,
       "retrieved_at": "2026-10-25T04:46:32.415126Z",
       "status": "ok",
@@ -388,7 +388,7 @@
       "waiting_from": "2026-10-25T00:50:00Z"
     },
     "2026-10-25_12": {
-      "checked_at": "2026-10-26T06:25:57.932939Z",
+      "checked_at": "2026-10-26T16:18:49.182383Z",
       "first_seen_at": "2026-10-25T13:31:03.861075Z",
       "missing_after": "2026-10-25T13:50:00Z",
       "missing_since": "2026-10-25T13:50:00Z",
@@ -399,19 +399,33 @@
     },
     "2026-10-26_00": {
       "archive_file": "data/2026/10/20261026_00.json",
-      "checked_at": "2026-10-26T06:25:57.932939Z",
+      "checked_at": "2026-10-26T16:18:49.182383Z",
       "first_seen_at": "2026-10-26T05:27:47.869528Z",
       "launch_time": "2026-10-25T23:30:00Z",
       "missing_after": "2026-10-26T01:50:00Z",
       "nominal_date": "2026-10-26",
-      "processed_at": "2026-10-26T06:26:17.999050Z",
+      "processed_at": "2026-10-26T16:24:39.139453Z",
       "profile_level_count": 1637,
       "retrieved_at": "2026-10-26T05:32:05.525480Z",
       "status": "ok",
       "term": "00",
       "waiting_from": "2026-10-26T00:50:00Z"
+    },
+    "2026-10-26_12": {
+      "archive_file": "data/2026/10/20261026_12.json",
+      "checked_at": "2026-10-26T16:18:49.182383Z",
+      "first_seen_at": "2026-10-26T16:18:49.182383Z",
+      "launch_time": "2026-10-26T11:30:00Z",
+      "missing_after": "2026-10-26T13:50:00Z",
+      "nominal_date": "2026-10-26",
+      "processed_at": "2026-10-26T16:24:44.738580Z",
+      "profile_level_count": 3134,
+      "retrieved_at": "2026-10-26T16:24:33.540302Z",
+      "status": "ok",
+      "term": "12",
+      "waiting_from": "2026-10-26T12:50:00Z"
     }
   },
-  "updated_at": "2026-10-26T06:25:57.932939Z",
+  "updated_at": "2026-10-26T16:18:49.182383Z",
   "version": 1
 }
