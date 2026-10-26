@@ -301,12 +301,16 @@ def update_dwd_scan_cache(
 
 
 def dwd_search_mode(now):
-    """Select recovery window using the nominal UTC time of missing terms."""
+    """Select recovery window for delayed or missing regular soundings."""
     if is_manual_run():
         return "manual catch-up", 72
 
+    data = load_status_file()
+    terms = data.get("terms", {})
     cutoff = now - timedelta(hours=48)
-    for entry in load_status_file()["terms"].values():
+
+    # Existing explicit missing terms.
+    for entry in terms.values():
         if not isinstance(entry, dict):
             continue
         if entry.get("status") != "missing" or entry.get("term") not in ("00", "12"):
@@ -318,6 +322,35 @@ def dwd_search_mode(now):
         except (KeyError, TypeError, ValueError):
             continue
         if cutoff <= nominal_time <= now:
+            return "scheduled catch-up", 48
+
+    # Recover expected 00/12 terms even if an earlier cron never ran and
+    # therefore never created a waiting/missing entry in status.json.
+    for day_offset in range(3):
+        nominal_date = now.date() - timedelta(days=day_offset)
+
+        for term in ("00", "12"):
+            nominal_time = datetime(
+                nominal_date.year,
+                nominal_date.month,
+                nominal_date.day,
+                int(term),
+                tzinfo=timezone.utc,
+            )
+
+            if not (cutoff <= nominal_time <= now):
+                continue
+
+            _, missing_from = regular_status_times(nominal_date, term)
+
+            # Keep the normal short search window while the sounding is
+            # still within its publication grace period.
+            if now < missing_from:
+                continue
+
+            if archive_status_metadata(nominal_date, term) is not None:
+                continue
+
             return "scheduled catch-up", 48
 
     return "scheduled", 3
