@@ -1,42 +1,14 @@
 {
   "current_expected": {
-    "key": "2026-10-26_12",
-    "nominal_date": "2026-10-26",
+    "key": "2026-10-27_00",
+    "nominal_date": "2026-10-27",
     "status": "ok",
-    "term": "12"
+    "term": "00"
   },
   "special_soundings": {},
   "station": 14015,
   "station_name": "Ljubljana",
   "terms": {
-    "2026-10-12_00": {
-      "archive_file": "data/2026/10/20261012_00.json",
-      "checked_at": "2026-10-13T14:08:20.060346Z",
-      "first_seen_at": "2026-10-12T01:09:13.660523Z",
-      "launch_time": "2026-10-11T23:30:00Z",
-      "missing_after": "2026-10-12T01:50:00Z",
-      "nominal_date": "2026-10-12",
-      "processed_at": "2026-10-12T09:24:24.436848Z",
-      "profile_level_count": 2062,
-      "retrieved_at": "2026-10-12T01:10:49.251464Z",
-      "status": "ok",
-      "term": "00",
-      "waiting_from": "2026-10-12T00:50:00Z"
-    },
-    "2026-10-12_12": {
-      "archive_file": "data/2026/10/20261012_12.json",
-      "checked_at": "2026-10-13T14:08:20.060346Z",
-      "first_seen_at": "2026-10-12T13:22:39.335450Z",
-      "launch_time": "2026-10-12T11:30:00Z",
-      "missing_after": "2026-10-12T13:50:00Z",
-      "nominal_date": "2026-10-12",
-      "processed_at": "2026-10-12T14:11:00.361318Z",
-      "profile_level_count": 2108,
-      "retrieved_at": "2026-10-12T13:24:45.678471Z",
-      "status": "ok",
-      "term": "12",
-      "waiting_from": "2026-10-12T12:50:00Z"
-    },
     "2026-10-13_00": {
       "archive_file": "data/2026/10/20261013_00.json",
       "checked_at": "2026-10-14T14:15:16.100799Z",
@@ -399,12 +371,12 @@
     },
     "2026-10-26_00": {
       "archive_file": "data/2026/10/20261026_00.json",
-      "checked_at": "2026-10-26T19:25:40.649066Z",
+      "checked_at": "2026-10-27T05:11:01.956049Z",
       "first_seen_at": "2026-10-26T05:27:47.869528Z",
       "launch_time": "2026-10-25T23:30:00Z",
       "missing_after": "2026-10-26T01:50:00Z",
       "nominal_date": "2026-10-26",
-      "processed_at": "2026-10-26T16:24:39.139453Z",
+      "processed_at": "2026-10-27T05:15:11.923319Z",
       "profile_level_count": 1637,
       "retrieved_at": "2026-10-26T05:32:05.525480Z",
       "status": "ok",
@@ -413,19 +385,33 @@
     },
     "2026-10-26_12": {
       "archive_file": "data/2026/10/20261026_12.json",
-      "checked_at": "2026-10-26T19:25:40.649066Z",
+      "checked_at": "2026-10-27T05:11:01.956049Z",
       "first_seen_at": "2026-10-26T16:18:49.182383Z",
       "launch_time": "2026-10-26T11:30:00Z",
       "missing_after": "2026-10-26T13:50:00Z",
       "nominal_date": "2026-10-26",
-      "processed_at": "2026-10-26T19:26:20.196272Z",
+      "processed_at": "2026-10-27T05:15:15.842978Z",
       "profile_level_count": 3134,
       "retrieved_at": "2026-10-26T16:24:33.540302Z",
       "status": "ok",
       "term": "12",
       "waiting_from": "2026-10-26T12:50:00Z"
+    },
+    "2026-10-27_00": {
+      "archive_file": "data/2026/10/20261027_00.json",
+      "checked_at": "2026-10-27T05:11:01.956049Z",
+      "first_seen_at": "2026-10-27T05:11:01.956049Z",
+      "launch_time": "2026-10-26T23:30:00Z",
+      "missing_after": "2026-10-27T01:50:00Z",
+      "nominal_date": "2026-10-27",
+      "processed_at": "2026-10-27T05:15:24.426305Z",
+      "profile_level_count": 2128,
+      "retrieved_at": "2026-10-27T05:15:07.694113Z",
+      "status": "ok",
+      "term": "00",
+      "waiting_from": "2026-10-27T00:50:00Z"
     }
   },
-  "updated_at": "2026-10-26T19:25:40.649066Z",
+  "updated_at": "2026-10-27T05:11:01.956049Z",
   "version": 1
 }
