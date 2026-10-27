@@ -1,21 +1,5 @@
 {
   "packages": {
-    "Z__C_EDZW_20261024182407_bda01%2Ctemp_bufr_999999_999999__MW_607.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-25T04:45:57.504008Z"
-    },
-    "Z__C_EDZW_20261024183420_bda01%2Ctemp_bufr_999999_999999__MW_608.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-25T04:45:56.169916Z"
-    },
-    "Z__C_EDZW_20261024184009_bda01%2Ctemp_bufr_999999_999999__MW_609.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-25T04:45:55.001333Z"
-    },
-    "Z__C_EDZW_20261024184605_bda01%2Ctemp_bufr_999999_999999__MW_610.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-25T04:45:52.935974Z"
-    },
     "Z__C_EDZW_20261024185111_bda01%2Ctemp_bufr_999999_999999__MW_611.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-10-25T04:45:51.236380Z"
@@ -2429,8 +2413,20 @@
     "Z__C_EDZW_20261027181406_bda01%2Ctemp_bufr_999999_999999__MW_209.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-10-27T18:23:42.739696Z"
+    },
+    "Z__C_EDZW_20261027181911_bda01%2Ctemp_bufr_999999_999999__MW_210.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-27T18:47:20.652485Z"
+    },
+    "Z__C_EDZW_20261027183009_bda01%2Ctemp_bufr_999999_999999__MW_211.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-27T18:47:19.532074Z"
+    },
+    "Z__C_EDZW_20261027183647_bda01%2Ctemp_bufr_999999_999999__MW_212.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-27T18:47:18.041865Z"
     }
   },
-  "updated_at": "2026-10-27T18:23:47.699571Z",
+  "updated_at": "2026-10-27T18:47:20.652704Z",
   "version": 1
 }
