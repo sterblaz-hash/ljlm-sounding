@@ -1,21 +1,5 @@
 {
   "packages": {
-    "Z__C_EDZW_20261025062700_bda01%2Ctemp_bufr_999999_999999__MW_710.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-25T13:33:09.668183Z"
-    },
-    "Z__C_EDZW_20261025063225_bda01%2Ctemp_bufr_999999_999999__MW_711.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-25T13:33:08.614506Z"
-    },
-    "Z__C_EDZW_20261025063800_bda01%2Ctemp_bufr_999999_999999__MW_712.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-25T13:33:07.541506Z"
-    },
-    "Z__C_EDZW_20261025064404_bda01%2Ctemp_bufr_999999_999999__MW_713.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-10-25T13:33:05.804421Z"
-    },
     "Z__C_EDZW_20261025070102_bda01%2Ctemp_bufr_999999_999999__MW_714.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-10-25T13:33:04.509454Z"
@@ -2463,8 +2447,32 @@
     "Z__C_EDZW_20261028060800_bda01%2Ctemp_bufr_999999_999999__MW_321.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-10-28T06:22:14.486426Z"
+    },
+    "Z__C_EDZW_20261028061800_bda01%2Ctemp_bufr_999999_999999__MW_322.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-28T06:56:16.301847Z"
+    },
+    "Z__C_EDZW_20261028062303_bda01%2Ctemp_bufr_999999_999999__MW_323.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-28T06:56:14.897197Z"
+    },
+    "Z__C_EDZW_20261028062830_bda01%2Ctemp_bufr_999999_999999__MW_324.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-28T06:56:13.533329Z"
+    },
+    "Z__C_EDZW_20261028063550_bda01%2Ctemp_bufr_999999_999999__MW_325.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-28T06:56:11.758025Z"
+    },
+    "Z__C_EDZW_20261028064100_bda01%2Ctemp_bufr_999999_999999__MW_326.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-28T06:56:09.797386Z"
+    },
+    "Z__C_EDZW_20261028064602_bda01%2Ctemp_bufr_999999_999999__MW_327.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-10-28T06:56:07.569528Z"
     }
   },
-  "updated_at": "2026-10-28T06:26:11.316556Z",
+  "updated_at": "2026-10-28T06:56:16.302059Z",
   "version": 1
 }
