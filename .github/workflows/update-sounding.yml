@@ -3,6 +3,13 @@ name: Update LJLM sounding
 on:
   workflow_dispatch:
 
+  workflow_run:
+    workflows:
+      - Update ICON-D2 LJLM +12 h forecasts
+      - Update C-LAEF LJLM +12 h sounding
+    types: [completed]
+    branches: [main]
+
   schedule:
     # Primary + reserve checks. GitHub scheduled events can occasionally be
     # delayed or dropped, so add independent staggered catch-up runs.
@@ -12,8 +19,14 @@ on:
 permissions:
   contents: write
 
+# Prevent overlapping OBS writers from colliding with one another.
+concurrency:
+  group: ljlm-observation-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   update:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -80,10 +93,19 @@ jobs:
             exit 0
           fi
 
+          git diff --cached --check
           git commit -m "Update LJLM sounding"
 
           echo "=== Git status after commit ==="
           git status --short
 
-          git pull --rebase --autostash origin main
-          git push origin HEAD:main
+          # Forecast publishers change other paths; rebase and retry if
+          # the branch advances again before our push.
+          for attempt in 1 2 3; do
+            git pull --rebase --autostash origin main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+          done
+          echo "Unable to publish OBS after three attempts." >&2
+          exit 1

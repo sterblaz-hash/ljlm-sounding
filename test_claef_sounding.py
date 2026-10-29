@@ -25,16 +25,17 @@ def product(run='2026-10-09T00:00:00Z'):
 
 
 class RunSelectionTests(unittest.TestCase):
-    def test_schedules_select_current_utc_day_and_explicit_cycle(self):
-        for schedule, hour in [('5 7 * * *', 0), ('5 19 * * *', 12)]:
-            for start_hour in (7 if hour == 0 else 19, 23):
-                now = c.datetime(2026, 10, 11, start_hour, 5, tzinfo=c.timezone.utc)
-                self.assertEqual(choose_run('12' if hour == 0 else '00', schedule=schedule, now=now),
-                                 now.replace(hour=hour, minute=0))
-        now = c.datetime(2026, 10, 12, 1, tzinfo=c.timezone.utc)
-        self.assertEqual(choose_run(schedule='5 7 * * *', now=now), now.replace(hour=0))
-        with self.assertRaises(ValueError):
-            choose_run(schedule='5 19 * * *', now=now)
+    def test_schedules_select_exact_cycle_and_survive_midnight_delay(self):
+        for schedule, cycle, due in [('5 7 * * *', 0, 7), ('5 10 * * *', 0, 10),
+                                     ('5 19 * * *', 12, 19), ('5 22 * * *', 12, 22)]:
+            for hour in (due, 23):
+                now = c.datetime(2026, 10, 11, hour, 5, tzinfo=c.timezone.utc)
+                self.assertEqual(choose_run(schedule=schedule, now=now),
+                                 now.replace(hour=cycle, minute=0))
+            # An event delayed past UTC midnight must NOT switch to a future cycle.
+            now = c.datetime(2026, 10, 12, 1, tzinfo=c.timezone.utc)
+            self.assertEqual(choose_run(schedule=schedule, now=now),
+                             c.datetime(2026, 10, 11, cycle, tzinfo=c.timezone.utc))
 
     def test_manual_exact_date_and_default_recent_chosen_cycle(self):
         now = c.datetime(2026, 10, 11, 7, tzinfo=c.timezone.utc)
