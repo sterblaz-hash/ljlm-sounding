@@ -4,7 +4,7 @@
 Requires optional h5py (and its NumPy dependency); no full-file download fallback.
 Default +12 h, newest file in official deterministic listing. Hard ceilings:
 64 MiB body bytes, 80 HTTP requests, 16 MiB per range, 32 MiB decoded chunk.
-No retries, <=1 request/s, 30s timeout; existing output survives any failure.
+Up to 3 attempts per transient request, <=1 request/s, 30s timeout; existing output survives any failure.
 """
 import argparse
 from datetime import datetime, timedelta, timezone
@@ -51,51 +51,117 @@ class SafetyRefusal(ProbeError):
 
 
 class TransferClient:
+    """Bounded and observable HTTP Range access.
+
+    Network timeouts and 408/5xx may retry the *same* request; safety failures,
+    changed ETag, malformed ranges and HTTP 429 never retry here. Every physical
+    attempt, including failed/partial transfers, counts against hard budgets.
+    """
+
+    MAX_ATTEMPTS = 3
+    RETRY_DELAYS = (2, 4)
+    RETRYABLE_HTTP = frozenset((408, 500, 502, 503, 504))
+    READ_CHUNK = 64 * 1024
+
     def __init__(self):
         self.requests = 0
         self.bytes = 0
         self.last_request = None
         self.range_log = []
 
+    def _read_limited(self, response, limit, content_length):
+        """Account for partial reads immediately, including those before timeout."""
+        chunks = []
+        remaining = limit
+        while remaining:
+            part = response.read(min(self.READ_CHUNK, remaining))
+            if not part:
+                break
+            self.bytes += len(part)
+            chunks.append(part)
+            remaining -= len(part)
+        if not remaining and content_length is None:
+            # Detect an ignored size limit without ever fetching a large body.
+            # No spare budget means that this response cannot safely be verified.
+            if self.bytes >= MAX_TOTAL:
+                raise SafetyRefusal('No remaining transfer budget for response size check.')
+            extra = response.read(1)
+            if extra:
+                self.bytes += len(extra)
+                raise SafetyRefusal('Oversized response body; no fallback download.')
+        return b''.join(chunks)
+
     def get(self, url, start=None, end=None, total=None, etag=None):
         limit = METADATA_BLOCK if start is None else end - start + 1
-        if limit <= 0 or limit > MAX_RANGE or self.bytes + limit > MAX_TOTAL or self.requests >= MAX_REQUESTS:
-            raise SafetyRefusal('Transfer/request budget exceeded; refusing bulk download.')
+        if limit <= 0 or limit > MAX_RANGE:
+            raise SafetyRefusal('Invalid transfer size; refusing bulk download.')
         if start is not None and (start < 0 or end >= total or limit == total):
             raise SafetyRefusal('Invalid range or full-file read refused.')
-        if self.last_request is not None:
-            time.sleep(max(0, 1 - (time.monotonic() - self.last_request)))
-        self.last_request = time.monotonic()
         headers = {'User-Agent': 'LJLM-CLAEF-PressureProfile/0.1 (bounded point research)',
                    'Accept-Encoding': 'identity'}
         if start is not None:
             headers['Range'] = f'bytes={start}-{end}'
             headers['If-Match'] = '"' + etag.strip('"') + '"'
-        self.requests += 1
-        try:
-            with urlopen(Request(url, headers=headers), timeout=30) as response:
+        # Never include URL query arguments or tokens in diagnostic logs.
+        filename = url.split('?', 1)[0].rsplit('/', 1)[-1] or '(listing)'
+        description = f'range={start}-{end}' if start is not None else 'metadata/listing'
+        for attempt in range(1, self.MAX_ATTEMPTS + 1):
+            if self.requests >= MAX_REQUESTS or self.bytes + limit > MAX_TOTAL:
+                raise SafetyRefusal('Transfer/request budget exceeded; refusing bulk download.')
+            if self.last_request is not None:
+                time.sleep(max(0, 1 - (time.monotonic() - self.last_request)))
+            self.last_request = time.monotonic()
+            self.requests += 1
+            index = self.requests
+            started = time.monotonic()
+            print(f'C-LAEF HTTP #{index}/{MAX_REQUESTS} attempt {attempt}/{self.MAX_ATTEMPTS} '
+                  f'{filename} {description}', file=sys.stderr, flush=True)
+            try:
+                with urlopen(Request(url, headers=headers), timeout=30) as response:
+                    if start is not None:
+                        expected = f'bytes {start}-{end}/{total}'
+                        if response.status != 206 or response.headers.get('Content-Range') != expected:
+                            raise SafetyRefusal('Server ignored or changed Range; full download refused.')
+                        if response.headers.get('ETag', '').strip('"') != etag.strip('"'):
+                            raise SafetyRefusal('Remote object changed or ETag missing.')
+                    length = response.headers.get('Content-Length')
+                    if length is not None:
+                        try:
+                            length = int(length)
+                        except ValueError as error:
+                            raise SafetyRefusal('Malformed Content-Length.') from error
+                        if length < 0 or length > limit:
+                            raise SafetyRefusal('Oversized Content-Length; body not read.')
+                    if response.headers.get('Content-Encoding', 'identity') != 'identity':
+                        raise SafetyRefusal('Unexpected content encoding.')
+                    body = self._read_limited(response, limit, length)
+                    if start is not None and len(body) != limit:
+                        raise SafetyRefusal('Truncated Range response.')
+                    if length is not None and len(body) != length:
+                        raise SafetyRefusal('Content-Length/body size mismatch.')
                 if start is not None:
-                    expected = f'bytes {start}-{end}/{total}'
-                    if response.status != 206 or response.headers.get('Content-Range') != expected:
-                        raise SafetyRefusal('Server ignored or changed Range; full download refused.')
-                    if response.headers.get('ETag', '').strip('"') != etag.strip('"'):
-                        raise SafetyRefusal('Remote object changed or ETag missing.')
-                length = response.headers.get('Content-Length')
-                if length is not None and int(length) > limit:
-                    raise SafetyRefusal('Oversized Content-Length; body not read.')
-                if response.headers.get('Content-Encoding', 'identity') != 'identity':
-                    raise SafetyRefusal('Unexpected content encoding.')
-                body = response.read(limit + 1)
-                self.bytes += len(body)
-                if len(body) > limit or (start is not None and len(body) != limit):
-                    raise SafetyRefusal('Oversized or truncated response.')
-            if start is not None:
-                self.range_log.append({'start': start, 'end': end, 'bytes': len(body)})
-            return body
-        except HTTPError as error:
-            raise ProbeError(f'GeoSphere HTTP {error.code}; stopping without retry.') from error
-        except (URLError, OSError, ValueError) as error:
-            raise ProbeError(f'Range request failed: {error}') from error
+                    self.range_log.append({'start': start, 'end': end, 'bytes': len(body)})
+                print(f'C-LAEF HTTP #{index} OK {len(body)} bytes '
+                      f'in {time.monotonic() - started:.1f}s', file=sys.stderr, flush=True)
+                return body
+            except SafetyRefusal as error:
+                print(f'C-LAEF HTTP #{index} SAFETY REFUSAL after '
+                      f'{time.monotonic() - started:.1f}s: {error}', file=sys.stderr, flush=True)
+                raise
+            except HTTPError as error:
+                retryable = error.code in self.RETRYABLE_HTTP
+                failure = f'GeoSphere HTTP {error.code}'
+                failure_cause = error
+            except (URLError, OSError) as error:
+                retryable = True
+                failure = f'Network error: {error}'
+                failure_cause = error
+            print(f'C-LAEF HTTP #{index} failed after {time.monotonic() - started:.1f}s: '
+                  f'{failure}; retryable={retryable}', file=sys.stderr, flush=True)
+            if not retryable or attempt == self.MAX_ATTEMPTS:
+                raise ProbeError(f'{filename} {description}: {failure}; '
+                                 f'physical request #{index}, attempt {attempt}/{self.MAX_ATTEMPTS}') from failure_cause
+            time.sleep(self.RETRY_DELAYS[attempt - 1])
 
 
 class RangeFile(io.RawIOBase):
