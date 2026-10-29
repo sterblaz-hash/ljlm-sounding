@@ -3,7 +3,8 @@ import argparse
 from datetime import date, datetime, timedelta, timezone
 
 
-SCHEDULES = {'5 7 * * *': '00', '5 19 * * *': '12'}
+SCHEDULES = {'5 7 * * *': ('00', 7), '5 10 * * *': ('00', 10),
+             '5 19 * * *': ('12', 19), '5 22 * * *': ('12', 22)}
 
 
 def choose_run(cycle='', run_date='', *, schedule='', now=None):
@@ -11,7 +12,7 @@ def choose_run(cycle='', run_date='', *, schedule='', now=None):
     if schedule:
         if schedule not in SCHEDULES:
             raise ValueError('Unexpected C-LAEF schedule')
-        cycle = SCHEDULES[schedule]
+        cycle, due_hour = SCHEDULES[schedule]
         if run_date:
             raise ValueError('Scheduled runs use the current UTC date')
     if cycle not in ('00', '12'):
@@ -20,7 +21,13 @@ def choose_run(cycle='', run_date='', *, schedule='', now=None):
     if run_date and day.isoformat() != run_date:
         raise ValueError('Run date must be YYYY-MM-DD')
     run = datetime(day.year, day.month, day.day, int(cycle), tzinfo=timezone.utc)
-    if not schedule and not run_date and run > now:
+    if schedule:
+        # Scheduled events can execute after midnight; use the most recent
+        # occurrence of this EXACT schedule, not the next calendar day's run.
+        due = run.replace(hour=due_hour, minute=5)
+        if due > now:
+            run -= timedelta(days=1)
+    elif not run_date and run > now:
         run -= timedelta(days=1)
     if run > now:
         raise ValueError('Run date/cycle is in the future')

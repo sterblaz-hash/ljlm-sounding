@@ -4,7 +4,7 @@
 Requires optional h5py (and its NumPy dependency); no full-file download fallback.
 Default +12 h, newest file in official deterministic listing. Hard ceilings:
 64 MiB body bytes, 80 HTTP requests, 16 MiB per range, 32 MiB decoded chunk.
-No retries, <=1 request/s, 15s timeout; existing output survives any failure.
+No retries, <=1 request/s, 30s timeout; existing output survives any failure.
 """
 import argparse
 from datetime import datetime, timedelta, timezone
@@ -73,7 +73,7 @@ class TransferClient:
             headers['If-Match'] = '"' + etag.strip('"') + '"'
         self.requests += 1
         try:
-            with urlopen(Request(url, headers=headers), timeout=15) as response:
+            with urlopen(Request(url, headers=headers), timeout=30) as response:
                 if start is not None:
                     expected = f'bytes {start}-{end}/{total}'
                     if response.status != 206 or response.headers.get('Content-Range') != expected:

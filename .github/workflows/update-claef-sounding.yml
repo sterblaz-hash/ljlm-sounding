@@ -2,8 +2,10 @@ name: Update C-LAEF LJLM +12 h sounding
 
 on:
   schedule:
-    - cron: "5 7 * * *"   # Current-day 00 UTC run; available around 06:40–06:50 UTC
-    - cron: "5 19 * * *"  # Current-day 12 UTC run; available around 18:40–18:50 UTC
+    - cron: "5 7 * * *"   # 00 UTC primary
+    - cron: "5 10 * * *"  # 00 UTC retry if GeoSphere was delayed or unavailable
+    - cron: "5 19 * * *"  # 12 UTC primary
+    - cron: "5 22 * * *"  # 12 UTC retry for the same exact cycle
   workflow_dispatch:
     inputs:
       run_cycle:
@@ -61,13 +63,50 @@ jobs:
           echo "slot=$(date -u -d "$run_time +12 hours" +%H)" >> "$GITHUB_OUTPUT"
           echo "C-LAEF run $run_time, fixed lead +12 h" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Check whether requested cycle is already published
+        id: published
+        shell: bash
+        env:
+          RUN_STAMP: ${{ steps.run.outputs.stamp }}
+          SLOT: ${{ steps.run.outputs.slot }}
+        run: |
+          python - <<'PYTHON'
+          import json
+          import os
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+
+          stamp = os.environ['RUN_STAMP']
+          archive = Path(f'models/claef/{stamp}/ljlm_f012.json')
+          latest = Path(f"models/claef/latest/{os.environ['SLOT']}/sounding.json")
+          run = datetime.strptime(stamp, '%Y%m%d%H').replace(tzinfo=timezone.utc)
+          valid = run + timedelta(hours=12)
+          complete = False
+          if archive.is_file() and latest.is_file():
+              try:
+                  archived = json.loads(archive.read_text())
+                  current = json.loads(latest.read_text())
+                  current_valid = datetime.fromisoformat(current['valid_time'].replace('Z', '+00:00'))
+                  complete = (archived['run_time'] == run.isoformat().replace('+00:00', 'Z')
+                              and current_valid >= valid)
+              except (OSError, ValueError, KeyError, TypeError):
+                  pass
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f'skip={str(complete).lower()}\n')
+          if complete:
+              print(f'C-LAEF cycle {stamp} is already safely archived; skipping repeat extraction.')
+          PYTHON
+
       - name: Install dependencies
+        if: steps.published.outputs.skip != 'true'
         run: python -m pip install --retries 10 --timeout 60 -r requirements.txt h5py==3.16.0
 
       - name: Test pressure profile and sounding offline
+        if: steps.published.outputs.skip != 'true'
         run: python -m unittest test_claef_pressure_profile test_claef_sounding -v
 
       - name: Generate +12 h sounding and verification slot
+        if: steps.published.outputs.skip != 'true'
         env:
           RUN_TIME: ${{ steps.run.outputs.time }}
         shell: bash
@@ -86,6 +125,7 @@ jobs:
           exit 1
 
       - name: Upload sounding products
+        if: steps.published.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: claef-${{ steps.run.outputs.stamp }}-f012
@@ -97,6 +137,7 @@ jobs:
           retention-days: 30
 
       - name: Persist C-LAEF sounding products only
+        if: steps.published.outputs.skip != 'true'
         env:
           RUN_STAMP: ${{ steps.run.outputs.stamp }}
           SLOT: ${{ steps.run.outputs.slot }}

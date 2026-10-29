@@ -114,7 +114,7 @@ class RangeSafetyTests(unittest.TestCase):
         self.assertEqual(client.bytes, 4); self.assertEqual(client.requests, 1)
         self.assertEqual(fetch.call_args.args[0].get_header('Range'), 'bytes=100-103')
         self.assertEqual(fetch.call_args.args[0].get_header('If-match'), '"abc"')
-        self.assertEqual(fetch.call_args.kwargs['timeout'], 15)
+        self.assertEqual(fetch.call_args.kwargs['timeout'], 30)
 
     @patch('claef_pressure_profile.urlopen')
     def test_ignored_range_refused_before_reading(self, fetch):
