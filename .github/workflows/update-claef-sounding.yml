@@ -103,7 +103,7 @@ jobs:
 
       - name: Test pressure profile and sounding offline
         if: steps.published.outputs.skip != 'true'
-        run: python -m unittest test_claef_pressure_profile test_claef_sounding -v
+        run: python -m unittest test_claef_pressure_profile test_claef_sounding test_claef_transfer_resilience -v
 
       - name: Generate +12 h sounding and verification slot
         if: steps.published.outputs.skip != 'true'
