@@ -21,20 +21,27 @@ permissions:
 
 # Prevent overlapping OBS writers from colliding with one another.
 concurrency:
-  group: ljlm-observation-${{ github.ref }}
+  group: ljlm-observation-main
   cancel-in-progress: false
 
 jobs:
   update:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 70
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Sync current main before installing dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          git reset --hard origin/main
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -46,66 +53,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --retries 10 --timeout 60 -r requirements.txt
 
-      - name: Update LJLM sounding
-        run: python extract_ljlm.py
+      - name: Test LJLM publication recovery offline
+        run: python -m unittest test_publish_ljlm -v
 
-      - name: Render Skew-T and hodograph
-        run: python render_ljlm.py --input data/latest.json
-
-      - name: Render matching OBS and ICON-D2 overlay
-        run: python render_icon_d2_verification.py
-
-      - name: Render matching OBS, ICON-D2 and C-LAEF verification
-        run: python render_model_verification.py
-
-      - name: Update model verification data
-        run: python build_model_verification_data.py --sync-recent-hours 72
-
-      - name: Update trajectory data
-        run: python build_trajectory_data.py --sync-recent-hours 72
-
-      - name: Update dashboard data
-        run: python build_dashboard_data.py --sync-recent-hours 72
-
-      - name: Commit and push
-        shell: bash
-        run: |
-          set -e
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add -A climatology diagnostics timeseries trajectories 2>/dev/null || true
-
-          if [ -d verification ]; then
-            git add -A -- verification
-          fi
-
-          if [ -d data ]; then
-            find data -type f -name "*.json" -print0 | xargs -0 -r git add -f --
-          fi
-
-          echo "=== Git status before commit ==="
-          git status --short
-
-          if git diff --cached --quiet; then
-            echo "No sounding changes to commit."
-            exit 0
-          fi
-
-          git diff --cached --check
-          git commit -m "Update LJLM sounding"
-
-          echo "=== Git status after commit ==="
-          git status --short
-
-          # Forecast publishers change other paths; rebase and retry if
-          # the branch advances again before our push.
-          for attempt in 1 2 3; do
-            git pull --rebase --autostash origin main
-            if git push origin HEAD:main; then
-              exit 0
-            fi
-          done
-          echo "Unable to publish OBS after three attempts." >&2
-          exit 1
+      - name: Update and publish LJLM from a fresh main checkout
+        env:
+          MPLBACKEND: Agg
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python publish_ljlm.py
