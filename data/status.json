@@ -1,9 +1,9 @@
 {
   "current_expected": {
-    "key": "2026-10-30_00",
+    "key": "2026-10-30_12",
     "nominal_date": "2026-10-30",
     "status": "ok",
-    "term": "00"
+    "term": "12"
   },
   "special_soundings": {},
   "station": 14015,
@@ -371,12 +371,12 @@
     },
     "2026-10-29_00": {
       "archive_file": "data/2026/10/20261029_00.json",
-      "checked_at": "2026-10-30T07:17:58.882020Z",
+      "checked_at": "2026-10-30T18:17:00.490598Z",
       "first_seen_at": "2026-10-29T06:27:23.835524Z",
       "launch_time": "2026-10-28T23:30:00Z",
       "missing_after": "2026-10-29T01:50:00Z",
       "nominal_date": "2026-10-29",
-      "processed_at": "2026-10-30T06:36:04.637513Z",
+      "processed_at": "2026-10-30T18:20:58.921183Z",
       "profile_level_count": 2194,
       "retrieved_at": "2026-10-29T06:31:28.332450Z",
       "status": "ok",
@@ -385,12 +385,12 @@
     },
     "2026-10-29_12": {
       "archive_file": "data/2026/10/20261029_12.json",
-      "checked_at": "2026-10-30T07:17:58.882020Z",
+      "checked_at": "2026-10-30T18:17:00.490598Z",
       "first_seen_at": "2026-10-29T16:16:32.436281Z",
       "launch_time": "2026-10-29T11:30:00Z",
       "missing_after": "2026-10-29T13:50:00Z",
       "nominal_date": "2026-10-29",
-      "processed_at": "2026-10-30T06:36:08.840963Z",
+      "processed_at": "2026-10-30T18:21:03.011540Z",
       "profile_level_count": 1926,
       "retrieved_at": "2026-10-29T16:20:40.951821Z",
       "status": "ok",
@@ -399,19 +399,33 @@
     },
     "2026-10-30_00": {
       "archive_file": "data/2026/10/20261030_00.json",
-      "checked_at": "2026-10-30T07:17:58.882020Z",
+      "checked_at": "2026-10-30T18:17:00.490598Z",
       "first_seen_at": "2026-10-30T06:32:20.534550Z",
       "launch_time": "2026-10-29T23:30:00Z",
       "missing_after": "2026-10-30T01:50:00Z",
       "nominal_date": "2026-10-30",
-      "processed_at": "2026-10-30T06:36:16.878589Z",
+      "processed_at": "2026-10-30T18:21:07.071156Z",
       "profile_level_count": 2110,
       "retrieved_at": "2026-10-30T06:35:56.574626Z",
       "status": "ok",
       "term": "00",
       "waiting_from": "2026-10-30T00:50:00Z"
+    },
+    "2026-10-30_12": {
+      "archive_file": "data/2026/10/20261030_12.json",
+      "checked_at": "2026-10-30T18:17:00.490598Z",
+      "first_seen_at": "2026-10-30T18:17:00.490598Z",
+      "launch_time": "2026-10-30T11:30:00Z",
+      "missing_after": "2026-10-30T13:50:00Z",
+      "nominal_date": "2026-10-30",
+      "processed_at": "2026-10-30T18:21:15.086476Z",
+      "profile_level_count": 2199,
+      "retrieved_at": "2026-10-30T18:20:54.833023Z",
+      "status": "ok",
+      "term": "12",
+      "waiting_from": "2026-10-30T12:50:00Z"
     }
   },
-  "updated_at": "2026-10-30T07:17:58.882020Z",
+  "updated_at": "2026-10-30T18:17:00.490598Z",
   "version": 1
 }
