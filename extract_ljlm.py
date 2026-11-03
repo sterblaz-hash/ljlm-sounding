@@ -8,6 +8,12 @@ from datetime import datetime, timezone, timedelta
 from urllib.request import urlopen, Request
 from urllib.parse import unquote
 
+from dwd_transfer import download_dwd
+from ljlm_dwd_fastpath import (
+    FAST_SEARCH_HOURS, can_skip_recent_positive, latest_may_advance,
+    read_json_optional, write_marker,
+)
+
 import numpy as np
 
 from eccodes import (
@@ -147,13 +153,7 @@ def trapezoid_integral(y_values, x_values):
 # ============================================================
 
 def download(url):
-    req = Request(
-        url,
-        headers={"User-Agent": "ljlm-sounding/1.0"}
-    )
-
-    with urlopen(req, timeout=60) as response:
-        return response.read()
+    return download_dwd(url)
 
 
 def get_directory_listing():
@@ -164,6 +164,10 @@ def get_directory_listing():
 
 
 def is_manual_run():
+    # The externally or periodically triggered fast scan is never an
+    # expensive manual 72-hour historical backfill.
+    if os.environ.get("LJLM_SCAN_MODE") == "fast":
+        return False
     event_name = os.environ.get(
         "GITHUB_EVENT_NAME",
         "manual_local"
@@ -302,6 +306,13 @@ def update_dwd_scan_cache(
 
 def dwd_search_mode(now):
     """Select recovery window for delayed or missing regular soundings."""
+    configured = os.environ.get("LJLM_SCAN_MODE", "").strip().lower()
+    if configured == "fast":
+        # Listing a 48h inventory is cheap. The persistent package cache
+        # avoids repeated downloads of already scanned negative packages.
+        return "fast", FAST_SEARCH_HOURS
+    if configured == "recovery":
+        return "recovery", 72
     if is_manual_run():
         return "manual catch-up", 72
 
@@ -385,6 +396,8 @@ def find_candidate_files(now=None, search_mode=None):
         set(files),
         reverse=True
     )
+    if not files:
+        raise RuntimeError("DWD directory contained no TEMP BUFR packages")
 
     event_name = os.environ.get(
         "GITHUB_EVENT_NAME",
@@ -444,14 +457,22 @@ def find_candidate_files(now=None, search_mode=None):
     if recent_files:
         return recent_files
 
-    # Safety fallback: if DWD changes the filename convention or the
-    # directory timestamp cannot be parsed, retain the old behaviour.
-    print(
-        "WARNING: no recent timestamped packages found; "
-        "using legacy fallback."
-    )
+    # An empty valid window must not trigger 250 older downloads.
+    if timestamped_files:
+        print("No recent DWD files; nothing to download.")
+        return []
 
+    # Only if the filename convention breaks entirely, preserve a bounded
+    # fallback and surface a warning for investigation.
+    print("WARNING: DWD filename timestamps unreadable; using fallback.")
     return files[:MAX_CANDIDATE_FILES]
+
+
+def __parse_cached_launch(text):
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except (ValueError, AttributeError, TypeError):
+        return None
 
 
 # ============================================================
@@ -648,11 +669,14 @@ def build_trajectory(
 
 def read_ljlm_from_bufr(path):
 
+    decoded_messages = 0
+    invalid_target_messages = 0
     with open(path, "rb") as f:
 
         while True:
 
             handle = None
+            target_message = False
 
             try:
                 handle = codes_bufr_new_from_file(f)
@@ -664,6 +688,7 @@ def read_ljlm_from_bufr(path):
 
             try:
                 codes_set(handle, "unpack", 1)
+                decoded_messages += 1
 
                 block = safe_get(
                     handle,
@@ -680,6 +705,7 @@ def read_ljlm_from_bufr(path):
                     or station != WMO_STATION
                 ):
                     continue
+                target_message = True
 
                 year = safe_get(handle, "year")
                 month = safe_get(handle, "month")
@@ -789,7 +815,7 @@ def read_ljlm_from_bufr(path):
                 ]
 
                 if not profile_lengths:
-                    return None
+                    raise ValueError("LJLM BUFR has no usable profile arrays")
 
                 n = min(profile_lengths)
 
@@ -961,6 +987,8 @@ def read_ljlm_from_bufr(path):
                 }
 
             except Exception as exc:
+                if target_message:
+                    invalid_target_messages += 1
                 print(
                     "BUFR message error:",
                     exc
@@ -971,6 +999,8 @@ def read_ljlm_from_bufr(path):
                 if handle is not None:
                     codes_release(handle)
 
+    if decoded_messages == 0 or invalid_target_messages:
+        raise ValueError("BUFR decode incomplete; do not negative-cache package")
     return None
 
 
@@ -4822,18 +4852,13 @@ def save_json(
         exist_ok=True
     )
 
-    with open(
-        OUTPUT_LATEST,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            profile,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
+    # Archival catch-up must never roll the operational latest backwards.
+    prior_latest = read_json_optional(OUTPUT_LATEST)
+    if latest_may_advance(profile, prior_latest):
+        with open(OUTPUT_LATEST, "w", encoding="utf-8") as f:
+            json.dump(profile, f, ensure_ascii=False, indent=2)
+    else:
+        print("Retaining newer/better data/latest.json")
 
     path = archive_path(
         nominal_date,
@@ -5419,6 +5444,8 @@ def main():
     )
 
     downloaded_count = 0
+    download_failures = 0
+    package_errors = 0
     downloaded_bytes = 0
     download_seconds = 0.0
     bufr_seconds = 0.0
@@ -5437,6 +5464,22 @@ def main():
         cached = scan_cache.get(
             "packages", {}
         ).get(filename)
+
+        # A recent *positive* package can be skipped only when its complete
+        # sounding is already safely archived. Positive files are rescanned
+        # regularly to detect corrected or enriched observations.
+        if search_mode[0] == "fast" and isinstance(cached, dict):
+            launch_cached = cached.get("launch_time")
+            if launch_cached:
+                launch_dt = __parse_cached_launch(launch_cached)
+                if launch_dt is not None:
+                    info = classify_sounding(launch_dt)
+                    complete = sounding_already_saved(
+                        info["nominal_date"], info["term"], launch_cached
+                    )
+                    if can_skip_recent_positive(cached, now, complete):
+                        packages_skipped_cache += 1
+                        continue
 
         # Negative cache entries are safe to skip. Positive LJLM packages
         # are rescanned so duplicate/updated profiles can still be compared.
@@ -5483,6 +5526,7 @@ def main():
                 f"in {one_download_s:.2f} s"
             )
         except Exception as exc:
+            download_failures += 1
             print(
                 "Download failed:",
                 exc
@@ -5611,6 +5655,7 @@ def main():
                     break
 
         except Exception as exc:
+            package_errors += 1
             print(
                 "Package warning:",
                 exc
@@ -5635,16 +5680,12 @@ def main():
     )
 
     if not items:
-        update_status_file(
-            now,
-            items
-        )
-
-        print()
-        print(
-            "No LJLM sounding found "
-            "in candidate packages."
-        )
+        update_status_file(now, items)
+        write_marker(0)
+        if download_failures or package_errors:
+            raise RuntimeError(f"DWD scan incomplete: {download_failures} "
+                               f"downloads and {package_errors} scans failed")
+        print("No new LJLM sounding in candidate packages.")
         return
 
     saved_count = 0
@@ -5701,24 +5742,30 @@ def main():
                 nominal_date
             )
 
-    # Ensure latest.json is the newest profile from this scan.
+    # Do not recalculate and rewrite an unchanged latest just because a
+    # scheduled fast check revisited its already complete source package.
     newest = items[-1]
+    if saved_count or search_mode[0] != "fast":
+        save_json(
+            newest["profile"],
+            newest["filename"],
+            newest["term"],
+            newest["nominal_date"]
+        )
 
-    save_json(
-        newest["profile"],
-        newest["filename"],
-        newest["term"],
-        newest["nominal_date"]
-    )
-
+    write_marker(saved_count)
+    if not saved_count and (download_failures or package_errors):
+        raise RuntimeError(f"DWD scan incomplete: {download_failures} "
+                           f"downloads, {package_errors} scans failed")
     update_status_file(
         now,
         items
     )
 
-    print_summary(
-        newest["profile"]
-    )
+    if saved_count or search_mode[0] != "fast":
+        print_summary(newest["profile"])
+    else:
+        print("Fast DWD scan: unchanged sounding; summary skipped.")
 
     print()
     print(

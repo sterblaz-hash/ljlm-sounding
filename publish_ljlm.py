@@ -15,6 +15,8 @@ import sys
 from pathlib import Path
 from typing import Callable
 
+from ljlm_dwd_fastpath import marker_has_updates
+
 
 MAX_ATTEMPTS = 3
 GIT_TARGET = "main"
@@ -77,6 +79,12 @@ def publish(runner: Callable[..., int] = run, max_attempts: int = MAX_ATTEMPTS) 
         runner(["git", "status", "--short"])
 
         for title, argv in PIPELINE:
+            if (title != "Extract LJLM observations"
+                    and os.environ.get("LJLM_SCAN_MODE") == "fast"
+                    and not marker_has_updates()):
+                print("Fast DWD scan: no new profile; skipping expensive "
+                      "rendering and derived-product builders.", flush=True)
+                break
             print(f"::group::{title}", flush=True)
             try:
                 runner(argv)
