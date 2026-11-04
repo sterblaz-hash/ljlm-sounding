@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-from ljlm_dwd_fastpath import marker_has_updates
+from ljlm_dwd_fastpath import marker_has_updates, published_latest_graphs_current
 
 
 MAX_ATTEMPTS = 3
@@ -81,7 +81,8 @@ def publish(runner: Callable[..., int] = run, max_attempts: int = MAX_ATTEMPTS) 
         for title, argv in PIPELINE:
             if (title != "Extract LJLM observations"
                     and os.environ.get("LJLM_SCAN_MODE") == "fast"
-                    and not marker_has_updates()):
+                    and not marker_has_updates()
+                    and published_latest_graphs_current()):
                 print("Fast DWD scan: no new profile; skipping expensive "
                       "rendering and derived-product builders.", flush=True)
                 break

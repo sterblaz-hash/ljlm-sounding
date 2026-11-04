@@ -10,8 +10,9 @@ from urllib.parse import unquote
 
 from dwd_transfer import download_dwd
 from ljlm_dwd_fastpath import (
-    FAST_SEARCH_HOURS, can_skip_recent_positive, latest_may_advance,
-    read_json_optional, write_marker,
+    FAST_SEARCH_HOURS, STATUS_HEARTBEAT_HOURS,
+    can_skip_recent_positive, can_skip_negative, latest_may_advance,
+    read_json_optional, write_marker, stable_status_fields, utc_datetime,
 )
 
 import numpy as np
@@ -252,6 +253,18 @@ def load_dwd_scan_cache(now=None):
 
 def save_dwd_scan_cache(cache):
     os.makedirs("data", exist_ok=True)
+
+    # Avoid a commit just to update the scan timestamp.
+    try:
+        with open(DWD_SCAN_CACHE_FILE, "r", encoding="utf-8") as source:
+            previous = json.load(source)
+        if (isinstance(previous, dict) and
+                previous.get("packages") == cache.get("packages") and
+                previous.get("version") == 1):
+            print("DWD cache unchanged; no rewrite")
+            return
+    except (OSError, ValueError, TypeError):
+        pass
 
     cache["version"] = 1
     cache["updated_at"] = (
@@ -3622,6 +3635,8 @@ def set_regular_term_status(data, nominal_date, term, now):
 def update_status_file(now, items):
     """Build the operational 00/12 status file from archive + current scan."""
     data = load_status_file()
+    previous_status = stable_status_fields(data)
+    previous_update = utc_datetime(data.get("updated_at"))
 
     data["version"] = 1
     data["station"] = 14015
@@ -3730,6 +3745,16 @@ def update_status_file(now, items):
     }
 
     data["updated_at"] = iso_utc(now)
+
+    # Status changes (new term, waiting -> missing, or publication)
+    # are always saved. Unchanged fast scans need only a periodic heartbeat.
+    if (os.environ.get("LJLM_SCAN_MODE") == "fast" and
+            previous_status == stable_status_fields(data) and
+            previous_update is not None and
+            timedelta(0) <= now - previous_update <
+            timedelta(hours=STATUS_HEARTBEAT_HOURS)):
+        print("Unchanged LJLM status; heartbeat deferred")
+        return
 
     os.makedirs("data", exist_ok=True)
     with open(STATUS_FILE, "w", encoding="utf-8") as f:
@@ -5484,8 +5509,8 @@ def main():
         # Negative cache entries are safe to skip. Positive LJLM packages
         # are rescanned so duplicate/updated profiles can still be compared.
         if (
-            isinstance(cached, dict)
-            and cached.get("contains_ljlm") is False
+            search_mode[0] == "fast"
+            and can_skip_negative(cached, dwd_filename_time(filename), now)
         ):
             packages_skipped_cache += 1
             print(
