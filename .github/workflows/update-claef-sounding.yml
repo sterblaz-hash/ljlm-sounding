@@ -2,10 +2,10 @@ name: Update C-LAEF LJLM +12 h sounding
 
 on:
   schedule:
-    - cron: "5 7 * * *"   # 00 UTC primary
-    - cron: "5 10 * * *"  # 00 UTC retry if GeoSphere was delayed or unavailable
-    - cron: "5 19 * * *"  # 12 UTC primary
-    - cron: "5 22 * * *"  # 12 UTC retry for the same exact cycle
+    - cron: "35 3 * * *"   # 00 UTC primary
+    - cron: "35 4 * * *"   # 00 UTC retry
+    - cron: "35 15 * * *"  # 12 UTC primary
+    - cron: "35 16 * * *"  # 12 UTC retry
   workflow_dispatch:
     inputs:
       run_cycle:

@@ -26,10 +26,10 @@ def product(run='2026-10-09T00:00:00Z'):
 
 class RunSelectionTests(unittest.TestCase):
     def test_schedules_select_exact_cycle_and_survive_midnight_delay(self):
-        for schedule, cycle, due in [('5 7 * * *', 0, 7), ('5 10 * * *', 0, 10),
-                                     ('5 19 * * *', 12, 19), ('5 22 * * *', 12, 22)]:
+        for schedule, cycle, due in [('35 3 * * *', 0, 3), ('35 4 * * *', 0, 4),
+                             ('35 15 * * *', 12, 15), ('35 16 * * *', 12, 16)]:
             for hour in (due, 23):
-                now = c.datetime(2026, 10, 11, hour, 5, tzinfo=c.timezone.utc)
+                now = c.datetime(2026, 10, 11, hour, 35, tzinfo=c.timezone.utc)
                 self.assertEqual(choose_run(schedule=schedule, now=now),
                                  now.replace(hour=cycle, minute=0))
             # An event delayed past UTC midnight must NOT switch to a future cycle.

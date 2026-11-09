@@ -3,9 +3,13 @@ import argparse
 from datetime import date, datetime, timedelta, timezone
 
 
-SCHEDULES = {'5 7 * * *': ('00', 7), '5 10 * * *': ('00', 10),
-             '5 19 * * *': ('12', 19), '5 22 * * *': ('12', 22)}
 
+SCHEDULES = {
+    '35 3 * * *': ('00', 3),
+    '35 4 * * *': ('00', 4),
+    '35 15 * * *': ('12', 15),
+    '35 16 * * *': ('12', 16),
+}
 
 def choose_run(cycle='', run_date='', *, schedule='', now=None):
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -24,7 +28,7 @@ def choose_run(cycle='', run_date='', *, schedule='', now=None):
     if schedule:
         # Scheduled events can execute after midnight; use the most recent
         # occurrence of this EXACT schedule, not the next calendar day's run.
-        due = run.replace(hour=due_hour, minute=5)
+        due = run.replace(hour=due_hour, minute=35)
         if due > now:
             run -= timedelta(days=1)
     elif not run_date and run > now:
