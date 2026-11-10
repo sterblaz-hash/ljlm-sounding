@@ -1,17 +1,17 @@
 {
   "version": 1,
   "station": 14015,
-  "valid_time": "2026-11-07T00:00:00Z",
-  "observation_sounding_id": "20261107_00",
+  "valid_time": "2026-11-10T00:00:00Z",
+  "observation_sounding_id": "20261110_00",
   "models": {
     "ICON-D2": {
-      "sounding_id": "icon-d2_2026110612_f012",
-      "run_time": "2026-11-06T12:00:00Z",
+      "sounding_id": "icon-d2_2026110912_f012",
+      "run_time": "2026-11-09T12:00:00Z",
       "lead_hours": 12
     },
     "C-LAEF": {
-      "sounding_id": "claef_2026110612_f012",
-      "run_time": "2026-11-06T12:00:00Z",
+      "sounding_id": "claef_2026110912_f012",
+      "run_time": "2026-11-09T12:00:00Z",
       "lead_hours": 12
     }
   },
@@ -20,28 +20,28 @@
       "pressure_hpa": 925,
       "values": {
         "OBS": {
-          "temperature_c": 3.8975141886788793,
-          "dewpoint_c": 0.04250472955962644,
-          "relative_humidity_pct": 75.93327027253831,
-          "height_m": 837.8317568134579,
-          "u_ms": -7.598842483188573,
-          "v_ms": 0.022064560107477857
+          "temperature_c": 6.64734745971552,
+          "dewpoint_c": 6.64734745971552,
+          "relative_humidity_pct": 100.0,
+          "height_m": 786.0640431956891,
+          "u_ms": 4.935673851740442,
+          "v_ms": 1.891721268987585
         },
         "ICON-D2": {
-          "temperature_c": 2.9284921906991275,
-          "dewpoint_c": 0.3020806856703835,
-          "relative_humidity_pct": 82.84184423070444,
-          "height_m": 854.9076278345512,
-          "u_ms": -7.571729398010967,
-          "v_ms": 0.4805059782181373
+          "temperature_c": 7.148037125369315,
+          "dewpoint_c": 6.866858011290601,
+          "relative_humidity_pct": 98.10356925829292,
+          "height_m": 806.8065588565755,
+          "u_ms": 9.620650890393884,
+          "v_ms": 2.94660073836167
         },
         "C-LAEF": {
-          "temperature_c": 2.7913818359375,
-          "dewpoint_c": 0.8802759212835183,
-          "relative_humidity_pct": 87.23860931396484,
-          "height_m": 851.5914981798066,
-          "u_ms": -7.207792282104492,
-          "v_ms": 0.32735157012939453
+          "temperature_c": 6.89349365234375,
+          "dewpoint_c": 6.885215077948527,
+          "relative_humidity_pct": 99.94324493408203,
+          "height_m": 803.1540320375715,
+          "u_ms": 6.096826553344727,
+          "v_ms": 2.4717750549316406
         }
       },
       "source_methods": {
@@ -51,22 +51,22 @@
       },
       "model_minus_obs": {
         "ICON-D2": {
-          "temperature_c": -0.9690219979797519,
-          "dewpoint_c": 0.25957595611075707,
-          "relative_humidity_pct": 6.90857395816613,
-          "height_m": 17.07587102109335,
-          "u_ms": 0.027113085177606244,
-          "v_ms": 0.4584414181106594,
-          "wind_vector_error_ms": 0.459242477594528
+          "temperature_c": 0.5006896656537956,
+          "dewpoint_c": 0.21951055157508126,
+          "relative_humidity_pct": -1.8964307417070785,
+          "height_m": 20.742515660886397,
+          "u_ms": 4.684977038653442,
+          "v_ms": 1.054879469374085,
+          "wind_vector_error_ms": 4.802268271100328
         },
         "C-LAEF": {
-          "temperature_c": -1.1061323527413793,
-          "dewpoint_c": 0.8377711917238918,
-          "relative_humidity_pct": 11.305339041426535,
-          "height_m": 13.759741366348749,
-          "u_ms": 0.39105020108408084,
-          "v_ms": 0.30528701002191666,
-          "wind_vector_error_ms": 0.49610524917200977
+          "temperature_c": 0.24614619262823023,
+          "dewpoint_c": 0.2378676182330075,
+          "relative_humidity_pct": -0.05675506591796875,
+          "height_m": 17.08998884188236,
+          "u_ms": 1.1611527016042844,
+          "v_ms": 0.5800537859440555,
+          "wind_vector_error_ms": 1.2979745725671827
         }
       }
     },
@@ -74,28 +74,28 @@
       "pressure_hpa": 850,
       "values": {
         "OBS": {
-          "temperature_c": -2.41,
-          "dewpoint_c": -2.49,
-          "relative_humidity_pct": 99.4,
-          "height_m": 1517.0,
-          "u_ms": -7.323135175472683,
-          "v_ms": 2.3794308566870948
+          "temperature_c": 5.24,
+          "dewpoint_c": 5.24,
+          "relative_humidity_pct": 100.0,
+          "height_m": 1481.0,
+          "u_ms": 14.657560842006118,
+          "v_ms": 8.807151080961933
         },
         "ICON-D2": {
-          "temperature_c": -2.065256953536111,
-          "dewpoint_c": -2.077975725823086,
-          "relative_humidity_pct": 99.90281227713025,
-          "height_m": 1533.1480288898088,
-          "u_ms": -5.178177738305075,
-          "v_ms": 2.172578158430462
+          "temperature_c": 4.508072382684201,
+          "dewpoint_c": 4.498494802249546,
+          "relative_humidity_pct": 99.93422419565346,
+          "height_m": 1500.016131702396,
+          "u_ms": 14.647506536910479,
+          "v_ms": 7.128234415253996
         },
         "C-LAEF": {
-          "temperature_c": -0.306243896484375,
-          "dewpoint_c": -4.870642753516246,
-          "relative_humidity_pct": 71.30522155761719,
-          "height_m": 1530.8867061827943,
-          "u_ms": -8.229265213012695,
-          "v_ms": 1.6064119338989258
+          "temperature_c": 5.493133544921875,
+          "dewpoint_c": 5.4907878571317985,
+          "relative_humidity_pct": 99.98373413085938,
+          "height_m": 1497.7120714961277,
+          "u_ms": 16.127925872802734,
+          "v_ms": 7.146718978881836
         }
       },
       "source_methods": {
@@ -105,22 +105,22 @@
       },
       "model_minus_obs": {
         "ICON-D2": {
-          "temperature_c": 0.344743046463889,
-          "dewpoint_c": 0.41202427417691423,
-          "relative_humidity_pct": 0.5028122771302463,
-          "height_m": 16.148028889808757,
-          "u_ms": 2.1449574371676086,
-          "v_ms": -0.20685269825663255,
-          "wind_vector_error_ms": 2.1549084542125416
+          "temperature_c": -0.7319276173157991,
+          "dewpoint_c": -0.7415051977504543,
+          "relative_humidity_pct": -0.06577580434654351,
+          "height_m": 19.016131702396024,
+          "u_ms": -0.010054305095639648,
+          "v_ms": -1.6789166657079377,
+          "wind_vector_error_ms": 1.678946770878343
         },
         "C-LAEF": {
-          "temperature_c": 2.103756103515625,
-          "dewpoint_c": -2.3806427535162458,
-          "relative_humidity_pct": -28.094778442382818,
-          "height_m": 13.886706182794342,
-          "u_ms": -0.9061300375400121,
-          "v_ms": -0.773018922788169,
-          "wind_vector_error_ms": 1.191062508821785
+          "temperature_c": 0.2531335449218748,
+          "dewpoint_c": 0.2507878571317983,
+          "relative_humidity_pct": -0.016265869140625,
+          "height_m": 16.71207149612769,
+          "u_ms": 1.470365030796616,
+          "v_ms": -1.6604321020800974,
+          "wind_vector_error_ms": 2.217883696095822
         }
       }
     },
@@ -128,28 +128,28 @@
       "pressure_hpa": 700,
       "values": {
         "OBS": {
-          "temperature_c": -1.6,
-          "dewpoint_c": -27.87,
-          "relative_humidity_pct": 11.4,
-          "height_m": 3065.0,
-          "u_ms": -4.703326778078576,
-          "v_ms": 6.7170467631697335
+          "temperature_c": -2.91,
+          "dewpoint_c": -2.91,
+          "relative_humidity_pct": 100.0,
+          "height_m": 3043.0,
+          "u_ms": 21.581125129491532,
+          "v_ms": 2.2682676529080776
         },
         "ICON-D2": {
-          "temperature_c": -2.73986151818533,
-          "dewpoint_c": -21.689908673072708,
-          "relative_humidity_pct": 22.59041274007887,
-          "height_m": 3084.071141053733,
-          "u_ms": -5.179419553578109,
-          "v_ms": 6.786211690835164
+          "temperature_c": -3.224802546013339,
+          "dewpoint_c": -3.5536044793745325,
+          "relative_humidity_pct": 97.59038303998561,
+          "height_m": 3060.2575978275204,
+          "u_ms": 18.461489567378848,
+          "v_ms": 3.817350669980904
         },
         "C-LAEF": {
-          "temperature_c": -2.600433349609375,
-          "dewpoint_c": -29.25864941813723,
-          "relative_humidity_pct": 10.84375,
-          "height_m": 3083.0050192343974,
-          "u_ms": -4.754936218261719,
-          "v_ms": 8.347803115844727
+          "temperature_c": -2.937164306640625,
+          "dewpoint_c": -3.4784965620568307,
+          "relative_humidity_pct": 96.04877471923828,
+          "height_m": 3061.6513252486834,
+          "u_ms": 19.754562377929688,
+          "v_ms": 3.9424591064453125
         }
       },
       "source_methods": {
@@ -159,22 +159,22 @@
       },
       "model_minus_obs": {
         "ICON-D2": {
-          "temperature_c": -1.13986151818533,
-          "dewpoint_c": 6.180091326927293,
-          "relative_humidity_pct": 11.190412740078871,
-          "height_m": 19.071141053732845,
-          "u_ms": -0.47609277549953255,
-          "v_ms": 0.06916492766543048,
-          "wind_vector_error_ms": 0.481090550834053
+          "temperature_c": -0.3148025460133388,
+          "dewpoint_c": -0.6436044793745324,
+          "relative_humidity_pct": -2.4096169600143895,
+          "height_m": 17.257597827520385,
+          "u_ms": -3.119635562112684,
+          "v_ms": 1.5490830170728263,
+          "wind_vector_error_ms": 3.4830710923237804
         },
         "C-LAEF": {
-          "temperature_c": -1.000433349609375,
-          "dewpoint_c": -1.3886494181372306,
-          "relative_humidity_pct": -0.5562500000000004,
-          "height_m": 18.005019234397423,
-          "u_ms": -0.0516094401831424,
-          "v_ms": 1.630756352674993,
-          "wind_vector_error_ms": 1.631572804414766
+          "temperature_c": -0.027164306640624858,
+          "dewpoint_c": -0.5684965620568305,
+          "relative_humidity_pct": -3.9512252807617188,
+          "height_m": 18.651325248683406,
+          "u_ms": -1.8265627515618448,
+          "v_ms": 1.6741914535372349,
+          "wind_vector_error_ms": 2.477750695386906
         }
       }
     },
@@ -182,28 +182,28 @@
       "pressure_hpa": 500,
       "values": {
         "OBS": {
-          "temperature_c": -17.82,
-          "dewpoint_c": -18.95,
-          "relative_humidity_pct": 90.8,
-          "height_m": 5654.0,
-          "u_ms": 8.00926824431198,
-          "v_ms": 5.819073997695486
+          "temperature_c": -17.33,
+          "dewpoint_c": -18.5,
+          "relative_humidity_pct": 90.6,
+          "height_m": 5646.0,
+          "u_ms": 20.990512378304835,
+          "v_ms": -7.22761302894887
         },
         "ICON-D2": {
-          "temperature_c": -17.8478749721771,
-          "dewpoint_c": -19.87523445183352,
-          "relative_humidity_pct": 84.13672264580153,
-          "height_m": 5673.37439751045,
-          "u_ms": 1.408165546723133,
-          "v_ms": 5.609388515574378
+          "temperature_c": -16.851361277819567,
+          "dewpoint_c": -19.539897926729665,
+          "relative_humidity_pct": 79.60897530311445,
+          "height_m": 5663.445573231155,
+          "u_ms": 20.2702893395209,
+          "v_ms": -7.913244193927915
         },
         "C-LAEF": {
-          "temperature_c": -17.798492431640625,
-          "dewpoint_c": -17.856558075064964,
-          "relative_humidity_pct": 99.51081085205078,
-          "height_m": 5675.097143902352,
-          "u_ms": 2.0562124252319336,
-          "v_ms": 6.462245941162109
+          "temperature_c": -17.269241333007812,
+          "dewpoint_c": -18.841758190487045,
+          "relative_humidity_pct": 87.53978729248047,
+          "height_m": 5666.109301468901,
+          "u_ms": 19.94566535949707,
+          "v_ms": -7.741193771362305
         }
       },
       "source_methods": {
@@ -213,22 +213,22 @@
       },
       "model_minus_obs": {
         "ICON-D2": {
-          "temperature_c": -0.027874972177098556,
-          "dewpoint_c": -0.9252344518335214,
-          "relative_humidity_pct": -6.6632773541984704,
-          "height_m": 19.374397510449853,
-          "u_ms": -6.601102697588846,
-          "v_ms": -0.20968548212110782,
-          "wind_vector_error_ms": 6.604432210684512
+          "temperature_c": 0.47863872218043113,
+          "dewpoint_c": -1.0398979267296653,
+          "relative_humidity_pct": -10.991024696885546,
+          "height_m": 17.445573231155322,
+          "u_ms": -0.720223038783935,
+          "v_ms": -0.6856311649790454,
+          "wind_vector_error_ms": 0.9943899235137535
         },
         "C-LAEF": {
-          "temperature_c": 0.021507568359375284,
-          "dewpoint_c": 1.0934419249350356,
-          "relative_humidity_pct": 8.710810852050784,
-          "height_m": 21.0971439023524,
-          "u_ms": -5.9530558190800456,
-          "v_ms": 0.6431719434666237,
-          "wind_vector_error_ms": 5.987699369035274
+          "temperature_c": 0.060758666992185795,
+          "dewpoint_c": -0.34175819048704525,
+          "relative_humidity_pct": -3.0602127075195256,
+          "height_m": 20.10930146890132,
+          "u_ms": -1.044847018807765,
+          "v_ms": -0.5135807424134349,
+          "wind_vector_error_ms": 1.1642467400381282
         }
       }
     },
@@ -236,28 +236,28 @@
       "pressure_hpa": 300,
       "values": {
         "OBS": {
-          "temperature_c": -46.76,
-          "dewpoint_c": -52.37,
-          "relative_humidity_pct": 52.9,
-          "height_m": 9256.0,
-          "u_ms": 1.4501483648617397,
-          "v_ms": 7.460366594202246
+          "temperature_c": -42.83,
+          "dewpoint_c": -48.05,
+          "relative_humidity_pct": 56.6,
+          "height_m": 9278.0,
+          "u_ms": 31.297165017382977,
+          "v_ms": -13.284858368635298
         },
         "ICON-D2": {
-          "temperature_c": -46.59898823939091,
-          "dewpoint_c": -51.55972133039545,
-          "relative_humidity_pct": 57.173157177789975,
-          "height_m": 9276.086510187331,
-          "u_ms": -1.8616512382470218,
-          "v_ms": 5.775465626905699
+          "temperature_c": -42.19150703315941,
+          "dewpoint_c": -47.651222374719666,
+          "relative_humidity_pct": 55.32977482175398,
+          "height_m": 9308.664727748175,
+          "u_ms": 33.51336790615495,
+          "v_ms": -10.884268964198359
         },
         "C-LAEF": {
-          "temperature_c": -46.587921142578125,
-          "dewpoint_c": -49.58421970607127,
-          "relative_humidity_pct": 71.33967590332031,
-          "height_m": 9279.668483885935,
-          "u_ms": -3.242452621459961,
-          "v_ms": 5.294811248779297
+          "temperature_c": -42.34327697753906,
+          "dewpoint_c": -43.13206910082106,
+          "relative_humidity_pct": 91.92318725585938,
+          "height_m": 9310.058416992551,
+          "u_ms": 32.42057418823242,
+          "v_ms": -10.646255493164062
         }
       },
       "source_methods": {
@@ -267,22 +267,22 @@
       },
       "model_minus_obs": {
         "ICON-D2": {
-          "temperature_c": 0.16101176060908529,
-          "dewpoint_c": 0.8102786696045499,
-          "relative_humidity_pct": 4.273157177789976,
-          "height_m": 20.08651018733144,
-          "u_ms": -3.3117996031087618,
-          "v_ms": -1.6849009672965467,
-          "wind_vector_error_ms": 3.715764777370628
+          "temperature_c": 0.6384929668405874,
+          "dewpoint_c": 0.39877762528033145,
+          "relative_humidity_pct": -1.2702251782460223,
+          "height_m": 30.66472774817521,
+          "u_ms": 2.2162028887719707,
+          "v_ms": 2.400589404436939,
+          "wind_vector_error_ms": 3.2671676928030684
         },
         "C-LAEF": {
-          "temperature_c": 0.172078857421873,
-          "dewpoint_c": 2.785780293928724,
-          "relative_humidity_pct": 18.439675903320314,
-          "height_m": 23.66848388593462,
-          "u_ms": -4.6926009863217,
-          "v_ms": -2.1655553454229493,
-          "wind_vector_error_ms": 5.168184784904397
+          "temperature_c": 0.4867230224609358,
+          "dewpoint_c": 4.917930899178934,
+          "relative_humidity_pct": 35.323187255859374,
+          "height_m": 32.05841699255143,
+          "u_ms": 1.1234091708494454,
+          "v_ms": 2.6386028754712356,
+          "wind_vector_error_ms": 2.867799382731245
         }
       }
     }
@@ -291,47 +291,47 @@
     "OBS": {
       "source_method": "highest_pressure_native_row",
       "row": {
-        "pressure_hpa": 988.0,
+        "pressure_hpa": 981.5,
         "height_m": 299.0,
-        "temperature_c": 7.71,
-        "dewpoint_c": 2.13,
-        "relative_humidity_pct": 67.8,
-        "potential_temperature_k": 281.83,
-        "equivalent_potential_temperature_k": 294.55,
-        "wind_speed_ms": 2.1,
-        "wind_direction_deg": 21.0
+        "temperature_c": 8.37,
+        "dewpoint_c": 6.75,
+        "relative_humidity_pct": 89.5,
+        "potential_temperature_k": 283.03,
+        "equivalent_potential_temperature_k": 300.6,
+        "wind_speed_ms": 1.4,
+        "wind_direction_deg": 343.0
       }
     },
     "ICON-D2": {
       "source_method": "highest_pressure_native_row",
       "row": {
         "model_level": 65,
-        "pressure_hpa": 989.672,
-        "temperature_c": 6.872,
-        "dewpoint_c": 3.163,
-        "specific_humidity_gkg": 4.8319,
-        "potential_temperature_k": 280.854,
-        "equivalent_potential_temperature_k": 294.421,
-        "u_ms": -1.487,
-        "v_ms": -1.098,
-        "wind_speed_ms": 1.848,
-        "wind_direction_deg": 53.56,
+        "pressure_hpa": 983.021,
+        "temperature_c": 8.61,
+        "dewpoint_c": 6.712,
+        "specific_humidity_gkg": 6.2357,
+        "potential_temperature_k": 283.142,
+        "equivalent_potential_temperature_k": 300.656,
+        "u_ms": -0.309,
+        "v_ms": -0.472,
+        "wind_speed_ms": 0.565,
+        "wind_direction_deg": 33.23,
         "height_m": 303.33,
-        "relative_humidity_pct": 77.22
+        "relative_humidity_pct": 87.85
       }
     },
     "C-LAEF": {
       "source_method": "explicit_model_surface",
       "row": {
-        "pressure_hpa": 990.3775,
+        "pressure_hpa": 983.73109375,
         "height_m": 295.66716407042674,
-        "temperature_c": 3.339019775390625,
-        "dewpoint_c": 1.4791969156562768,
-        "relative_humidity_pct": 87.61309814453125,
-        "u_ms": 0.20125293731689453,
-        "v_ms": -1.6423835754394531,
-        "wind_speed_ms": 1.6546681098189933,
-        "wind_direction_deg": 353.01396772198865,
+        "temperature_c": 7.36419677734375,
+        "dewpoint_c": 6.524248620926553,
+        "relative_humidity_pct": 94.40509033203125,
+        "u_ms": 0.15549087524414062,
+        "v_ms": 0.680180549621582,
+        "wind_speed_ms": 0.6977270185163438,
+        "wind_direction_deg": 192.87668550506754,
         "omega_pa_s": null,
         "below_model_surface": false,
         "level_type": "model_surface",
@@ -347,5 +347,5 @@
     "surface": "separate native rows; no surface bias",
     "plot": "native T/Td samples; C-LAEF dotted with native markers; no dense resampling"
   },
-  "generated_at": "2026-11-07T07:20:46.297920Z"
+  "generated_at": "2026-11-10T07:52:47.711310Z"
 }
