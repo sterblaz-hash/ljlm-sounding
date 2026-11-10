@@ -2421,8 +2421,12 @@
     "Z__C_EDZW_20261110195751_bda01%2Ctemp_bufr_999999_999999__MW_083.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-11-10T20:03:26.829273Z"
+    },
+    "Z__C_EDZW_20261110200652_bda01%2Ctemp_bufr_999999_999999__MW_084.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-11-10T20:30:39.756159Z"
     }
   },
-  "updated_at": "2026-11-10T20:03:46.311610Z",
+  "updated_at": "2026-11-10T20:30:39.756409Z",
   "version": 1
 }
