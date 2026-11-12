@@ -6,8 +6,8 @@
   "nominal_date": "2026-11-12",
   "term": "12",
   "launch_time": null,
-  "processed_at": "2026-11-12T01:09:28Z",
-  "rendered_at": "2026-11-12T01:09:32.224462Z",
+  "processed_at": "2026-11-12T08:28:12Z",
+  "rendered_at": "2026-11-12T08:28:14.738129Z",
   "latest": {
     "skewt": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026111200/diagnostics/f012/latest_skewt.png",
     "lowlevel": "/home/runner/work/ljlm-sounding/ljlm-sounding/models/icon-d2/2026111200/diagnostics/f012/latest_lowlevel.png",
