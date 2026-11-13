@@ -60,4 +60,6 @@ jobs:
         env:
           MPLBACKEND: Agg
           PYTHONDONTWRITEBYTECODE: "1"
+          # Manual dispatch retains the full 72h recovery behavior.
+          LJLM_SCAN_MODE: ${{ github.event_name == 'workflow_dispatch' && 'recovery' || 'fast' }}
         run: python publish_ljlm.py
