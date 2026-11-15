@@ -25748,7 +25748,7 @@
   "source": "DWD Open Data BUFR",
   "source_file": "Z__C_EDZW_20261113004600_bda01,temp_bufr_999999_999999__MW_520.bin",
   "retrieved_at": "2026-11-13T02:04:17.380544Z",
-  "processed_at": "2026-11-14T12:29:33.627354Z",
+  "processed_at": "2026-11-15T00:29:15.941331Z",
   "term": "00",
   "nominal_date": "2026-11-13",
   "sounding_classification": {
