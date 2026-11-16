@@ -1,9 +1,5 @@
 {
   "packages": {
-    "Z__C_EDZW_20261113223804_bda01%2Ctemp_bufr_999999_999999__MW_696.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-11-14T00:27:03.520708Z"
-    },
     "Z__C_EDZW_20261113230616_bda01%2Ctemp_bufr_999999_999999__MW_697.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-11-14T00:27:02.914293Z"
@@ -2121,8 +2117,12 @@
     "Z__C_EDZW_20261116220102_bda01%2Ctemp_bufr_999999_999999__MW_298.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-11-16T22:34:36.704944Z"
+    },
+    "Z__C_EDZW_20261116223204_bda01%2Ctemp_bufr_999999_999999__MW_299.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-11-16T22:57:00.327670Z"
     }
   },
-  "updated_at": "2026-11-16T22:34:41.759444Z",
+  "updated_at": "2026-11-16T22:57:00.327894Z",
   "version": 1
 }
