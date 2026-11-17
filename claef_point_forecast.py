@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Central C-LAEF LJLM point cache; independent of dashboard and workflows.
 
-Run python3 claef_point_forecast.py. At most two metadata and two point requests
-per refresh, paced one second apart. A persisted 15-minute check interval also
-applies after failures; 429 Retry-After/reset can extend it. Existing good output
-survives errors. Matching reference times are required; values retain native units.
+Run python3 claef_point_forecast.py. Normally two metadata and two point
+requests per refresh, paced at least one second apart; temporary network failures
+may trigger up to two bounded retries per request. A persisted 15-minute check
+interval applies after failures; 429 Retry-After/reset can extend it. Existing
+good output survives errors. Reference times must match; native units are kept.
 """
 import argparse
 from datetime import datetime, timedelta, timezone
@@ -30,6 +31,10 @@ PERCENTILES = ('P10', 'P50', 'P90')
 SCHEMA_VERSION = 2
 CHECK_SECONDS = 900
 MAX_BYTES = 1024 * 1024
+REQUEST_TIMEOUT = 30
+MAX_ATTEMPTS = 3
+RETRY_DELAYS = (2, 5)  # seconds, before second and third HTTP request
+RETRYABLE_HTTP = frozenset((408, 500, 502, 503, 504))
 DEFAULT_OUTPUT = Path(__file__).resolve().parent / 'models/claef/latest/point.json'
 INTERVAL_KINDS = {'tp': 'interval_amount', 'rain': 'interval_amount',
                   'sf': 'interval_amount', 'sund': 'interval_duration',
@@ -77,25 +82,45 @@ class ForecastClient:
         self.last_request = None
 
     def json(self, url):
-        if self.last_request is not None:
-            time.sleep(max(0, 1 - (time.monotonic() - self.last_request)))
-        self.last_request = time.monotonic()
+        # GET requests are safe to retry, but never bypass throttling or response
+        # validation. Rate limiting applies to *each physical HTTP attempt*.
         request = Request(url, headers={'User-Agent': 'LJLM-CLAEF-PointCache/1.0 (GeoSphere public point forecast)',
                                         'Accept': 'application/json'})
-        try:
-            with urlopen(request, timeout=15) as response:
-                body = response.read(MAX_BYTES + 1)
-                if len(body) > MAX_BYTES:
-                    raise RetrievalError('API response exceeds 1 MiB cap.')
-            data = json.loads(body)
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            if self.last_request is not None:
+                time.sleep(max(0, 1 - (time.monotonic() - self.last_request)))
+            self.last_request = time.monotonic()
+            try:
+                with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
+                    body = response.read(MAX_BYTES + 1)
+                    if len(body) > MAX_BYTES:
+                        raise RetrievalError('API response exceeds 1 MiB cap.')
+            except HTTPError as error:
+                # Rate limits (429) and explicit server backoff (503 Retry-After)
+                # must be handled by the existing persisted check gate.
+                deferred = error.code == 429 or (
+                    error.code == 503 and error.headers.get('Retry-After'))
+                if deferred:
+                    deadline = retry_deadline(error.headers, now_utc())
+                    raise RetrievalError(f'GeoSphere HTTP {error.code}; retry deferred.', deadline) from error
+                if error.code in RETRYABLE_HTTP and attempt < MAX_ATTEMPTS:
+                    time.sleep(RETRY_DELAYS[attempt - 1])
+                    continue
+                raise RetrievalError(f'GeoSphere HTTP {error.code} after {attempt} attempt(s).') from error
+            except (URLError, TimeoutError, socket.timeout, OSError) as error:
+                if attempt < MAX_ATTEMPTS:
+                    time.sleep(RETRY_DELAYS[attempt - 1])
+                    continue
+                raise RetrievalError(f'GeoSphere request failed after {attempt} attempts: {error}') from error
+
+            # Reject malformed/oversized responses WITHOUT retrying them.
+            try:
+                data = json.loads(body)
+            except ValueError as error:
+                raise RetrievalError(f'Invalid GeoSphere JSON: {error}') from error
             if not isinstance(data, dict):
                 raise RetrievalError('API JSON is not an object.')
             return data
-        except HTTPError as error:
-            deadline = retry_deadline(error.headers, now_utc()) if error.code == 429 else None
-            raise RetrievalError(f'GeoSphere HTTP {error.code}; no automatic retry.', deadline) from error
-        except (URLError, TimeoutError, socket.timeout, OSError, ValueError) as error:
-            raise RetrievalError(f'GeoSphere request failed: {error}') from error
 
 
 def atomic_json(path, data):

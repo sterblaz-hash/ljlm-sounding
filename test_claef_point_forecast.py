@@ -277,14 +277,41 @@ class CacheTests(unittest.TestCase):
 
 class TransportTests(unittest.TestCase):
     @patch('claef_point_forecast.urlopen')
-    def test_http_429_and_503_stop_without_retry(self, fetch):
+    def test_http_429_and_503_retry_after_never_retry(self, fetch):
         headers = Message(); headers['Retry-After'] = '1800'
         for code in (429, 503):
             fetch.reset_mock()
             fetch.side_effect = HTTPError('https://example.test', code, 'failure', headers, None)
-            with self.assertRaisesRegex(c.RetrievalError, str(code)) as failure: c.ForecastClient().json('https://example.test')
+            with self.assertRaisesRegex(c.RetrievalError, str(code)) as failure:
+                c.ForecastClient().json('https://example.test')
             self.assertEqual(fetch.call_count, 1)
-            self.assertEqual(failure.exception.retry_at is not None, code == 429)
+            self.assertIsNotNone(failure.exception.retry_at)
+
+    @patch('claef_point_forecast.time.sleep')
+    @patch('claef_point_forecast.urlopen')
+    def test_transient_http_503_recovery_and_persistent_failure(self, fetch, sleep):
+        server_error = HTTPError('https://example.test', 503, 'unavailable', Message(), None)
+        fetch.side_effect = [server_error, io.BytesIO(b'{"ok":true}')]
+        self.assertEqual(c.ForecastClient().json('https://example.test'), {'ok': True})
+        self.assertEqual(fetch.call_count, 2)
+        fetch.reset_mock()
+        fetch.side_effect = HTTPError('https://example.test', 503, 'unavailable', Message(), None)
+        with self.assertRaisesRegex(c.RetrievalError, 'after 3 attempt'):
+            c.ForecastClient().json('https://example.test')
+        self.assertEqual(fetch.call_count, 3)
+
+    @patch('claef_point_forecast.time.sleep')
+    @patch('claef_point_forecast.urlopen')
+    def test_timeout_then_success_and_permanent_http_error(self, fetch, sleep):
+        fetch.side_effect = [TimeoutError('slow'), URLError('temporary'), io.BytesIO(b'{}')]
+        self.assertEqual(c.ForecastClient().json('https://example.test'), {})
+        self.assertEqual(fetch.call_count, 3)
+        self.assertTrue(all(call.kwargs['timeout'] == c.REQUEST_TIMEOUT for call in fetch.call_args_list))
+        fetch.reset_mock()
+        fetch.side_effect = HTTPError('https://example.test', 400, 'bad request', Message(), None)
+        with self.assertRaisesRegex(c.RetrievalError, '400'):
+            c.ForecastClient().json('https://example.test')
+        self.assertEqual(fetch.call_count, 1)
 
     def test_retry_after_date_and_reset(self):
         headers = Message(); headers['Retry-After'] = 'Fri, 09 Oct 2026 08:00:00 GMT'; headers['ratelimit-reset'] = '60'
@@ -294,14 +321,18 @@ class TransportTests(unittest.TestCase):
     def test_timeout_agent_invalid_response_and_network_errors(self, fetch):
         response = io.BytesIO(b'{"ok":true}'); fetch.return_value = response
         self.assertEqual(c.ForecastClient().json('https://example.test'), {'ok': True})
-        self.assertEqual(fetch.call_args.kwargs['timeout'], 15)
+        self.assertEqual(fetch.call_args.kwargs['timeout'], c.REQUEST_TIMEOUT)
         self.assertIn('PointCache', fetch.call_args.args[0].get_header('User-agent'))
         for body in (b'bad JSON', b'[]'):
             fetch.return_value = io.BytesIO(body)
             with self.assertRaises(c.RetrievalError): c.ForecastClient().json('https://example.test')
         for error in (URLError('DNS'), TimeoutError()):
+            fetch.reset_mock()
             fetch.side_effect = error
-            with self.assertRaises(c.RetrievalError): c.ForecastClient().json('https://example.test')
+            with patch('claef_point_forecast.time.sleep'):
+                with self.assertRaises(c.RetrievalError):
+                    c.ForecastClient().json('https://example.test')
+            self.assertEqual(fetch.call_count, c.MAX_ATTEMPTS)
 
     @patch('claef_point_forecast.MAX_BYTES', 3)
     @patch('claef_point_forecast.urlopen')
