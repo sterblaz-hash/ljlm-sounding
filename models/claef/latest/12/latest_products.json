@@ -2,12 +2,12 @@
   "version": 2,
   "station": 14015,
   "station_name": "Ljubljana",
-  "sounding_id": "claef_2026111600_f012",
-  "nominal_date": "2026-11-16",
+  "sounding_id": "claef_2026111700_f012",
+  "nominal_date": "2026-11-17",
   "term": "12",
   "launch_time": null,
-  "processed_at": "2026-11-16T11:57:00.919406Z",
-  "rendered_at": "2026-11-16T11:57:03.058766Z",
+  "processed_at": "2026-11-17T04:12:47.992283Z",
+  "rendered_at": "2026-11-17T04:12:50.180278Z",
   "latest": {
     "skewt": "models/claef/latest/12/skewt.png",
     "lowlevel": "models/claef/latest/12/lowlevel.png",
@@ -16,11 +16,11 @@
     "hodograph": "models/claef/latest/12/hodograph.png"
   },
   "archive": {
-    "skewt": "models/claef/2026111600/diagnostics/f012/2026/11/20261116_12_skewt.png",
-    "lowlevel": "models/claef/2026111600/diagnostics/f012/2026/11/20261116_12_lowlevel.png",
-    "skewt_zoom": "models/claef/2026111600/diagnostics/f012/2026/11/20261116_12_skewt_zoom.png",
-    "thetae": "models/claef/2026111600/diagnostics/f012/2026/11/20261116_12_thetae.png",
-    "hodograph": "models/claef/2026111600/diagnostics/f012/2026/11/20261116_12_hodograph.png"
+    "skewt": "models/claef/2026111700/diagnostics/f012/2026/11/20261117_12_skewt.png",
+    "lowlevel": "models/claef/2026111700/diagnostics/f012/2026/11/20261117_12_lowlevel.png",
+    "skewt_zoom": "models/claef/2026111700/diagnostics/f012/2026/11/20261117_12_skewt_zoom.png",
+    "thetae": "models/claef/2026111700/diagnostics/f012/2026/11/20261117_12_thetae.png",
+    "hodograph": "models/claef/2026111700/diagnostics/f012/2026/11/20261117_12_hodograph.png"
   },
   "skewt": "models/claef/latest/12/skewt.png",
   "skewt_zoom": "models/claef/latest/12/skewt_zoom.png",
@@ -29,19 +29,19 @@
   "hodograph": "models/claef/latest/12/hodograph.png",
   "profile_type": "model",
   "model": "C-LAEF",
-  "run_time": "2026-11-16T00:00:00Z",
-  "valid_time": "2026-11-16T12:00:00Z",
+  "run_time": "2026-11-17T00:00:00Z",
+  "valid_time": "2026-11-17T12:00:00Z",
   "lead_hours": 12,
   "requested_latitude": 46.0656,
   "requested_longitude": 14.5122,
   "grid_latitude": 46.06199999999979,
   "grid_longitude": 14.508700000000164,
   "source": {
-    "url": "https://public.hub.geosphere.at/datahub/resources/nwp-v2-1h-1km/filelisting/nwp_2026111600.nc",
-    "etag": "99d7fc89a004f480ad853531a3827b49-183",
-    "file_size_bytes": 9568978234
+    "url": "https://public.hub.geosphere.at/datahub/resources/nwp-v2-1h-1km/filelisting/nwp_2026111700.nc",
+    "etag": "231210e7beeefb1ccae2ba81f9310d3a-183",
+    "file_size_bytes": 9587418608
   },
   "sounding": "models/claef/latest/12/sounding.json",
-  "verification_date": "2026-11-16",
+  "verification_date": "2026-11-17",
   "verification_term": "12"
 }
