@@ -7,8 +7,10 @@ from datetime import date, datetime, timedelta, timezone
 SCHEDULES = {
     '35 3 * * *': ('00', 3),
     '35 4 * * *': ('00', 4),
+    '35 5 * * *': ('00', 5),
     '35 15 * * *': ('12', 15),
     '35 16 * * *': ('12', 16),
+    '35 17 * * *': ('12', 17),
 }
 
 def choose_run(cycle='', run_date='', *, schedule='', now=None):
