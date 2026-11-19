@@ -1,7 +1,7 @@
 name: Update C-LAEF LJLM +12 h sounding
 
 on:
-    schedule:
+  schedule:
     - cron: "35 3 * * *"   # 00 UTC primary
     - cron: "35 4 * * *"   # 00 UTC retry
     - cron: "35 5 * * *"   # 00 UTC late retry
