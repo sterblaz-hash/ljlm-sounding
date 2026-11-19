@@ -2267,8 +2267,16 @@
     "Z__C_EDZW_20261119201111_bda01%2Ctemp_bufr_999999_999999__MW_921.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-11-19T21:01:29.222767Z"
+    },
+    "Z__C_EDZW_20261119205805_bda01%2Ctemp_bufr_999999_999999__MW_922.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-11-19T21:40:59.618847Z"
+    },
+    "Z__C_EDZW_20261119211909_bda01%2Ctemp_bufr_999999_999999__MW_923.bin": {
+      "contains_ljlm": false,
+      "scanned_at": "2026-11-19T21:40:58.892463Z"
     }
   },
-  "updated_at": "2026-11-19T21:02:10.155107Z",
+  "updated_at": "2026-11-19T21:40:59.618991Z",
   "version": 1
 }
