@@ -78,7 +78,7 @@
   ],
   "top_pressure_requested_hpa": 100.0,
   "compressed_download_mb": 282.66,
-  "fetch_seconds": 131.4,
+  "fetch_seconds": 285.9,
   "z500_m": 5484.3,
   "thickness_1000_500_m": 5336.3,
   "levels": [
@@ -1120,7 +1120,7 @@
   "sounding_id": "icon-d2_2026112300_f012",
   "nominal_date": "2026-11-23",
   "term": "12",
-  "processed_at": "2026-11-23T01:09:28Z",
+  "processed_at": "2026-11-23T09:18:33Z",
   "source_url": "https://opendata.dwd.de/weather/nwp/icon-d2/grib",
   "diagnostic_notes": [
     "Native model levels on the DWD regular latitude/longitude grid; nearest grid point.",
