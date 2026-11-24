@@ -50,9 +50,10 @@ def now_utc():
 
 
 class RetrievalError(ProbeError):
-    def __init__(self, message, retry_at=None):
+    def __init__(self, message, retry_at=None, transient=False):
         super().__init__(message)
         self.retry_at = retry_at
+        self.transient = transient
 
 
 def retry_deadline(headers, now):
@@ -102,16 +103,16 @@ class ForecastClient:
                     error.code == 503 and error.headers.get('Retry-After'))
                 if deferred:
                     deadline = retry_deadline(error.headers, now_utc())
-                    raise RetrievalError(f'GeoSphere HTTP {error.code}; retry deferred.', deadline) from error
+                    raise RetrievalError(f'GeoSphere HTTP {error.code}; retry deferred.', retry_at=deadline, transient=True) from error
                 if error.code in RETRYABLE_HTTP and attempt < MAX_ATTEMPTS:
                     time.sleep(RETRY_DELAYS[attempt - 1])
                     continue
-                raise RetrievalError(f'GeoSphere HTTP {error.code} after {attempt} attempt(s).') from error
+                raise RetrievalError(f'GeoSphere HTTP {error.code} after {attempt} attempt(s).', transient=error.code in RETRYABLE_HTTP) from error
             except (URLError, TimeoutError, socket.timeout, OSError) as error:
                 if attempt < MAX_ATTEMPTS:
                     time.sleep(RETRY_DELAYS[attempt - 1])
                     continue
-                raise RetrievalError(f'GeoSphere request failed after {attempt} attempts: {error}') from error
+                raise RetrievalError(f'GeoSphere request failed after {attempt} attempts: {error}', transient=True) from error
 
             # Reject malformed/oversized responses WITHOUT retrying them.
             try:
@@ -273,9 +274,49 @@ def validate_coverage(meta, response, cycle, names):
         raise ProbeError('Cycle changed or forecast coverage incomplete; preserving cache.')
 
 
-def write_status(output, product, error=None, attempted_at=None):
+def recent_usable_cache(product, now):
+    """Allow a transient source outage without failing when a recent forecast survives.
+
+    The model cycle must be no more than 12 hours old and the stored forecast
+    must still cover the current time. Check the self-contained published
+    product, since source metadata may be unavailable during an outage.
+    """
+    try:
+        if not isinstance(product, dict):
+            return False
+        if product.get('schema_version') != SCHEMA_VERSION or product.get('model') != 'C-LAEF AlpeAdria':
+            return False
+        if product.get('requested_location') != {'latitude': 46.0656, 'longitude': 14.5122}:
+            return False
+        cycle = parse_time(product['reference_time'])
+        retrieved = parse_time(product['retrieved_at'])
+        now = now.astimezone(timezone.utc)
+        if not timedelta(0) <= now - cycle <= timedelta(hours=12):
+            return False
+        if retrieved > now:
+            return False
+        rows = product['records']
+        if not isinstance(rows, list) or not rows or len(rows) != product['forecast_hour_count']:
+            return False
+        valid_times = [parse_time(row['valid_time']) for row in rows]
+        if valid_times != sorted(set(valid_times)):
+            return False
+        if parse_time(product['forecast_start']) != valid_times[0]:
+            return False
+        if parse_time(product['forecast_end']) != valid_times[-1]:
+            return False
+        if not valid_times[0] <= now <= valid_times[-1]:
+            return False
+        if any(parse_time(product['sources'][kind]['reference_time']) != cycle for kind in RESOURCES):
+            return False
+        return True
+    except (KeyError, ValueError, TypeError, AttributeError, ProbeError):
+        return False
+
+
+def write_status(output, product, error=None, attempted_at=None, degraded=False):
     """Small status; successful same-cycle runs keep identical status bytes."""
-    status = {'status': 'error' if error else ('ok' if product else 'unavailable'),
+    status = {'status': ('warning' if degraded else 'error') if error else ('ok' if product else 'unavailable'),
               'model_reference_time': product.get('reference_time') if product else None,
               'retrieved_at': product.get('retrieved_at') if product else None,
               'forecast_hour_count': len(product.get('records', [])) if product else 0}
@@ -366,7 +407,15 @@ def refresh(output=DEFAULT_OUTPUT, client=None, now=None):
                 state['next_check_at'] = utc(max(next_check, error.retry_at).isoformat())
             state['last_error'] = str(error)
             atomic_json(state_path, state)
-            write_status(output, read_json(output), error, now.isoformat())
+            surviving_product = read_json(output)
+            if (isinstance(error, RetrievalError) and error.transient
+                    and recent_usable_cache(surviving_product, now)):
+                # No false GitHub Actions failure for a short GeoSphere outage.
+                # The original forecast stays untouched; status records a warning.
+                write_status(output, surviving_product, error, now.isoformat(), degraded=True)
+                return {'status': 'degraded', 'reference_time': surviving_product['reference_time'],
+                        'reason': str(error), 'previous_forecast_preserved': True}
+            write_status(output, surviving_product, error, now.isoformat())
             raise
 
 
