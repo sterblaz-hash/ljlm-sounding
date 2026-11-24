@@ -2757,6 +2757,41 @@ function getDashboardTimeseries(windowKey) {
   return result;
 }
 
+function getDashboardSystemHealth() {
+  const cache = CacheService.getScriptCache();
+  const key = 'ljlm-system-health:v2';
+  const cached = cache.get(key);
+  if (cached) return JSON.parse(cached);
+
+  const report = fetchJsonOptional_('data/system_health.json');
+  const streamIds = ['obs_00', 'obs_12', 'icon_d2_00', 'icon_d2_12',
+    'claef_sounding_00', 'claef_sounding_12', 'claef_point'];
+  if (!report || report.schema_version !== 2 || typeof report.status !== 'string' ||
+      typeof report.checked_at !== 'string' || !/(?:Z|[+-]\d{2}:\d{2})$/.test(report.checked_at) ||
+      !Number.isFinite(Date.parse(report.checked_at)) ||
+      !Array.isArray(report.checks) || report.checks.length !== streamIds.length ||
+      !streamIds.every(id => report.checks.some(check => check && check.id === id &&
+        typeof check.name === 'string' && typeof check.status === 'string'))) {
+    return null;
+  }
+
+  const result = {
+    status: report.status,
+    checked_at: report.checked_at,
+    checks: streamIds.map(id => report.checks.find(check => check && check.id === id)),
+    archive: report.archive && Array.isArray(report.archive.gaps) &&
+      report.archive.gaps.every(gap => gap && typeof gap.valid_time === 'string') ? report.archive : null,
+    github_actions: report.github_actions && Array.isArray(report.github_actions.workflows) &&
+      report.github_actions.workflows.every(workflow => workflow && typeof workflow.name === 'string' &&
+        typeof workflow.status === 'string' && Array.isArray(workflow.recent_failures)) ? report.github_actions : null
+  };
+  const encoded = JSON.stringify(result);
+  if (Utilities.newBlob(encoded).getBytes().length < 95000) {
+    cache.put(key, encoded, LJLM_CONFIG.CACHE_SECONDS);
+  }
+  return result;
+}
+
 // Compact annual curves only; the full historical distribution is never fetched.
 function getDashboardClimatology(parameterKey) {
   if (typeof parameterKey !== 'string' || !/^[a-z][a-z0-9_]*$/.test(parameterKey)) {

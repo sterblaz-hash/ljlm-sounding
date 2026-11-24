@@ -1730,6 +1730,22 @@
     }
 
     .view-tabs { flex-wrap: wrap; }
+    .health-title { margin: 0; }
+    .health-content { padding: 16px; overflow-wrap: anywhere; }
+    .health-content section + section { margin-top: 24px; }
+    .health-content h3 { margin: 0 0 10px; font-size: 16px; }
+    .health-content h4 { margin: 0 0 8px; font-size: 14px; }
+    .health-content p { margin: 8px 0; }
+    .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 255px), 1fr)); gap: 10px; }
+    .health-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+    .health-card dl { margin: 8px 0 0; }
+    .health-card dd { margin: 0 0 6px; }
+    .health-content ul { padding-inline-start: 22px; }
+    .health-content li + li { margin-top: 6px; }
+    .health-badge { display: inline-block; border-radius: 12px; padding: 2px 8px; background: var(--bg); }
+    .health-good { background: var(--green-soft); color: #126747; }
+    .health-warn { background: var(--orange-soft); color: #81500c; }
+    .health-bad { background: var(--red-soft); color: #a1332d; }
     .extra-diagnostics { padding: 14px; }
     .extra-diagnostics summary { cursor: pointer; color: var(--blue); }
     .potek-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 16px; }
@@ -1813,6 +1829,7 @@
       <button id="viewClimatologyBtn" class="view-tab" type="button"
         onclick="showClimatologyView()">Climatology</button>
       <button id="viewTrajectoriesBtn" class="view-tab" type="button" onclick="showTrajectoriesView()">Trajectories</button>
+      <button id="viewSystemHealthBtn" class="view-tab" type="button" onclick="showSystemHealthView()">System Health</button>
     </div>
 
     <div id="app">
@@ -4023,6 +4040,7 @@
     function setMainView_(view) {
       disposeTrajectoryMap_();
       currentView = view;
+      document.getElementById('viewSystemHealthBtn').classList.toggle('active', view === 'systemHealth');
       document.getElementById('viewModelVerificationBtn').classList.toggle('active', view === 'modelVerification');
       document.getElementById('viewTrajectoriesBtn').classList.toggle('active', view === 'trajectories');
       document.getElementById('viewClimatologyBtn').classList.toggle('active', view === 'climatology');
@@ -5221,6 +5239,135 @@
     const modelVerificationErrors = Object.create(null);
     let modelVerificationWindow = '30d';
     const modelVerificationPeriods = [['7d', '7 d'], ['30d', '30 d'], ['90d', '90 d'], ['1y', '1 y']];
+
+    let systemHealthReport = null;
+    let systemHealthLoadedAt = 0;
+    let systemHealthPending = false;
+
+    function showSystemHealthView() {
+      setMainView_('systemHealth');
+      if (!systemHealthPending && (!systemHealthReport || Date.now() - systemHealthLoadedAt >= 45000)) {
+        systemHealthPending = true;
+        google.script.run.withSuccessHandler(receiveSystemHealth_)
+          .withFailureHandler(() => receiveSystemHealth_(null)).getDashboardSystemHealth();
+      }
+      renderSystemHealth_();
+    }
+
+    function receiveSystemHealth_(report) {
+      systemHealthPending = false;
+      systemHealthReport = report;
+      systemHealthLoadedAt = Date.now();
+      if (currentView === 'systemHealth') renderSystemHealth_();
+    }
+
+    function healthWords_(value) {
+      return typeof value === 'string' && value
+        ? value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ')
+        : 'Unknown';
+    }
+
+    function healthBadge_(status) {
+      const tone = status === 'ok' ? 'good' :
+        ['warning', 'stale', 'attention'].includes(status) ? 'warn' :
+        ['unavailable', 'invalid', 'error'].includes(status) ? 'bad' : '';
+      const label = status === 'stale' ? 'Delayed' : status === 'ok' ? 'OK' : healthWords_(status);
+      const icon = {good: '✓', warn: '!', bad: '×'}[tone] || '•';
+      return '<span class="health-badge health-' + tone + '"><span aria-hidden="true">' + icon +
+        '</span> ' + esc(label) + '</span>';
+    }
+
+    function healthTime_(value) {
+      const time = typeof value === 'string' && /(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? Date.parse(value) : NaN;
+      return Number.isFinite(time) ? utcLabel(new Date(time).toISOString().replace('.000Z', 'Z')) : 'Unavailable';
+    }
+
+    function healthIssue_(check) {
+      const detail = typeof check.detail === 'string' && check.detail;
+      return [detail || (check.issue_code ? healthWords_(check.issue_code) : ''),
+        check.reported_error].filter(value => typeof value === 'string' && value).map(esc).join(' · ');
+    }
+
+    function healthStream_(check) {
+      return '<article class="health-card"><h4>' + esc(check.name) + '</h4>' + healthBadge_(check.status) +
+        '<dl><dt>Latest valid time</dt><dd>' + healthTime_(check.actual_valid) + '</dd>' +
+        (check.expected_valid ? '<dt>Expected valid time</dt><dd>' + healthTime_(check.expected_valid) + '</dd>' : '') +
+        '</dl><p>' + healthIssue_(check) + '</p></article>';
+    }
+
+    function healthArchive_(archive) {
+      if (!archive) return '<p>Archive gap information is unavailable.</p>';
+      const kinds = {obs: 'OBS Ljubljana', icon_d2: 'ICON-D2 +12 h', claef_sounding: 'C-LAEF +12 h'};
+      const descriptions = {
+        archive_file_missing: 'Published archive file missing',
+        archive_file_unreadable: 'Published archive file unreadable',
+        invalid_archive_metadata: 'Invalid archive metadata',
+        obs_not_registered: 'Observation term missing from the archive index',
+        obs_status_unavailable: 'Observation archive index unavailable'
+      };
+      const gapCount = archive.gaps.length;
+      return '<p>' + healthTime_(archive.window_start) + ' to ' + healthTime_(archive.window_end) +
+        ' · ' + gapCount + (gapCount === 1 ? ' gap' : ' gaps') + '</p>' +
+        (archive.gaps.length ? '<ul>' + archive.gaps.map(gap =>
+          '<li>' + esc(typeof gap.kind === 'string' && Object.hasOwn(kinds, gap.kind) ?
+            kinds[gap.kind] : healthWords_(gap.kind)) + ' · ' + healthTime_(gap.valid_time) +
+          ' · ' + esc(typeof gap.detail === 'string' && gap.detail ||
+            (typeof gap.issue_code === 'string' && Object.hasOwn(descriptions, gap.issue_code) ?
+              descriptions[gap.issue_code] : healthWords_(gap.issue_code))) + '</li>'
+        ).join('') + '</ul>' : '<p>No archive gaps reported.</p>');
+    }
+
+    function healthRun_(run) {
+      if (!run) return 'No run reported';
+      const time = healthTime_(run.created_at);
+      const result = esc(healthWords_(run.conclusion || run.status));
+      const url = run.url;
+      const allowed = typeof url === 'string' &&
+        /^https:\/\/github\.com\/sterblaz-hash\/ljlm-sounding\/actions\/runs\/[0-9]+\/?$/.test(url);
+      return (allowed ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' +
+        time + '</a>' : time) + ' · ' + result;
+    }
+
+    function healthActions_(actions) {
+      if (!actions) return '<p>Workflow information is unavailable.</p>';
+      const summary = '<p>' + healthBadge_(actions.status) + '</p>';
+      if (!actions.workflows.length) return summary + '<p>No workflow results in this report.</p>';
+      return summary + '<p>Workflow results describe GitHub Actions executions. Data availability is shown above.</p>' +
+        '<div class="health-grid">' + actions.workflows.map(workflow =>
+          '<article class="health-card"><h4>' + esc(workflow.name) + '</h4>' + healthBadge_(workflow.status) +
+          '<dl><dt>Latest run</dt><dd>' + healthRun_(workflow.latest_run) +
+          '</dd><dt>Latest successful run</dt><dd>' + healthRun_(workflow.last_success) + '</dd></dl>' +
+          '<p><strong>Recent failed executions</strong></p>' +
+          (workflow.recent_failures.length ? '<ul>' + workflow.recent_failures.map(run =>
+            '<li>' + healthRun_(run) + '</li>').join('') + '</ul>' : '<p>None reported.</p>') +
+          (typeof workflow.detail === 'string' && workflow.detail ? '<p>' + esc(workflow.detail) + '</p>' : '') + '</article>'
+        ).join('') + '</div>';
+    }
+
+    function renderSystemHealth_() {
+      const report = systemHealthReport;
+      let content = '<p role="status">' + (systemHealthPending ? 'Loading system health …' :
+        'System health report unavailable. Reopen this tab to retry.') + '</p>';
+      if (report) {
+        const checks = report.checks;
+        const issues = checks.filter(check => check.status !== 'ok');
+        const delayed = issues.filter(check => check.status === 'stale').length;
+        const unavailable = issues.filter(check => ['unavailable', 'invalid', 'error'].includes(check.status)).length;
+        content = '<p>Overall status ' + healthBadge_(report.status) + '</p>' +
+          '<p>Latest health check (UTC) ' + healthTime_(report.checked_at) + '</p>' +
+          '<p>' + (checks.length - issues.length) + ' healthy · ' + delayed + ' delayed · ' +
+          unavailable + ' unavailable or in error · ' + (issues.length - delayed - unavailable) + ' warnings or other issues</p>' +
+          (systemHealthPending ? '<p role="status">Refreshing system health …</p>' : '') +
+          '<section><h3>Data Streams</h3><div class="health-grid">' + checks.map(healthStream_).join('') + '</div></section>' +
+          '<section><h3>Current Issues</h3>' + (issues.length ? '<ul>' + issues.map(check =>
+            '<li><strong>' + esc(check.name) + '</strong> ' + healthBadge_(check.status) +
+            ' ' + healthIssue_(check) + '</li>').join('') + '</ul>' : '<p>No current data stream issues.</p>') + '</section>' +
+          '<section><h3>Historical Archive Gaps</h3>' + healthArchive_(report.archive) + '</section>' +
+          '<section><h3>GitHub Actions</h3>' + healthActions_(report.github_actions) + '</section>';
+      }
+      document.getElementById('app').innerHTML = '<section class="panel"><div class="panel-head">' +
+        '<h2 class="panel-title health-title">System Health</h2></div><div class="health-content">' + content + '</div></section>';
+    }
 
     function showModelVerificationView() {
       setMainView_('modelVerification');
