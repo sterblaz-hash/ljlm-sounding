@@ -1,9 +1,5 @@
 {
   "packages": {
-    "Z__C_EDZW_20261121225801_bda01%2Ctemp_bufr_999999_999999__MW_340.bin": {
-      "contains_ljlm": false,
-      "scanned_at": "2026-11-22T00:27:08.431311Z"
-    },
     "Z__C_EDZW_20261121230804_bda01%2Ctemp_bufr_999999_999999__MW_341.bin": {
       "contains_ljlm": false,
       "scanned_at": "2026-11-22T00:27:07.704510Z"
@@ -2133,6 +2129,6 @@
       "scanned_at": "2026-11-24T22:47:48.371429Z"
     }
   },
-  "updated_at": "2026-11-24T22:47:52.318621Z",
+  "updated_at": "2026-11-24T23:07:06.834146Z",
   "version": 1
 }
