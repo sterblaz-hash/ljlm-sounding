@@ -16,7 +16,8 @@ for (const key of ['7d', '30d', '90d', '1y']) {
   assert.equal(result.variables.length, 37);
   const count = fetched.length;
   backend.getDashboardTimeseries(key);
-  assert.equal(fetched.length, count + 1); // manifest only; series from cache
+  const cacheable = Buffer.byteLength(JSON.stringify(result)) < 95000;
+  assert.equal(fetched.length, count + (cacheable ? 1 : 2));
 }
 for (const key of ['../data/latest.json', 'latest', '__proto__', null]) {
   const count = fetched.length;
@@ -268,9 +269,18 @@ element('app').innerHTML = 'Annual';
 overlayBrowser.renderComparison(withOverlay);
 assert.equal(element('app').innerHTML, 'Annual');
 // C-LAEF uses the same +12 h comparison contract but exposes a sparse profile.
-backend.fetchJsonOptional_ = path => path.startsWith('verification/') ? null : read(path);
-backend.fetchJson_ = path => read(path);
+// Use a matched archive pair so the success case is independent of live publication lag.
+const claefObservation = read('data/2026/11/20261123_00.json');
+const claefForecast = read('models/claef/2026112212/ljlm_f012.json');
+const claefLatestPath = 'models/claef/latest/' + claefObservation.term + '/';
+backend.fetchJsonOptional_ = path => {
+  assert.equal(path, claefLatestPath + 'sounding.json');
+  return claefForecast;
+};
+backend.fetchJson_ = path => path === 'data/latest.json' ? claefObservation : read(path);
 const claefComparison = backend.getClaefSoundingComparison();
+backend.fetchJson_ = path => read(path);
+backend.fetchJsonOptional_ = path => path.startsWith('verification/') ? null : read(path);
 assert.equal(claefComparison.available, true);
 assert.equal(claefComparison.model.model, 'C-LAEF');
 assert.equal(claefComparison.modelLabel, 'C-LAEF');
@@ -284,13 +294,13 @@ assert.ok(Number.isFinite(claefComparison.rmse.temperatureC));
 assert.ok(Number.isFinite(claefComparison.rmse.dewpointC));
 assert.ok(Number.isFinite(claefComparison.rmse.windSpeedMs));
 assert.match(claefComparison.images.model.full,
-  new RegExp('models/claef/latest/' + observed.term + '/skewt\\.png'));
+  new RegExp(claefLatestPath + 'skewt\\.png'));
 assert.match(claefComparison.images.model.zoom,
-  new RegExp('models/claef/latest/' + observed.term + '/lowlevel\\.png'));
+  new RegExp(claefLatestPath + 'lowlevel\\.png'));
 assert.match(claefComparison.images.model.thetae,
-  new RegExp('models/claef/latest/' + observed.term + '/thetae\\.png'));
+  new RegExp(claefLatestPath + 'thetae\\.png'));
 assert.match(claefComparison.images.model.hodograph,
-  new RegExp('models/claef/latest/' + observed.term + '/hodograph\\.png'));
+  new RegExp(claefLatestPath + 'hodograph\\.png'));
 console.log('C-LAEF sparse +12 h comparison backend checks passed.');
 overlayBrowser.setMainView_('claefComparison');
 overlayBrowser.renderComparison(claefComparison);
@@ -1010,3 +1020,149 @@ element('app').innerHTML='Other view';
 leavingRequest.success(verificationResponse('7d'));
 assert.equal(element('app').innerHTML,'Other view');
 console.log('Model verification lazy loading, stale protection, aggregate charts, gaps, N and empty/unavailable checks passed.');
+
+// Operational health is fetched lazily from the public report through Apps Script.
+const healthBackend = vm.createContext({CacheService: backend.CacheService, Utilities: backend.Utilities});
+vm.runInContext(fs.readFileSync('apps-script/Code.gs', 'utf8'), healthBackend);
+const healthStreams = [
+  ['obs_00', 'OBS Ljubljana · 00 UTC', 'ok'],
+  ['obs_12', 'OBS Ljubljana · 12 UTC', 'warning'],
+  ['icon_d2_00', 'ICON-D2 +12 h · 00 UTC', 'stale'],
+  ['icon_d2_12', 'ICON-D2 +12 h · 12 UTC', 'unavailable'],
+  ['claef_sounding_00', 'C-LAEF +12 h · 00 UTC', 'invalid'],
+  ['claef_sounding_12', 'C-LAEF +12 h · 12 UTC', 'ok'],
+  ['claef_point', 'C-LAEF point forecast', 'error']
+];
+const healthValid = '2026-11-24T00:00:00Z';
+const healthRunUrl = 'https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/';
+const healthFixture = {
+  schema_version: 2,
+  status: 'attention',
+  checked_at: '2026-11-24T13:04:03+01:00',
+  checks: healthStreams.map(([id, name, status]) => ({
+    id, name, status,
+    actual_valid: status === 'unavailable' ? null : healthValid,
+    expected_valid: id === 'claef_point' ? null : healthValid,
+    detail: status === 'stale' ? '<img src=x onerror=alert(1)>' : 'Publisher supplied detail',
+    reported_error: status === 'error' ? 'GeoSphere HTTP 503' : null
+  })).reverse(),
+  archive: {
+    status: 'warning',
+    window_start: '2026-11-17T12:00:00Z',
+    window_end: '2026-11-24T12:00:00Z',
+    gaps: [
+      {kind: 'claef_sounding', valid_time: '2026-11-19T12:00:00Z', issue_code: 'archive_file_missing'},
+      {kind: 'icon_d2', valid_time: '2026-11-20T12:00:00Z', issue_code: 'invalid_archive_metadata'}
+    ]
+  },
+  github_actions: {
+    status: 'error',
+    workflows: [{
+      name: 'C-LAEF workflow <test>',
+      status: 'error',
+      latest_run: {created_at: healthValid, status: 'completed', conclusion: 'failure', url: healthRunUrl + '123'},
+      last_success: {created_at: '2026-11-23T12:00:00Z', conclusion: 'success', url: healthRunUrl + '122'},
+      recent_failures: [
+        {created_at: healthValid, conclusion: 'failure', url: healthRunUrl + '123'},
+        {created_at: healthValid, conclusion: 'timed_out', url: 'javascript:alert(1)'}
+      ]
+    }, {
+      name: 'OBS workflow',
+      status: 'running',
+      latest_run: {created_at: healthValid, status: 'in_progress', conclusion: null},
+      last_success: null,
+      recent_failures: []
+    }]
+  }
+};
+const healthFetches = [];
+let healthHttpCode = 200;
+let healthResponse = JSON.stringify(healthFixture);
+healthBackend.UrlFetchApp = {fetch(url) {
+  healthFetches.push(url);
+  return {getResponseCode: () => healthHttpCode, getContentText: () => healthResponse};
+}};
+const healthPayload = healthBackend.getDashboardSystemHealth();
+assert.deepEqual(Array.from(healthPayload.checks, check => check.id), healthStreams.map(stream => stream[0]));
+assert.equal(healthPayload.archive.gaps.length, 2);
+assert.equal(healthPayload.github_actions.workflows[0].latest_run.conclusion, 'failure');
+assert.equal(healthBackend.getDashboardSystemHealth().checked_at, healthFixture.checked_at);
+assert.equal(healthFetches.length, 1);
+assert.match(healthFetches[0], /^https:\/\/raw\.githubusercontent\.com\/sterblaz-hash\/ljlm-sounding\/main\/data\/system_health\.json\?ts=\d+$/);
+cached.delete('ljlm-system-health:v2');
+healthHttpCode = 404;
+assert.equal(healthBackend.getDashboardSystemHealth(), null);
+healthHttpCode = 200;
+for (const invalid of ['{', 'null', '{}', JSON.stringify({...healthFixture, checks: []}),
+  JSON.stringify({...healthFixture, checked_at: 'invalid'})]) {
+  healthResponse = invalid;
+  assert.equal(healthBackend.getDashboardSystemHealth(), null);
+}
+assert.equal(cached.has('ljlm-system-health:v2'), false);
+healthResponse = JSON.stringify({...healthFixture, archive: {gaps: [null]}, github_actions: {workflows: [null]}});
+const partialHealth = healthBackend.getDashboardSystemHealth();
+assert.equal(partialHealth.archive, null);
+assert.equal(partialHealth.github_actions, null);
+
+runner.getDashboardSystemHealth = function() { calls.push({type: 'health', success, failure}); };
+const healthBrowser = vm.createContext({document: {getElementById: element, querySelectorAll: () => []},
+  google: {script: {run: runner}}});
+const beforeHealthInit = calls.length;
+vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], healthBrowser);
+assert.deepEqual(calls.slice(beforeHealthInit).map(call => call.type), ['sounding']);
+assert.match(html, /onclick="showSystemHealthView\(\)">System Health/);
+healthBrowser.showSystemHealthView();
+healthBrowser.showSystemHealthView();
+assert.equal(calls.length, beforeHealthInit + 2);
+assert.match(element('app').innerHTML, /Loading system health/);
+calls.at(-1).failure();
+assert.match(element('app').innerHTML, /report unavailable.*retry/);
+healthBrowser.showSystemHealthView();
+calls.at(-1).success(null);
+assert.match(element('app').innerHTML, /report unavailable/);
+healthBrowser.showSystemHealthView();
+healthBrowser.showSoundingView();
+const soundingBeforeHealth = element('app').innerHTML;
+calls.findLast(call => call.type === 'health').success(healthPayload);
+assert.equal(element('app').innerHTML, soundingBeforeHealth);
+const requestsBeforeReopen = calls.length;
+healthBrowser.showSystemHealthView();
+assert.equal(calls.length, requestsBeforeReopen);
+const healthMarkup = element('app').innerHTML;
+assert.equal((healthMarkup.match(/Expected valid time/g) || []).length, 6);
+assert.match(healthMarkup, /2026-11-24 12:04:03 UTC/);
+assert.match(healthMarkup, /2 healthy · 1 delayed · 3 unavailable or in error · 1 warnings or other issues/);
+const dataStreamsMarkup = healthMarkup.split('Data Streams')[1].split('Current Issues')[0];
+for (const [, name] of healthStreams) assert.ok(dataStreamsMarkup.includes(name), name);
+const currentIssuesMarkup = healthMarkup.split('Current Issues')[1].split('Historical Archive Gaps')[0];
+for (const label of ['Delayed', 'Warning', 'Unavailable', 'Invalid', 'Error', 'GeoSphere HTTP 503']) {
+  assert.ok(currentIssuesMarkup.includes(label), label);
+}
+assert.doesNotMatch(currentIssuesMarkup, /Published archive file missing|2026-11-19/);
+assert.match(currentIssuesMarkup, /&lt;img src=x onerror=alert\(1\)&gt;/);
+assert.doesNotMatch(healthMarkup, /<img|href="javascript:/);
+assert.match(healthMarkup, /Historical Archive Gaps[\s\S]*2026-11-19 12:00:00 UTC · Published archive file missing/);
+assert.match(healthMarkup, /Invalid archive metadata/);
+assert.match(healthMarkup, /href="https:\/\/github\.com\/sterblaz-hash\/ljlm-sounding\/actions\/runs\/123"[^>]*>[^<]*UTC<\/a> · Failure/);
+assert.match(healthMarkup, /Latest successful run[\s\S]*\/actions\/runs\/122[^>]*>[^<]*UTC<\/a> · Success/);
+assert.match(healthMarkup, /Recent failed executions[\s\S]*Timed out/);
+assert.match(healthMarkup, /C-LAEF workflow &lt;test&gt;/);
+assert.match(healthMarkup, /Running[\s\S]*In progress/);
+
+vm.runInContext('systemHealthLoadedAt -= 45000', healthBrowser);
+healthBrowser.showSystemHealthView();
+assert.equal(calls.length, requestsBeforeReopen + 1);
+calls.at(-1).success({
+  ...healthPayload, status: 'ok', checks: healthPayload.checks.map(check => ({...check, status: 'ok'})),
+  github_actions: {status: 'not_checked', workflows: []}
+});
+assert.match(element('app').innerHTML, /Overall status <span class="health-badge health-good"/);
+assert.match(element('app').innerHTML, /No current data stream issues/);
+assert.match(element('app').innerHTML, /Historical Archive Gaps[\s\S]*2 gaps/);
+assert.match(element('app').innerHTML, /Not checked[\s\S]*No workflow results in this report/);
+healthBrowser.receiveSystemHealth_({...healthPayload, status: 'warning'});
+assert.match(element('app').innerHTML, /Overall status <span class="health-badge health-warn"[^>]*>.*Warning/);
+healthBrowser.receiveSystemHealth_(partialHealth);
+assert.match(element('app').innerHTML, /Archive gap information is unavailable/);
+assert.match(element('app').innerHTML, /Workflow information is unavailable/);
+console.log('System Health schema, caching, navigation, operational and archive status, and workflow checks passed.');
