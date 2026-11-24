@@ -1,0 +1,79 @@
+name: Publish LJLM system health
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Eight snapshots per day. GitHub may start scheduled jobs late.
+    - cron: "17 */3 * * *"
+
+# Health reads Actions history and publishes only its own JSON output.
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: ljlm-system-health-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run offline health tests
+        run: python -m unittest test_system_health -q
+
+      - name: Refresh health report and publish only its JSON
+        shell: bash
+        env:
+          PUBLISH_BRANCH: ${{ github.ref_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # The workspace is a disposable GitHub Actions checkout. On a
+          # concurrent data publication, restart from the new remote tip and
+          # regenerate health rather than rebasing an out-of-date report.
+          for attempt in 1 2 3; do
+            git fetch --no-tags origin "$PUBLISH_BRANCH"
+            git reset --hard "origin/$PUBLISH_BRANCH"
+
+            python build_system_health.py --github-actions --days 7
+            python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('data/system_health.json').read_text(encoding='utf-8'))
+          assert report['schema_version'] == 2
+          assert len(report['checks']) == 7
+          assert report['archive']['days'] == 7
+          assert report['status'] in {'ok', 'warning', 'attention'}
+          assert report['github_actions']['status'] in {'ok', 'warning', 'error', 'running', 'unavailable', 'unknown'}
+          PY
+
+            git add -- data/system_health.json
+            if git diff --cached --quiet; then
+              echo "Health report unchanged; nothing to publish."
+              exit 0
+            fi
+            git diff --cached --check
+            git commit -m "Update LJLM system health"
+            if git push origin "HEAD:$PUBLISH_BRANCH"; then
+              echo "Published updated health report to $PUBLISH_BRANCH."
+              exit 0
+            fi
+            echo "Remote branch moved; regenerating health from its latest commit ($attempt/3)."
+          done
+
+          echo "Unable to publish health after three attempts; no force push used." >&2
+          exit 1
