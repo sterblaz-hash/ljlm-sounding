@@ -30,7 +30,7 @@ jobs:
       # The point builder and its parsing helper use only the standard library.
       # Do not install the repository's meteorological/rendering dependencies.
       - name: Run offline point-cache tests
-        run: python test_claef_point_forecast.py
+        run: python -m unittest test_claef_point_forecast test_claef_transient_alerts -q
 
       - name: Refresh central point cache
         run: python claef_point_forecast.py
