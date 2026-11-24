@@ -1,1 +1,1 @@
-{"status":"warning","model_reference_time":"2026-11-24T12:00:00Z","retrieved_at":"2026-11-24T19:31:57.680060Z","forecast_hour_count":61,"attempted_at":"2026-11-24T23:34:12.034527Z","message":"GeoSphere HTTP 500 after 3 attempt(s).","previous_forecast_preserved":true}
+{"status":"ok","model_reference_time":"2026-11-24T18:00:00Z","retrieved_at":"2026-11-24T23:46:42.906105Z","forecast_hour_count":61}
