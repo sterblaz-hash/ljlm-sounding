@@ -2,20 +2,20 @@
   "schema_version": 2,
   "station": 14015,
   "station_name": "Ljubljana",
-  "checked_at": "2026-11-24T22:30:28Z",
-  "status": "attention",
+  "checked_at": "2026-11-25T08:43:25Z",
+  "status": "warning",
   "checks": [
     {
       "id": "obs_00",
       "name": "OBS Ljubljana · 00 UTC",
       "kind": "obs",
       "slot": "00",
-      "expected_valid": "2026-11-24T00:00:00Z",
-      "upcoming_valid": "2026-11-25T00:00:00Z",
-      "upcoming_due_at": "2026-11-25T04:00:00Z",
+      "expected_valid": "2026-11-25T00:00:00Z",
+      "upcoming_valid": "2026-11-26T00:00:00Z",
+      "upcoming_due_at": "2026-11-26T04:00:00Z",
       "source": "data/status.json",
       "status": "ok",
-      "actual_valid": "2026-11-24T00:00:00Z",
+      "actual_valid": "2026-11-25T00:00:00Z",
       "detail": "OBS term registered as ok",
       "issue_code": null,
       "cause": null,
@@ -42,16 +42,16 @@
       "name": "ICON-D2 +12 h · 00 UTC",
       "kind": "icon_d2",
       "slot": "00",
-      "expected_valid": "2026-11-24T00:00:00Z",
-      "upcoming_valid": "2026-11-25T00:00:00Z",
-      "upcoming_due_at": "2026-11-25T04:00:00Z",
+      "expected_valid": "2026-11-25T00:00:00Z",
+      "upcoming_valid": "2026-11-26T00:00:00Z",
+      "upcoming_due_at": "2026-11-26T04:00:00Z",
       "source": "models/icon-d2/latest/00/sounding.json",
       "status": "ok",
-      "actual_valid": "2026-11-24T00:00:00Z",
+      "actual_valid": "2026-11-25T00:00:00Z",
       "detail": "Published +12 h forecast covers the expected term",
       "issue_code": null,
       "cause": null,
-      "github_actions_status": "error"
+      "github_actions_status": "warning"
     },
     {
       "id": "icon_d2_12",
@@ -63,20 +63,20 @@
       "upcoming_due_at": "2026-11-25T16:00:00Z",
       "source": "models/icon-d2/latest/12/sounding.json",
       "status": "ok",
-      "actual_valid": "2026-11-24T12:00:00Z",
+      "actual_valid": "2026-11-25T12:00:00Z",
       "detail": "Published +12 h forecast covers the expected term",
       "issue_code": null,
       "cause": null,
-      "github_actions_status": "error"
+      "github_actions_status": "warning"
     },
     {
       "id": "claef_sounding_00",
       "name": "C-LAEF +12 h · 00 UTC",
       "kind": "claef_sounding",
       "slot": "00",
-      "expected_valid": "2026-11-24T00:00:00Z",
-      "upcoming_valid": "2026-11-25T00:00:00Z",
-      "upcoming_due_at": "2026-11-25T07:00:00Z",
+      "expected_valid": "2026-11-25T00:00:00Z",
+      "upcoming_valid": "2026-11-26T00:00:00Z",
+      "upcoming_due_at": "2026-11-26T07:00:00Z",
       "source": "models/claef/latest/00/sounding.json",
       "status": "ok",
       "actual_valid": "2026-11-25T00:00:00Z",
@@ -95,7 +95,7 @@
       "upcoming_due_at": "2026-11-25T19:00:00Z",
       "source": "models/claef/latest/12/sounding.json",
       "status": "ok",
-      "actual_valid": "2026-11-24T12:00:00Z",
+      "actual_valid": "2026-11-25T12:00:00Z",
       "detail": "Published +12 h forecast covers the expected term",
       "issue_code": null,
       "cause": null,
@@ -109,8 +109,8 @@
       "expected_valid": null,
       "source": "models/claef/latest/status.json",
       "status": "ok",
-      "actual_valid": "2026-11-24T12:00:00Z",
-      "age_hours": 10.51,
+      "actual_valid": "2026-11-25T00:00:00Z",
+      "age_hours": 8.72,
       "detail": "Recently retrieved point forecast",
       "reported_error": null,
       "issue_code": null,
@@ -127,8 +127,8 @@
     "error": 0
   },
   "archive": {
-    "window_start": "2026-11-17T22:30:28Z",
-    "window_end": "2026-11-24T22:30:28Z",
+    "window_start": "2026-11-18T08:43:25Z",
+    "window_end": "2026-11-25T08:43:25Z",
     "days": 7,
     "status": "warning",
     "streams": [
@@ -190,27 +190,27 @@
     "note": "Gaps refer to local published archive files; origin/source causality is not inferred."
   },
   "github_actions": {
-    "status": "error",
+    "status": "warning",
     "workflows": [
       {
         "id": "obs",
         "name": "OBS Ljubljana",
         "workflow": "update-sounding.yml",
         "latest_run": {
-          "id": 45393427346,
-          "created_at": "2026-11-24T12:25:52Z",
+          "id": 45518015520,
+          "created_at": "2026-11-25T00:25:49Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45393427346",
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45518015520",
           "event": "workflow_dispatch"
         },
         "recent_failures": [],
         "last_success": {
-          "id": 45393427346,
-          "created_at": "2026-11-24T12:25:52Z",
+          "id": 45518015520,
+          "created_at": "2026-11-25T00:25:49Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45393427346",
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45518015520",
           "event": "workflow_dispatch"
         },
         "status": "ok",
@@ -221,11 +221,11 @@
         "name": "ICON-D2 +12 h",
         "workflow": "update-icon-d2-forecast.yml",
         "latest_run": {
-          "id": 45398279070,
-          "created_at": "2026-11-24T12:55:50Z",
-          "conclusion": "failure",
+          "id": 45522506423,
+          "created_at": "2026-11-25T01:00:49Z",
+          "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45398279070",
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45522506423",
           "event": "workflow_dispatch"
         },
         "recent_failures": [
@@ -239,14 +239,14 @@
           }
         ],
         "last_success": {
-          "id": 45380937703,
-          "created_at": "2026-11-24T11:05:32Z",
+          "id": 45522506423,
+          "created_at": "2026-11-25T01:00:49Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45380937703",
-          "event": "schedule"
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45522506423",
+          "event": "workflow_dispatch"
         },
-        "status": "error",
+        "status": "warning",
         "detail": "Run result only; individual job logs not inspected"
       },
       {
@@ -254,11 +254,11 @@
         "name": "C-LAEF +12 h",
         "workflow": "update-claef-sounding.yml",
         "latest_run": {
-          "id": 45435099838,
-          "created_at": "2026-11-24T16:16:00Z",
+          "id": 45543849631,
+          "created_at": "2026-11-25T04:00:50Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45435099838",
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45543849631",
           "event": "workflow_dispatch"
         },
         "recent_failures": [
@@ -285,22 +285,14 @@
             "status": "completed",
             "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45313098177",
             "event": "schedule"
-          },
-          {
-            "id": 45211646000,
-            "created_at": "2026-11-23T16:00:53Z",
-            "conclusion": "failure",
-            "status": "completed",
-            "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45211646000",
-            "event": "workflow_dispatch"
           }
         ],
         "last_success": {
-          "id": 45435099838,
-          "created_at": "2026-11-24T16:16:00Z",
+          "id": 45543849631,
+          "created_at": "2026-11-25T04:00:50Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45435099838",
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45543849631",
           "event": "workflow_dispatch"
         },
         "status": "warning",
@@ -311,20 +303,20 @@
         "name": "C-LAEF point",
         "workflow": "update-claef-point.yml",
         "latest_run": {
-          "id": 45471024533,
-          "created_at": "2026-11-24T19:31:00Z",
+          "id": 45557527429,
+          "created_at": "2026-11-25T06:01:03Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45471024533",
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45557527429",
           "event": "workflow_dispatch"
         },
         "recent_failures": [],
         "last_success": {
-          "id": 45471024533,
-          "created_at": "2026-11-24T19:31:00Z",
+          "id": 45557527429,
+          "created_at": "2026-11-25T06:01:03Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45471024533",
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45557527429",
           "event": "workflow_dispatch"
         },
         "status": "ok",
