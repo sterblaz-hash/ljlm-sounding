@@ -1,9 +1,9 @@
 {
   "current_expected": {
-    "key": "2026-11-25_12",
-    "nominal_date": "2026-11-25",
+    "key": "2026-11-26_00",
+    "nominal_date": "2026-11-26",
     "status": "ok",
-    "term": "12"
+    "term": "00"
   },
   "special_soundings": {},
   "station": 14015,
@@ -361,12 +361,12 @@
     },
     "2026-11-24_12": {
       "archive_file": "data/2026/11/20261124_12.json",
-      "checked_at": "2026-11-26T00:26:37.229642Z",
+      "checked_at": "2026-11-26T02:01:40.515685Z",
       "first_seen_at": "2026-11-24T12:33:04.279034Z",
       "launch_time": "2026-11-24T11:30:00Z",
       "missing_after": "2026-11-24T13:50:00Z",
       "nominal_date": "2026-11-24",
-      "processed_at": "2026-11-25T12:30:09.698155Z",
+      "processed_at": "2026-11-26T02:04:10.693689Z",
       "profile_level_count": 1596,
       "retrieved_at": "2026-11-24T12:39:03.759090Z",
       "status": "ok",
@@ -375,12 +375,12 @@
     },
     "2026-11-25_00": {
       "archive_file": "data/2026/11/20261125_00.json",
-      "checked_at": "2026-11-26T00:26:37.229642Z",
+      "checked_at": "2026-11-26T02:01:40.515685Z",
       "first_seen_at": "2026-11-25T00:31:05.278110Z",
       "launch_time": "2026-11-24T23:30:00Z",
       "missing_after": "2026-11-25T01:50:00Z",
       "nominal_date": "2026-11-25",
-      "processed_at": "2026-11-25T12:30:13.534365Z",
+      "processed_at": "2026-11-26T02:04:13.950626Z",
       "profile_level_count": 2032,
       "retrieved_at": "2026-11-25T00:35:08.718017Z",
       "status": "ok",
@@ -389,19 +389,33 @@
     },
     "2026-11-25_12": {
       "archive_file": "data/2026/11/20261125_12.json",
-      "checked_at": "2026-11-26T00:26:37.229642Z",
+      "checked_at": "2026-11-26T02:01:40.515685Z",
       "first_seen_at": "2026-11-25T12:26:33.958223Z",
       "launch_time": "2026-11-25T11:30:00Z",
       "missing_after": "2026-11-25T13:50:00Z",
       "nominal_date": "2026-11-25",
-      "processed_at": "2026-11-26T00:31:16.874387Z",
+      "processed_at": "2026-11-26T02:04:17.476120Z",
       "profile_level_count": 1957,
       "retrieved_at": "2026-11-25T12:29:57.655230Z",
       "status": "ok",
       "term": "12",
       "waiting_from": "2026-11-25T12:50:00Z"
+    },
+    "2026-11-26_00": {
+      "archive_file": "data/2026/11/20261126_00.json",
+      "checked_at": "2026-11-26T02:01:40.515685Z",
+      "first_seen_at": "2026-11-26T02:01:40.515685Z",
+      "launch_time": "2026-11-25T23:30:00Z",
+      "missing_after": "2026-11-26T01:50:00Z",
+      "nominal_date": "2026-11-26",
+      "processed_at": "2026-11-26T02:04:24.387813Z",
+      "profile_level_count": 2144,
+      "retrieved_at": "2026-11-26T02:04:07.191406Z",
+      "status": "ok",
+      "term": "00",
+      "waiting_from": "2026-11-26T00:50:00Z"
     }
   },
-  "updated_at": "2026-11-26T00:26:37.229642Z",
+  "updated_at": "2026-11-26T02:01:40.515685Z",
   "version": 1
 }
