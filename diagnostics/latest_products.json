@@ -2,12 +2,12 @@
   "version": 2,
   "station": 14015,
   "station_name": "Ljubljana",
-  "sounding_id": "20261127_00",
+  "sounding_id": "20261127_12",
   "nominal_date": "2026-11-27",
-  "term": "00",
-  "launch_time": "2026-11-26T23:30:00Z",
-  "processed_at": "2026-11-27T00:28:46.006564Z",
-  "rendered_at": "2026-11-27T09:46:10.727109Z",
+  "term": "12",
+  "launch_time": "2026-11-27T11:30:00Z",
+  "processed_at": "2026-11-27T12:30:11.935871Z",
+  "rendered_at": "2026-11-27T12:30:18.010914Z",
   "latest": {
     "skewt": "diagnostics/latest_skewt.png",
     "lowlevel": "diagnostics/latest_lowlevel.png",
@@ -16,11 +16,11 @@
     "hodograph": "diagnostics/latest_hodograph.png"
   },
   "archive": {
-    "skewt": "diagnostics/2026/11/20261127_00_skewt.png",
-    "lowlevel": "diagnostics/2026/11/20261127_00_lowlevel.png",
-    "skewt_zoom": "diagnostics/2026/11/20261127_00_skewt_zoom.png",
-    "thetae": "diagnostics/2026/11/20261127_00_thetae.png",
-    "hodograph": "diagnostics/2026/11/20261127_00_hodograph.png"
+    "skewt": "diagnostics/2026/11/20261127_12_skewt.png",
+    "lowlevel": "diagnostics/2026/11/20261127_12_lowlevel.png",
+    "skewt_zoom": "diagnostics/2026/11/20261127_12_skewt_zoom.png",
+    "thetae": "diagnostics/2026/11/20261127_12_thetae.png",
+    "hodograph": "diagnostics/2026/11/20261127_12_hodograph.png"
   },
   "skewt": "diagnostics/latest_skewt.png",
   "skewt_zoom": "diagnostics/latest_skewt_zoom.png",
