@@ -2,7 +2,7 @@
   "schema_version": 2,
   "station": 14015,
   "station_name": "Ljubljana",
-  "checked_at": "2026-11-26T16:58:53Z",
+  "checked_at": "2026-11-27T01:46:14Z",
   "status": "warning",
   "checks": [
     {
@@ -63,7 +63,7 @@
       "upcoming_due_at": "2026-11-27T16:00:00Z",
       "source": "models/icon-d2/latest/12/sounding.json",
       "status": "ok",
-      "actual_valid": "2026-11-26T12:00:00Z",
+      "actual_valid": "2026-11-27T12:00:00Z",
       "detail": "Published +12 h forecast covers the expected term",
       "issue_code": null,
       "cause": null,
@@ -90,9 +90,9 @@
       "name": "C-LAEF +12 h · 12 UTC",
       "kind": "claef_sounding",
       "slot": "12",
-      "expected_valid": "2026-11-25T12:00:00Z",
-      "upcoming_valid": "2026-11-26T12:00:00Z",
-      "upcoming_due_at": "2026-11-26T19:00:00Z",
+      "expected_valid": "2026-11-26T12:00:00Z",
+      "upcoming_valid": "2026-11-27T12:00:00Z",
+      "upcoming_due_at": "2026-11-27T19:00:00Z",
       "source": "models/claef/latest/12/sounding.json",
       "status": "ok",
       "actual_valid": "2026-11-26T12:00:00Z",
@@ -109,8 +109,8 @@
       "expected_valid": null,
       "source": "models/claef/latest/status.json",
       "status": "ok",
-      "actual_valid": "2026-11-26T09:00:00Z",
-      "age_hours": 7.98,
+      "actual_valid": "2026-11-26T18:00:00Z",
+      "age_hours": 7.77,
       "detail": "Recently retrieved point forecast",
       "reported_error": null,
       "issue_code": null,
@@ -127,23 +127,23 @@
     "error": 0
   },
   "archive": {
-    "window_start": "2026-11-19T16:58:53Z",
-    "window_end": "2026-11-26T16:58:53Z",
+    "window_start": "2026-11-20T01:46:14Z",
+    "window_end": "2026-11-27T01:46:14Z",
     "days": 7,
     "status": "warning",
     "streams": [
       {
         "kind": "obs",
-        "expected": 14,
-        "available": 14,
+        "expected": 13,
+        "available": 13,
         "missing": 0,
         "invalid": 0,
         "status": "ok"
       },
       {
         "kind": "icon_d2",
-        "expected": 14,
-        "available": 14,
+        "expected": 13,
+        "available": 13,
         "missing": 0,
         "invalid": 0,
         "status": "ok"
@@ -179,11 +179,11 @@
         "name": "OBS Ljubljana",
         "workflow": "update-sounding.yml",
         "latest_run": {
-          "id": 45834755659,
-          "created_at": "2026-11-26T14:00:58Z",
+          "id": 45916665218,
+          "created_at": "2026-11-27T00:25:50Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45834755659",
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45916665218",
           "event": "workflow_dispatch"
         },
         "recent_failures": [
@@ -197,11 +197,11 @@
           }
         ],
         "last_success": {
-          "id": 45834755659,
-          "created_at": "2026-11-26T14:00:58Z",
+          "id": 45916665218,
+          "created_at": "2026-11-27T00:25:50Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45834755659",
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45916665218",
           "event": "workflow_dispatch"
         },
         "status": "warning",
@@ -212,20 +212,20 @@
         "name": "ICON-D2 +12 h",
         "workflow": "update-icon-d2-forecast.yml",
         "latest_run": {
-          "id": 45824244170,
-          "created_at": "2026-11-26T12:55:50Z",
+          "id": 45919614527,
+          "created_at": "2026-11-27T00:55:50Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45824244170",
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45919614527",
           "event": "workflow_dispatch"
         },
         "recent_failures": [],
         "last_success": {
-          "id": 45824244170,
-          "created_at": "2026-11-26T12:55:50Z",
+          "id": 45919614527,
+          "created_at": "2026-11-27T00:55:50Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45824244170",
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45919614527",
           "event": "workflow_dispatch"
         },
         "status": "ok",
@@ -236,12 +236,12 @@
         "name": "C-LAEF +12 h",
         "workflow": "update-claef-sounding.yml",
         "latest_run": {
-          "id": 45854697754,
-          "created_at": "2026-11-26T16:00:52Z",
+          "id": 45920725467,
+          "created_at": "2026-11-27T01:07:18Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45854697754",
-          "event": "workflow_dispatch"
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45920725467",
+          "event": "schedule"
         },
         "recent_failures": [
           {
@@ -254,12 +254,12 @@
           }
         ],
         "last_success": {
-          "id": 45854697754,
-          "created_at": "2026-11-26T16:00:52Z",
+          "id": 45920725467,
+          "created_at": "2026-11-27T01:07:18Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45854697754",
-          "event": "workflow_dispatch"
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45920725467",
+          "event": "schedule"
         },
         "status": "warning",
         "detail": "Run result only; individual job logs not inspected"
@@ -269,20 +269,20 @@
         "name": "C-LAEF point",
         "workflow": "update-claef-point.yml",
         "latest_run": {
-          "id": 45852326593,
-          "created_at": "2026-11-26T15:46:00Z",
+          "id": 45920099383,
+          "created_at": "2026-11-27T01:01:00Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45852326593",
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45920099383",
           "event": "workflow_dispatch"
         },
         "recent_failures": [],
         "last_success": {
-          "id": 45852326593,
-          "created_at": "2026-11-26T15:46:00Z",
+          "id": 45920099383,
+          "created_at": "2026-11-27T01:01:00Z",
           "conclusion": "success",
           "status": "completed",
-          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45852326593",
+          "url": "https://github.com/sterblaz-hash/ljlm-sounding/actions/runs/45920099383",
           "event": "workflow_dispatch"
         },
         "status": "ok",
